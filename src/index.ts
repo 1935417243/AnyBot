@@ -101,6 +101,10 @@ class LRUMap<K, V> {
   has(key: K): boolean {
     return this.map.has(key);
   }
+
+  delete(key: K): void {
+    this.map.delete(key);
+  }
 }
 
 class CappedSet<T> {
@@ -258,6 +262,16 @@ async function processTextMessage(message: {
       chatId: message.chat_id,
     });
     await sendText(larkClient, message.chat_id, "请直接发送文字问题。");
+    return;
+  }
+
+  if (userText === "/new") {
+    historyByChat.delete(message.chat_id);
+    logger.info("message.text.new_window", {
+      messageId: message.message_id,
+      chatId: message.chat_id,
+    });
+    await sendText(larkClient, message.chat_id, "新窗口已开启");
     return;
   }
 

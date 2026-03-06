@@ -23,7 +23,6 @@ const RUNTIME_PROMPT_FILE_ORDER = [
 const TEMPLATE_FILE_ORDER = [
   ...RUNTIME_PROMPT_FILE_ORDER,
   "BOOTSTRAP.md",
-  "HEARTBEAT.md",
 ] as const;
 
 const DEFAULT_PROMPT_DIR = fileURLToPath(

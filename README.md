@@ -68,11 +68,12 @@ npm run bot:stop --prefix /Users/erhu/code/python/CodexDesktopControl
 - 会话历史只保存在内存里，进程重启后会丢失
 - 机器人会先给你的消息加一个“已收到”的 reaction，再生成完整回复
 - 当前支持文本消息和图片消息；其它类型仍会返回兜底提示
+- 文本消息输入 `/new` 会清空当前会话历史，并回复“新窗口已开启”
 - 图片消息会先下载到本机临时目录，再通过 `codex exec -i` 作为输入图片交给模型
 - 如果 Codex 的最终回复里包含本机图片绝对路径，或 `![alt](/absolute/path.png)` 这种 Markdown 图片，机器人会自动上传并发送该图片
 - 长连接模式不需要公网回调地址
 - 这台机器本地需要先能正常使用 `codex`
-- 首次启动时会把默认的 `AGENTS.md`、`PROFILE.md`、`MEMORY.md`、`SOUL.md`、`BOOTSTRAP.md`、`HEARTBEAT.md` 初始化到 `CODEX_WORKDIR`
+- 首次启动时会把默认的 `AGENTS.md`、`PROFILE.md`、`MEMORY.md`、`SOUL.md`、`BOOTSTRAP.md` 初始化到 `CODEX_WORKDIR`
 - 运行时会优先读取 `CODEX_WORKDIR` 里的 `AGENTS.md`、`PROFILE.md`、`SOUL.md` 来构建基础 system prompt
 - `MEMORY.md` 只在最近对话明显涉及项目、代码、文件、命令、报错、提示词等任务上下文时按需注入，避免寒暄类消息也携带整份项目记忆
 - 只要 `CODEX_WORKDIR/BOOTSTRAP.md` 还存在，机器人就会保持首次引导模式；引导完成并删除该文件后，恢复普通协作模式
