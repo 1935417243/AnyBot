@@ -271,7 +271,7 @@ async function processTextMessage(message: {
       messageId: message.message_id,
       chatId: message.chat_id,
     });
-    await sendText(larkClient, message.chat_id, "新窗口已开启");
+    await sendText(larkClient, message.chat_id, "新窗口已开启，我们可以继续聊天了");
     return;
   }
 
