@@ -11,7 +11,7 @@ mkdir -p "$PROJECT_DIR/$RUN_DIR"
 if [ -f "$PROJECT_DIR/$PID_FILE" ]; then
   PID="$(cat "$PROJECT_DIR/$PID_FILE")"
   if kill -0 "$PID" 2>/dev/null; then
-    echo "机器人已在运行（pid $PID）"
+    echo "机器人已在运行（pid ${PID}）"
     exit 0
   fi
   rm -f "$PROJECT_DIR/$PID_FILE"
@@ -19,9 +19,9 @@ fi
 
 (
   cd "$PROJECT_DIR"
-  nohup /bin/sh -c 'exec node ./node_modules/tsx/dist/cli.mjs src/index.ts' >>"$LOG_FILE" 2>&1 </dev/null &
+  nohup npx tsx src/index.ts >>"$LOG_FILE" 2>&1 </dev/null &
   echo "$!" >"$PID_FILE"
 )
 PID="$(cat "$PROJECT_DIR/$PID_FILE")"
-echo "机器人已启动（pid $PID）"
+echo "机器人已启动（pid ${PID}）"
 echo "日志文件：$PROJECT_DIR/$LOG_FILE"
