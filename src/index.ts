@@ -57,12 +57,13 @@ if (!sandboxModes.includes(codexSandboxRaw as SandboxMode)) {
 
 const codexSandbox = codexSandboxRaw as SandboxMode;
 
-function getSystemPrompt(): string {
+function getSystemPrompt(conversationText?: string): string {
   return buildSystemPrompt({
     workdir: codexWorkdir,
     sandbox: codexSandbox,
     extraPrompt: extraSystemPrompt,
     templateDir: codexPromptTemplateDir,
+    conversationText,
   });
 }
 
@@ -159,7 +160,10 @@ async function generateReply(
   historyText = userText,
 ): Promise<string> {
   const history = historyByChat.get(chatId) || [];
-  const systemPrompt = getSystemPrompt();
+  const promptContext = [...history.slice(-4), { role: "user" as const, content: historyText }]
+    .map((turn) => turn.content)
+    .join("\n");
+  const systemPrompt = getSystemPrompt(promptContext);
   const transcript = [...history, { role: "user" as const, content: historyText }]
     .map((turn) => `${turn.role.toUpperCase()}: ${turn.content}`)
     .join("\n\n");

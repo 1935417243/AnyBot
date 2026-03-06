@@ -73,7 +73,8 @@ npm run bot:stop --prefix /Users/erhu/code/python/CodexDesktopControl
 - 长连接模式不需要公网回调地址
 - 这台机器本地需要先能正常使用 `codex`
 - 首次启动时会把默认的 `AGENTS.md`、`PROFILE.md`、`MEMORY.md`、`SOUL.md`、`BOOTSTRAP.md`、`HEARTBEAT.md` 初始化到 `CODEX_WORKDIR`
-- 运行时会优先读取 `CODEX_WORKDIR` 里的 `AGENTS.md`、`PROFILE.md`、`MEMORY.md`、`SOUL.md` 来构建 system prompt
+- 运行时会优先读取 `CODEX_WORKDIR` 里的 `AGENTS.md`、`PROFILE.md`、`SOUL.md` 来构建基础 system prompt
+- `MEMORY.md` 只在最近对话明显涉及项目、代码、文件、命令、报错、提示词等任务上下文时按需注入，避免寒暄类消息也携带整份项目记忆
 - 只要 `CODEX_WORKDIR/BOOTSTRAP.md` 还存在，机器人就会保持首次引导模式；引导完成并删除该文件后，恢复普通协作模式
 - 运行日志是单行 JSON，默认会记录消息接收、过滤、Codex 调用耗时、飞书回复与异常上下文；排查问题时可把 `LOG_LEVEL` 调到 `debug`
 - 如果你需要排查“飞书到底发来了什么、机器人最终回了什么、送给 codex 的 prompt 是什么”，可以同时开启 `LOG_INCLUDE_CONTENT=true` 和 `LOG_INCLUDE_PROMPT=true`

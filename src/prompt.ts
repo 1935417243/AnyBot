@@ -7,11 +7,17 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const RUNTIME_PROMPT_FILE_ORDER = [
+const CORE_PROMPT_FILE_ORDER = [
   "AGENTS.md",
   "PROFILE.md",
-  "MEMORY.md",
   "SOUL.md",
+] as const;
+
+const OPTIONAL_PROMPT_FILE_ORDER = ["MEMORY.md"] as const;
+
+const RUNTIME_PROMPT_FILE_ORDER = [
+  ...CORE_PROMPT_FILE_ORDER,
+  ...OPTIONAL_PROMPT_FILE_ORDER,
 ] as const;
 
 const TEMPLATE_FILE_ORDER = [
@@ -74,10 +80,33 @@ function ensureWorkspacePromptFiles(
   }
 }
 
-function loadPromptSections(workdir: string): string[] {
+function shouldIncludeMemory(conversationText?: string): boolean {
+  const normalized = conversationText?.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  if (
+    normalized.length <= 12 &&
+    /^(你好|您好|在吗|hi|hello|hey|ok|okay|收到|好的|嗯|哈喽)$/i.test(
+      normalized,
+    )
+  ) {
+    return false;
+  }
+
+  return /(```|`[^`]+`|\/|\\|\.([cm]?[jt]sx?|py|md|json|yaml|yml|env)\b|npm\b|node\b|git\b|bash\b|shell\b|代码|仓库|项目|文件|目录|路径|环境变量|命令|日志|报错|错误|测试|调试|实现|重构|优化|提示词|上下文|记忆|飞书|机器人|Codex|prompt|memory|profile|agent|sandbox)/i.test(
+    normalized,
+  );
+}
+
+function loadPromptSections(
+  workdir: string,
+  conversationText?: string,
+): string[] {
   const sections: string[] = [];
 
-  for (const filename of RUNTIME_PROMPT_FILE_ORDER) {
+  for (const filename of CORE_PROMPT_FILE_ORDER) {
     const filePath = path.join(workdir, filename);
     const content = readMarkdownFile(filePath);
     if (!content) {
@@ -85,6 +114,18 @@ function loadPromptSections(workdir: string): string[] {
     }
 
     sections.push(`# ${filename}\n\n${content}`);
+  }
+
+  if (shouldIncludeMemory(conversationText)) {
+    for (const filename of OPTIONAL_PROMPT_FILE_ORDER) {
+      const filePath = path.join(workdir, filename);
+      const content = readMarkdownFile(filePath);
+      if (!content) {
+        continue;
+      }
+
+      sections.push(`# ${filename}\n\n${content}`);
+    }
   }
 
   return sections;
@@ -123,6 +164,7 @@ export function buildSystemPrompt(options: {
   sandbox: string;
   extraPrompt?: string;
   templateDir?: string;
+  conversationText?: string;
 }): string {
   const templateDir = resolvePromptDir(options.templateDir);
   ensureWorkspacePromptFiles(options.workdir, templateDir);
@@ -141,7 +183,10 @@ export function buildSystemPrompt(options: {
     parts.push(options.extraPrompt.trim());
   }
 
-  const sections = loadPromptSections(options.workdir);
+  const sections = loadPromptSections(
+    options.workdir,
+    options.conversationText,
+  );
   if (sections.length > 0) {
     parts.push(sections.join("\n\n"));
   }
