@@ -44,7 +44,6 @@ const codexBin = process.env.CODEX_BIN || "codex";
 const codexSandboxRaw = process.env.CODEX_SANDBOX || "read-only";
 const codexModel = process.env.CODEX_MODEL;
 const codexWorkdir = process.env.CODEX_WORKDIR || process.cwd();
-const codexSkillsDir = process.env.CODEX_SKILLS_DIR;
 const extraSystemPrompt = process.env.CODEX_SYSTEM_PROMPT;
 const shouldLogContent = includeContentInLogs();
 const shouldLogPrompt = includePromptInLogs();
@@ -62,7 +61,6 @@ function getSystemPrompt(): string {
     workdir: codexWorkdir,
     sandbox: codexSandbox,
     extraPrompt: extraSystemPrompt,
-    skillsDir: codexSkillsDir,
   });
 }
 
@@ -206,7 +204,6 @@ ${transcript}
     model: codexModel,
     prompt,
     imagePaths,
-    enableSkills: Boolean(codexSkillsDir),
   });
 
   const nextHistory = trimHistory([
@@ -452,7 +449,6 @@ async function main(): Promise<void> {
     codexSandbox,
     codexModel: codexModel || null,
     codexWorkdir,
-    skillsDir: codexSkillsDir || null,
     extraSystemPrompt: extraSystemPrompt ? "<set>" : null,
     logIncludeContent: shouldLogContent,
     logIncludePrompt: shouldLogPrompt,

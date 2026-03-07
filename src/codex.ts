@@ -44,7 +44,6 @@ export type RunCodexOptions = {
   prompt: string;
   imagePaths?: string[];
   timeoutMs?: number;
-  enableSkills?: boolean;
 };
 
 export async function runCodex(opts: RunCodexOptions): Promise<string> {
@@ -56,7 +55,6 @@ export async function runCodex(opts: RunCodexOptions): Promise<string> {
     prompt,
     imagePaths = [],
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    enableSkills = false,
   } = opts;
   const startedAt = Date.now();
 
@@ -69,10 +67,6 @@ export async function runCodex(opts: RunCodexOptions): Promise<string> {
     "-s",
     sandbox,
   ];
-
-  if (enableSkills) {
-    args.push("--enable", "skills");
-  }
 
   if (model) {
     args.push("-m", model);
