@@ -242,18 +242,6 @@
             box-shadow: 0 0 8px var(--accent);
         }
 
-        .history-item-dot {
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: var(--text-dim);
-            flex-shrink: 0;
-            transition: background 0.15s;
-        }
-
-        .history-item.active .history-item-dot {
-            background: var(--accent);
-        }
 
         .history-item-text {
             white-space: nowrap;
@@ -321,6 +309,11 @@
         .history-item-source.discord {
             background: rgba(88, 101, 242, 0.15);
             color: #5865f2;
+        }
+
+        .history-item-source.web {
+            background: rgba(107, 114, 128, 0.15);
+            color: #9ca3af;
         }
 
         .history-item-source.default {
@@ -1505,18 +1498,12 @@
                     item.className = 'history-item' + (!isChannelView && s.id === currentSessionId ? ' active' : '');
                     item.dataset.id = s.id;
 
-                    var dot = document.createElement('div');
-                    dot.className = 'history-item-dot';
-
-                    if (s.source && s.source !== 'web') {
-                        var meta = CHANNEL_META[s.source];
-                        var badge = document.createElement('span');
-                        badge.className = 'history-item-source ' + (meta ? meta.iconClass : 'default');
-                        badge.textContent = meta ? meta.badge : s.source;
-                        item.appendChild(badge);
-                    } else {
-                        item.appendChild(dot);
-                    }
+                    var effectiveSource = (s.source && s.source !== 'web') ? s.source : 'web';
+                    var meta = CHANNEL_META[effectiveSource];
+                    var badge = document.createElement('span');
+                    badge.className = 'history-item-source ' + (meta ? meta.iconClass : 'default');
+                    badge.textContent = meta ? meta.badge : effectiveSource;
+                    item.appendChild(badge);
 
                     var text = document.createElement('span');
                     text.className = 'history-item-text';
@@ -1736,6 +1723,7 @@
         const channelsBtn = document.getElementById('channels-btn');
 
         const CHANNEL_META = {
+            web: {name: '本地', icon: '本', iconClass: 'web', badge: '本地'},
             feishu: {name: '飞书', icon: '飞', iconClass: 'feishu', badge: '飞书'},
             qq: {name: 'QQ', icon: 'Q', iconClass: 'qq', badge: 'QQ'},
             dingtalk: {name: '钉钉', icon: '钉', iconClass: 'dingtalk', badge: '钉钉'},
