@@ -1157,6 +1157,10 @@
   }
 
   async function createNewChat() {
+    if (!isChannelView && currentSessionId && !document.querySelector('#messages .message-row')) {
+      inputEl.focus();
+      return;
+    }
     try {
       var res = await fetch('/api/sessions', { method: 'POST' });
       var data = await res.json();
@@ -1362,14 +1366,11 @@
   }
 
   channelsBtn.addEventListener('click', function () {
-    if (isChannelView) {
-      showChatView();
+    if (isChannelView) return;
+    if (!channelsData) {
+      fetchChannels().then(function () { showChannelsPage(); });
     } else {
-      if (!channelsData) {
-        fetchChannels().then(function () { showChannelsPage(); });
-      } else {
-        showChannelsPage();
-      }
+      showChannelsPage();
     }
   });
 
