@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "web": "tsx src/web.ts",
-    "web:dev": "tsx watch src/web.ts",
     "check": "tsc --noEmit",
     "bot:start": "mkdir -p .run && sh ./scripts/bot-start.sh",
     "bot:stop": "sh ./scripts/bot-stop.sh",

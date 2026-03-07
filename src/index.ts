@@ -2,6 +2,7 @@ import "dotenv/config";
 
 import { rm } from "node:fs/promises";
 import path from "node:path";
+import { createApp } from "./web/server.js";
 
 import type { SandboxMode } from "./types.js";
 import { sandboxModes } from "./types.js";
@@ -471,6 +472,8 @@ const dispatcher = new EventDispatcher({}).register({
   "im.message.receive_v1": handleMessage,
 });
 
+const WEB_PORT = parseInt(process.env.WEB_PORT || "19981", 10);
+
 async function main(): Promise<void> {
   logger.info("service.starting", {
     groupChatMode,
@@ -482,7 +485,15 @@ async function main(): Promise<void> {
     extraSystemPrompt: extraSystemPrompt ? "<set>" : null,
     logIncludeContent: shouldLogContent,
     logIncludePrompt: shouldLogPrompt,
+    webPort: WEB_PORT,
   });
+
+  const webApp = createApp();
+  webApp.listen(WEB_PORT, () => {
+    logger.info("web.started", { port: WEB_PORT });
+    console.log(`Codex Web UI: http://localhost:${WEB_PORT}`);
+  });
+
   await wsClient.start({ eventDispatcher: dispatcher });
   logger.info("service.started");
 }
