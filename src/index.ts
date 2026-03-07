@@ -113,9 +113,12 @@ function getSessionGeneration(chatId: string): number {
   return sessionGenerationByChat.get(chatId) || 0;
 }
 
-function resetChatSession(chatId: string): void {
+function resetChatSession(chatId: string, source?: string): void {
   sessionIdByChat.delete(chatId);
   sessionGenerationByChat.set(chatId, getSessionGeneration(chatId) + 1);
+  if (source) {
+    db.detachChatId(source, chatId);
+  }
 }
 
 function formatCodexError(error: unknown): string {
@@ -250,6 +253,9 @@ async function main(): Promise<void> {
     logIncludePrompt: shouldLogPrompt,
     webPort: WEB_PORT,
   });
+
+  db.detachAllChannelSessions();
+  logger.info("service.channel_sessions_detached");
 
   const webApp = createApp();
   webApp.listen(WEB_PORT, () => {

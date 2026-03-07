@@ -105,6 +105,14 @@ const stmts = {
     FROM sessions WHERE source = ? AND chat_id = ?
     ORDER BY updated_at DESC LIMIT 1
   `),
+
+  detachChatId: db.prepare(`
+    UPDATE sessions SET chat_id = NULL WHERE source = ? AND chat_id = ?
+  `),
+
+  detachAllChannelSessions: db.prepare(`
+    UPDATE sessions SET chat_id = NULL WHERE source != 'web' AND chat_id IS NOT NULL
+  `),
 };
 
 export function listSessions(): SessionSummary[] {
@@ -188,6 +196,14 @@ export function deleteSession(id: string): void {
 
 export function addMessage(sessionId: string, role: "user" | "assistant", content: string): void {
   stmts.insertMessage.run(sessionId, role, content);
+}
+
+export function detachChatId(source: string, chatId: string): void {
+  stmts.detachChatId.run(source, chatId);
+}
+
+export function detachAllChannelSessions(): void {
+  stmts.detachAllChannelSessions.run();
 }
 
 export function closeDb(): void {
