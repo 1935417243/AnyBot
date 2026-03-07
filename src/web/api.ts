@@ -5,6 +5,7 @@ import type { SandboxMode } from "../types.js";
 import { sandboxModes } from "../types.js";
 import { buildSystemPrompt } from "../prompt.js";
 import { logger } from "../logger.js";
+import * as db from "./db.js";
 
 const codexBin = process.env.CODEX_BIN || "codex";
 const codexSandboxRaw = process.env.CODEX_SANDBOX || "read-only";
@@ -15,17 +16,6 @@ const extraSystemPrompt = process.env.CODEX_SYSTEM_PROMPT;
 const codexSandbox: SandboxMode = sandboxModes.includes(codexSandboxRaw as SandboxMode)
   ? (codexSandboxRaw as SandboxMode)
   : "read-only";
-
-type ChatSession = {
-  id: string;
-  title: string;
-  sessionId: string | null;
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
-  createdAt: number;
-  updatedAt: number;
-};
-
-const sessions = new Map<string, ChatSession>();
 
 const outputContract = [
   "只回复当前这条用户消息。",
@@ -71,20 +61,12 @@ export function chatRouter(): Router {
   const router = Router();
 
   router.get("/sessions", (_req: Request, res: Response) => {
-    const list = [...sessions.values()]
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map(({ id, title, messages, createdAt, updatedAt }) => ({
-        id,
-        title,
-        messageCount: messages.length,
-        createdAt,
-        updatedAt,
-      }));
+    const list = db.listSessions();
     res.json(list);
   });
 
   router.post("/sessions", (_req: Request, res: Response) => {
-    const session: ChatSession = {
+    const session: db.ChatSession = {
       id: generateId(),
       title: "新对话",
       sessionId: null,
@@ -92,13 +74,13 @@ export function chatRouter(): Router {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    sessions.set(session.id, session);
+    db.createSession(session);
     res.json({ id: session.id, title: session.title });
   });
 
   router.get("/sessions/:id", (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const session = sessions.get(id);
+    const session = db.getSession(id);
     if (!session) {
       res.status(404).json({ error: "会话不存在" });
       return;
@@ -112,13 +94,13 @@ export function chatRouter(): Router {
 
   router.delete("/sessions/:id", (req: Request, res: Response) => {
     const id = req.params.id as string;
-    sessions.delete(id);
+    db.deleteSession(id);
     res.json({ ok: true });
   });
 
   router.post("/sessions/:id/messages", async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const session = sessions.get(id);
+    const session = db.getSession(id);
     if (!session) {
       res.status(404).json({ error: "会话不存在" });
       return;
@@ -131,9 +113,9 @@ export function chatRouter(): Router {
     }
 
     const userText = content.trim();
-    session.messages.push({ role: "user", content: userText });
+    db.addMessage(id, "user", userText);
 
-    if (session.messages.length <= 2) {
+    if (session.messages.length <= 1) {
       session.title = generateTitle(userText);
     }
 
@@ -157,16 +139,18 @@ export function chatRouter(): Router {
         sessionId: session.sessionId || undefined,
       });
 
-      if (result.sessionId) {
-        session.sessionId = result.sessionId;
-      }
-
-      session.messages.push({ role: "assistant", content: result.text });
-      session.updatedAt = Date.now();
+      const codexSessionId = result.sessionId || session.sessionId;
+      db.addMessage(id, "assistant", result.text);
+      db.updateSession({
+        id,
+        title: session.title,
+        sessionId: codexSessionId,
+        updatedAt: Date.now(),
+      });
 
       logger.info("web.chat.success", {
         sessionId: session.id,
-        codexSessionId: session.sessionId,
+        codexSessionId,
         replyChars: result.text.length,
       });
 
