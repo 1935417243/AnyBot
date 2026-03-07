@@ -6,6 +6,8 @@ export type ChatSession = {
   id: string;
   title: string;
   sessionId: string | null;
+  source: string;
+  chatId: string | null;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   createdAt: number;
   updatedAt: number;
@@ -14,6 +16,7 @@ export type ChatSession = {
 export type SessionSummary = {
   id: string;
   title: string;
+  source: string;
   messageCount: number;
   createdAt: number;
   updatedAt: number;
@@ -33,6 +36,8 @@ db.exec(`
     id         TEXT PRIMARY KEY,
     title      TEXT NOT NULL DEFAULT '新对话',
     session_id TEXT,
+    source     TEXT NOT NULL DEFAULT 'web',
+    chat_id    TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
@@ -48,9 +53,18 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
 `);
 
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'web'`);
+} catch (_) {}
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN chat_id TEXT`);
+} catch (_) {}
+
+db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_source_chat ON sessions(source, chat_id)`);
+
 const stmts = {
   listSessions: db.prepare(`
-    SELECT s.id, s.title, s.created_at AS createdAt, s.updated_at AS updatedAt,
+    SELECT s.id, s.title, s.source, s.created_at AS createdAt, s.updated_at AS updatedAt,
            COUNT(m.id) AS messageCount
     FROM sessions s
     LEFT JOIN messages m ON m.session_id = s.id
@@ -59,7 +73,8 @@ const stmts = {
   `),
 
   getSession: db.prepare(`
-    SELECT id, title, session_id AS sessionId, created_at AS createdAt, updated_at AS updatedAt
+    SELECT id, title, session_id AS sessionId, source, chat_id AS chatId,
+           created_at AS createdAt, updated_at AS updatedAt
     FROM sessions WHERE id = ?
   `),
 
@@ -69,8 +84,8 @@ const stmts = {
   `),
 
   insertSession: db.prepare(`
-    INSERT INTO sessions (id, title, session_id, created_at, updated_at)
-    VALUES (@id, @title, @sessionId, @createdAt, @updatedAt)
+    INSERT INTO sessions (id, title, session_id, source, chat_id, created_at, updated_at)
+    VALUES (@id, @title, @sessionId, @source, @chatId, @createdAt, @updatedAt)
   `),
 
   updateSession: db.prepare(`
@@ -83,6 +98,13 @@ const stmts = {
   insertMessage: db.prepare(`
     INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)
   `),
+
+  findBySourceChat: db.prepare(`
+    SELECT id, title, session_id AS sessionId, source, chat_id AS chatId,
+           created_at AS createdAt, updated_at AS updatedAt
+    FROM sessions WHERE source = ? AND chat_id = ?
+    ORDER BY updated_at DESC LIMIT 1
+  `),
 };
 
 export function listSessions(): SessionSummary[] {
@@ -91,7 +113,15 @@ export function listSessions(): SessionSummary[] {
 
 export function getSession(id: string): ChatSession | null {
   const row = stmts.getSession.get(id) as
-    | { id: string; title: string; sessionId: string | null; createdAt: number; updatedAt: number }
+    | {
+        id: string;
+        title: string;
+        sessionId: string | null;
+        source: string;
+        chatId: string | null;
+        createdAt: number;
+        updatedAt: number;
+      }
     | undefined;
   if (!row) return null;
 
@@ -108,9 +138,34 @@ export function createSession(session: ChatSession): void {
     id: session.id,
     title: session.title,
     sessionId: session.sessionId,
+    source: session.source || "web",
+    chatId: session.chatId || null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
   });
+}
+
+export function findSessionBySourceChat(
+  source: string,
+  chatId: string,
+): ChatSession | null {
+  const row = stmts.findBySourceChat.get(source, chatId) as
+    | {
+        id: string;
+        title: string;
+        sessionId: string | null;
+        source: string;
+        chatId: string | null;
+        createdAt: number;
+        updatedAt: number;
+      }
+    | undefined;
+  if (!row) return null;
+  const messages = stmts.getMessages.all(row.id) as Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
+  return { ...row, messages };
 }
 
 export function updateSession(session: {

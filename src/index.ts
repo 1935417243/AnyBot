@@ -20,6 +20,7 @@ import {
 import { getCurrentModel } from "./web/model-config.js";
 import { startAllChannels } from "./channels/index.js";
 import type { ChannelCallbacks } from "./channels/index.js";
+import * as db from "./web/db.js";
 
 const codexBin = process.env.CODEX_BIN || "codex";
 const codexSandboxRaw = process.env.CODEX_SANDBOX || "read-only";
@@ -130,10 +131,41 @@ function formatCodexError(error: unknown): string {
   return "处理消息时出错了，请稍后再试。";
 }
 
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function generateTitle(text: string): string {
+  const clean = text.replace(/\n/g, " ").trim();
+  return clean.length > 20 ? clean.slice(0, 20) + "…" : clean;
+}
+
+function getOrCreateChannelSession(
+  source: string,
+  chatId: string,
+): db.ChatSession {
+  const existing = db.findSessionBySourceChat(source, chatId);
+  if (existing) return existing;
+
+  const session: db.ChatSession = {
+    id: generateId(),
+    title: "新对话",
+    sessionId: null,
+    source,
+    chatId,
+    messages: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  db.createSession(session);
+  return session;
+}
+
 async function generateReply(
   chatId: string,
   userText: string,
   imagePaths: string[] = [],
+  source: string = "unknown",
 ): Promise<string> {
   const sessionId = sessionIdByChat.get(chatId);
   const sessionGeneration = getSessionGeneration(chatId);
@@ -141,10 +173,19 @@ async function generateReply(
     ? buildResumePrompt(userText)
     : buildFirstTurnPrompt(userText);
 
+  const dbSession = getOrCreateChannelSession(source, chatId);
+  db.addMessage(dbSession.id, "user", userText);
+
+  if (dbSession.messages.length <= 1) {
+    dbSession.title = generateTitle(userText);
+  }
+
   logger.info("reply.generate.start", {
     chatId,
+    source,
     mode: sessionId ? "resume" : "new",
     sessionId: sessionId || null,
+    dbSessionId: dbSession.id,
     userTextChars: userText.length,
     imageCount: imagePaths.length,
     promptChars: prompt.length,
@@ -166,9 +207,19 @@ async function generateReply(
     sessionIdByChat.set(chatId, result.sessionId);
   }
 
+  db.addMessage(dbSession.id, "assistant", result.text);
+  db.updateSession({
+    id: dbSession.id,
+    title: dbSession.title,
+    sessionId: result.sessionId || dbSession.sessionId,
+    updatedAt: Date.now(),
+  });
+
   logger.info("reply.generate.success", {
     chatId,
+    source,
     sessionId: result.sessionId,
+    dbSessionId: dbSession.id,
     replyChars: result.text.length,
     ...(shouldLogContent ? { replyText: rawLogString(result.text) } : {}),
   });
@@ -179,7 +230,8 @@ async function generateReply(
 // --- Channel callbacks ---
 
 const channelCallbacks: ChannelCallbacks = {
-  generateReply,
+  generateReply: (chatId, userText, imagePaths, source) =>
+    generateReply(chatId, userText, imagePaths, source),
   resetSession: resetChatSession,
 };
 

@@ -197,7 +197,7 @@ export class FeishuChannel implements IChannel {
     }
 
     if (userText === "/new") {
-      this.callbacks!.resetSession(message.chat_id);
+      this.callbacks!.resetSession(message.chat_id, "feishu");
       await sendText(client, message.chat_id, "新窗口已开启，我们可以继续聊天了");
       return;
     }
@@ -216,6 +216,8 @@ export class FeishuChannel implements IChannel {
         const reply = await this.callbacks!.generateReply(
           message.chat_id,
           userText,
+          undefined,
+          "feishu",
         );
         await sendReply(client, message.chat_id, reply, this.codexWorkdir);
       } catch (error) {
@@ -259,6 +261,7 @@ export class FeishuChannel implements IChannel {
           message.chat_id,
           userText,
           [imagePath],
+          "feishu",
         );
         await sendReply(client, message.chat_id, reply, this.codexWorkdir);
       } catch (error) {

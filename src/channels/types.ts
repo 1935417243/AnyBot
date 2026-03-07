@@ -20,8 +20,9 @@ export interface ChannelCallbacks {
     chatId: string,
     userText: string,
     imagePaths?: string[],
+    source?: string,
   ) => Promise<string>;
-  resetSession: (chatId: string) => void;
+  resetSession: (chatId: string, source?: string) => void;
 }
 
 export interface IChannel {

@@ -76,6 +76,8 @@ export function chatRouter(): Router {
       id: generateId(),
       title: "新对话",
       sessionId: null,
+      source: "web",
+      chatId: null,
       messages: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
