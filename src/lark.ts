@@ -337,7 +337,7 @@ export async function sendReply(
   if (payload.text) {
     await sendText(client, chatId, payload.text);
   } else if (payload.imagePaths.length > 0 || payload.filePaths.length > 0) {
-    await sendText(client, chatId, "附件已发送。");
+    await sendText(client, chatId, "请查收~");
   }
 
   for (const imagePath of payload.imagePaths) {
