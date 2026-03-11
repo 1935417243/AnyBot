@@ -197,9 +197,10 @@ export function chatRouter(): Router {
     res.json({ ok: true });
   });
 
-  router.post("/skills/open-folder", (_req: Request, res: Response) => {
+  router.post("/skills/open-folder", (req: Request, res: Response) => {
     try {
-      openSkillsFolder();
+      const { path: skillPath } = req.body as { path?: string };
+      openSkillsFolder(skillPath);
       res.json({ ok: true });
     } catch (error) {
       res.status(500).json({ error: "打开文件夹失败" });

@@ -1490,6 +1490,7 @@
             transform: translateX(16px);
         }
 
+        .skill-open-btn,
         .skill-delete-btn {
             width: 28px;
             height: 28px;
@@ -1505,8 +1506,15 @@
             opacity: 0;
         }
 
+        .skill-card:hover .skill-open-btn,
         .skill-card:hover .skill-delete-btn {
             opacity: 1;
+        }
+
+        .skill-open-btn:hover {
+            color: var(--accent);
+            background: var(--accent-dim);
+            border-color: rgba(124, 111, 247, 0.2);
         }
 
         .skill-delete-btn:hover {
@@ -2562,6 +2570,18 @@
                 });
             });
 
+            var openBtn = document.createElement('button');
+            openBtn.className = 'skill-open-btn';
+            openBtn.title = '打开文件夹';
+            openBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H6L4.5 3H2a1 1 0 0 0-1 1z" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            openBtn.addEventListener('click', function () {
+                fetch('/api/skills/open-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: skill.fullPath }),
+                });
+            });
+
             var delBtn = document.createElement('button');
             delBtn.className = 'skill-delete-btn';
             delBtn.title = '删除技能';
@@ -2591,6 +2611,7 @@
             });
 
             actions.appendChild(toggle);
+            actions.appendChild(openBtn);
             actions.appendChild(delBtn);
             top.appendChild(info);
             top.appendChild(actions);

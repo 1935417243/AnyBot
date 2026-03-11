@@ -157,9 +157,10 @@ export function deleteSkill(id: string): { ok: boolean; error?: string } {
   }
 }
 
-export function openSkillsFolder(): void {
-  const sources = getSkillSources();
-  const dir = sources.length > 0 ? sources[0].dir : path.join(getCodexHome(), "skills");
+export function openSkillsFolder(skillPath?: string): void {
+  const dir = skillPath
+    ? path.dirname(skillPath)
+    : (getSkillSources()[0]?.dir || path.join(getCodexHome(), "skills"));
 
   const platform = os.platform();
   const cmd =
