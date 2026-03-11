@@ -1,6 +1,6 @@
 # CodexDesktopControl
 
-把 [OpenAI Codex CLI](https://github.com/openai/codex) 变成可远程使用的 AI 助手——通过内置 **Web UI** 在浏览器里对话，或通过 **飞书机器人** 在手机 / 桌面端随时向你这台机器上的 Codex 发消息。
+把 [OpenAI Codex CLI](https://github.com/openai/codex) 变成可远程使用的 AI 助手——通过内置 **Web UI** 在浏览器里对话，或通过 **飞书机器人** / **QQ 机器人** 在手机 / 桌面端随时向你这台机器上的 Codex 发消息。
 
 支持 **macOS** 和 **Linux**。
 
@@ -9,7 +9,8 @@
 ## 特性
 
 - **Web UI** — 开箱即用的本地聊天界面，支持 Markdown 渲染、代码高亮、会话管理
-- **飞书集成** — 长连接模式接入飞书，手机上也能用 Codex
+- **多平台集成** — 同时支持飞书（长连接）和 QQ 机器人（WebSocket），手机上也能用 Codex
+- **技能管理** — 在 Web UI 中浏览、启用 / 禁用 / 删除 Codex 技能（`$CODEX_HOME/skills/`）
 - **会话续聊** — 复用 Codex 原生 session，上下文不丢失；输入 `/new` 开启新会话
 - **图片理解** — 发送图片给 Codex，支持多模态对话
 - **文件回传** — Codex 生成的图片、文件自动发送回聊天
@@ -126,7 +127,8 @@ npm start
 - 多会话管理，历史记录持久化（SQLite）
 - Markdown 渲染 + 代码语法高亮 + 一键复制
 - 模型切换
-- 频道配置管理（飞书等）
+- 频道配置管理（飞书、QQ 机器人）
+- 技能管理（浏览、启用 / 禁用、删除）
 - 深色主题
 
 ---
@@ -168,6 +170,11 @@ npm start
     "groupChatMode": "mention",   // "mention"（仅 @机器人时回复）或 "all"（所有消息都回复）
     "botOpenId": "ou_xxxx",       // 可选；mention 模式下用于精确判断是否 @了机器人
     "ackReaction": "OK"           // 收到消息后的 reaction 表情，留空可关闭
+  },
+  "qqbot": {
+    "enabled": true,
+    "appId": "your_app_id",
+    "appSecret": "your_app_secret"
   }
 }
 ```
@@ -181,6 +188,41 @@ npm start
 - 发送 `/new` — 重置当前会话
 - 发送图片 — 自动下载并交给 Codex 处理
 - Codex 回复中的图片 / 文件会自动上传回飞书（单文件上限 30MB）
+
+---
+
+## QQ 机器人集成
+
+通过 QQ 开放平台 WebSocket 网关接入，支持频道、群聊和私聊。
+
+### QQ 侧配置
+
+在 [QQ 开放平台](https://q.qq.com/) 创建机器人应用后：
+
+1. 获取 **App ID** 和 **App Secret**
+2. 配置机器人的消息接收权限
+
+### 连接配置
+
+与飞书相同，通过 Web UI、REST API 或 `.data/channels.json` 中的 `qqbot` 字段配置 App ID / App Secret。
+
+### 使用方式
+
+- **频道消息** — 在 QQ 频道中 @ 机器人
+- **群聊** — 在群中 @ 机器人发送消息
+- **私聊** — 直接给机器人发消息
+- 发送 `/new` — 重置当前会话
+
+---
+
+## 技能管理
+
+通过 Web UI 管理 Codex 的技能（读取 `$CODEX_HOME/skills/` 目录下的 `SKILL.md` 文件）：
+
+- 浏览所有已安装技能，查看名称与描述
+- 启用 / 禁用指定技能
+- 删除不需要的技能
+- 快速打开技能所在文件夹
 
 ---
 
@@ -216,15 +258,20 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 | `GET` | `/api/model-config` | 获取当前模型配置 |
 | `PUT` | `/api/model-config` | 切换模型 `{ "modelId": "..." }` |
 | `GET` | `/api/channels` | 获取频道配置 |
-| `PUT` | `/api/channels/:type` | 更新频道配置 |
+| `PUT` | `/api/channels/:type` | 更新频道配置（支持 `feishu`、`qqbot`） |
+| `GET` | `/api/skills` | 获取技能列表 |
+| `PUT` | `/api/skills/:id/toggle` | 启用 / 禁用技能 `{ "enabled": true }` |
+| `DELETE` | `/api/skills/:id` | 删除技能 |
+| `POST` | `/api/skills/open-folder` | 在文件管理器中打开技能目录 |
 
 ---
 
 ## 工作原理
 
-- 每个聊天（Web 会话 / 飞书 chat）绑定一个 Codex `thread_id`，后续消息通过 `codex exec resume` 续聊
-- 会话绑定关系保存在 SQLite 中；飞书频道的绑定在进程重启后自动重建
+- 每个聊天（Web 会话 / 飞书 chat / QQ 聊天）绑定一个 Codex `thread_id`，后续消息通过 `codex exec resume` 续聊
+- 会话绑定关系保存在 SQLite 中；各频道的绑定在进程重启后自动重建
 - 飞书消息先加一个 reaction（默认 ✅）表示已收到，再等待 Codex 完整回复
+- QQ 机器人通过 WebSocket 网关接收消息，OAuth2 自动管理 Token
 - 支持文本和图片消息；其它消息类型会收到提示
 - `/new` 重置当前会话
 - 图片消息先下载到临时目录，通过 `codex exec -i` 传入
@@ -239,30 +286,38 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 ```
 CodexDesktopControl/
 ├── src/
-│   ├── index.ts          # 主入口，会话状态管理
-│   ├── codex.ts          # Codex CLI 子进程封装
-│   ├── lark.ts           # 飞书 API（消息、文件、图片）
-│   ├── logger.ts         # 结构化日志
-│   ├── message.ts        # 消息解析（输入输出）
-│   ├── prompt.ts         # 系统提示词构建
-│   ├── types.ts          # 类型定义
-│   ├── channels/         # 频道管理（飞书等）
-│   │   ├── index.ts      # ChannelManager
-│   │   ├── feishu.ts     # 飞书频道实现
-│   │   ├── config.ts     # channels.json 读写
-│   │   └── types.ts      # 频道接口定义
-│   └── web/              # Web 层
-│       ├── server.ts     # Express 服务
-│       ├── api.ts        # REST API
-│       ├── db.ts         # SQLite 持久化
-│       ├── model-config.ts # 模型配置
-│       └── public/       # 前端静态文件
-├── scripts/              # daemon 控制脚本
+│   ├── index.ts            # 主入口，会话状态管理
+│   ├── codex.ts            # Codex CLI 子进程封装
+│   ├── lark.ts             # 飞书 API（消息、文件、图片）
+│   ├── logger.ts           # 结构化日志
+│   ├── message.ts          # 消息解析（输入输出）
+│   ├── prompt.ts           # 系统提示词构建
+│   ├── types.ts            # 类型定义
+│   ├── channels/           # 频道管理
+│   │   ├── index.ts        # ChannelManager
+│   │   ├── feishu.ts       # 飞书频道实现
+│   │   ├── qqbot.ts        # QQ 机器人频道实现
+│   │   ├── config.ts       # channels.json 读写
+│   │   └── types.ts        # 频道接口定义
+│   ├── web/                # Web 层
+│   │   ├── server.ts       # Express 服务
+│   │   ├── api.ts          # REST API
+│   │   ├── db.ts           # SQLite 持久化
+│   │   ├── model-config.ts # 模型配置
+│   │   ├── skills.ts       # 技能管理
+│   │   └── public/         # 前端静态文件
+│   └── agent/              # Agent 模板文件
+│       └── md_files/
+│           ├── AGENTS.md   # Agent 行为规则
+│           ├── BOOTSTRAP.md # 首次启动引导
+│           ├── MEMORY.md   # 长期记忆模板
+│           └── PROFILE.md  # Agent 身份与用户档案
+├── scripts/                # daemon 控制脚本
 │   ├── bot-start.sh
 │   ├── bot-stop.sh
 │   └── bot-status.sh
-├── setup.sh              # 交互式配置引导
-├── .env.example          # 环境变量模板
+├── setup.sh                # 交互式配置引导
+├── .env.example            # 环境变量模板
 └── package.json
 ```
 
