@@ -1,0 +1,165 @@
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { exec } from "node:child_process";
+
+export interface SkillInfo {
+  id: string;
+  name: string;
+  description: string;
+  fullPath: string;
+  source: string;
+  enabled: boolean;
+  content: string;
+}
+
+interface SkillSource {
+  label: string;
+  dir: string;
+}
+
+function getCodexHome(): string {
+  return process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+}
+
+function getSkillSources(): SkillSource[] {
+  const home = os.homedir();
+  const codexHome = getCodexHome();
+
+  const sources: SkillSource[] = [
+    { label: "Codex 技能", dir: path.join(codexHome, "skills") },
+  ];
+
+  return sources.filter((s) => {
+    try {
+      return fs.statSync(s.dir).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+}
+
+function getDisabledSkillsPath(): string {
+  const dataDir = process.env.CODEX_DATA_DIR || path.join(process.cwd(), ".data");
+  fs.mkdirSync(dataDir, { recursive: true });
+  return path.join(dataDir, "disabled-skills.json");
+}
+
+function readDisabledSkills(): Set<string> {
+  try {
+    const raw = fs.readFileSync(getDisabledSkillsPath(), "utf-8");
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDisabledSkills(disabled: Set<string>): void {
+  fs.writeFileSync(getDisabledSkillsPath(), JSON.stringify([...disabled], null, 2), "utf-8");
+}
+
+function parseSkillMd(content: string): { name: string; description: string } {
+  const result = { name: "", description: "" };
+  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!fmMatch) return result;
+
+  const fm = fmMatch[1];
+  const nameMatch = fm.match(/^name:\s*["']?(.+?)["']?\s*$/m);
+  const descMatch = fm.match(/^description:\s*["']?(.+?)["']?\s*$/m);
+
+  if (nameMatch) result.name = nameMatch[1].trim();
+  if (descMatch) result.description = descMatch[1].trim();
+
+  return result;
+}
+
+function scanSkillDir(dir: string): Array<{ name: string; skillPath: string }> {
+  const results: Array<{ name: string; skillPath: string }> = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const skillMd = path.join(dir, entry.name, "SKILL.md");
+      if (fs.existsSync(skillMd)) {
+        results.push({ name: entry.name, skillPath: skillMd });
+      }
+    }
+  } catch {
+    // dir not readable
+  }
+  return results;
+}
+
+export function listSkills(): { skills: SkillInfo[]; sources: Array<{ label: string; dir: string; count: number }> } {
+  const disabled = readDisabledSkills();
+  const sources = getSkillSources();
+  const skills: SkillInfo[] = [];
+  const sourceStats: Array<{ label: string; dir: string; count: number }> = [];
+
+  for (const source of sources) {
+    const found = scanSkillDir(source.dir);
+    sourceStats.push({ label: source.label, dir: source.dir, count: found.length });
+
+    for (const item of found) {
+      const content = fs.readFileSync(item.skillPath, "utf-8");
+      const meta = parseSkillMd(content);
+      const id = `${source.label}::${item.name}`;
+
+      skills.push({
+        id,
+        name: meta.name || item.name,
+        description: meta.description || "",
+        fullPath: item.skillPath,
+        source: source.label,
+        enabled: !disabled.has(id),
+        content,
+      });
+    }
+  }
+
+  skills.sort((a, b) => a.name.localeCompare(b.name));
+  return { skills, sources: sourceStats };
+}
+
+export function toggleSkill(id: string, enabled: boolean): void {
+  const disabled = readDisabledSkills();
+  if (enabled) {
+    disabled.delete(id);
+  } else {
+    disabled.add(id);
+  }
+  writeDisabledSkills(disabled);
+}
+
+export function deleteSkill(id: string): { ok: boolean; error?: string } {
+  const { skills } = listSkills();
+  const skill = skills.find((s) => s.id === id);
+  if (!skill) return { ok: false, error: "技能不存在" };
+
+  const skillDir = path.dirname(skill.fullPath);
+  try {
+    fs.rmSync(skillDir, { recursive: true, force: true });
+    const disabled = readDisabledSkills();
+    disabled.delete(id);
+    writeDisabledSkills(disabled);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "删除失败" };
+  }
+}
+
+export function openSkillsFolder(): void {
+  const sources = getSkillSources();
+  const dir = sources.length > 0 ? sources[0].dir : path.join(getCodexHome(), "skills");
+
+  const platform = os.platform();
+  const cmd =
+    platform === "darwin"
+      ? `open "${dir}"`
+      : platform === "win32"
+        ? `explorer "${dir}"`
+        : `xdg-open "${dir}"`;
+
+  exec(cmd, () => {});
+}

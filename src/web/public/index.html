@@ -166,6 +166,42 @@
             flex-shrink: 0;
         }
 
+        #skills-btn {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-muted);
+            padding: 9px 14px;
+            cursor: pointer;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.18s ease;
+            letter-spacing: 0.01em;
+            margin-top: 6px;
+        }
+
+        #skills-btn:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+            border-color: rgba(124, 111, 247, 0.25);
+        }
+
+        #skills-btn.active {
+            background: var(--accent-dim);
+            border-color: rgba(124, 111, 247, 0.35);
+            color: var(--text);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        #skills-btn svg {
+            flex-shrink: 0;
+        }
+
         .sidebar-label {
             padding: 14px 16px 6px;
             font-size: 10px;
@@ -1221,6 +1257,417 @@
         .channel-save-ok.show {
             opacity: 1;
         }
+
+        #skills-view {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skills-page {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .skills-header {
+            padding: 28px 32px 0;
+            flex-shrink: 0;
+        }
+
+        .skills-header-top {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 6px;
+        }
+
+        .skills-header-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(74, 222, 128, 0.12);
+            color: #4ade80;
+            flex-shrink: 0;
+        }
+
+        .skills-header-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .skills-header-count {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .skills-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 32px 0;
+            flex-shrink: 0;
+        }
+
+        .skills-search {
+            flex: 1;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            color: var(--text);
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            padding: 9px 14px 9px 36px;
+            outline: none;
+            transition: border-color 0.18s ease, box-shadow 0.18s ease;
+            background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='6' cy='6' r='4.5' stroke='%236b6b80' stroke-width='1.2'/%3E%3Cpath d='M9.5 9.5L12.5 12.5' stroke='%236b6b80' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 12px center;
+        }
+
+        .skills-search:focus {
+            border-color: rgba(124, 111, 247, 0.4);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .skills-search::placeholder {
+            color: var(--text-dim);
+        }
+
+        .skills-toolbar-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 9px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .skills-toolbar-btn:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+            border-color: rgba(124, 111, 247, 0.25);
+        }
+
+        .skills-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 32px 16px;
+        }
+
+        .skills-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .skills-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .skills-list::-webkit-scrollbar-thumb {
+            background: var(--scrollbar);
+            border-radius: 99px;
+        }
+
+        .skills-group {
+            margin-bottom: 24px;
+        }
+
+        .skills-group-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            padding: 0 0 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .skills-group-badge {
+            font-size: 10px;
+            font-weight: 600;
+            background: var(--accent-dim);
+            color: var(--accent);
+            padding: 1px 7px;
+            border-radius: 10px;
+            letter-spacing: 0;
+        }
+
+        .skill-card {
+            background: var(--sidebar);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 8px;
+            transition: border-color 0.15s ease;
+        }
+
+        .skill-card:hover {
+            border-color: rgba(124, 111, 247, 0.2);
+        }
+
+        .skill-card-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .skill-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .skill-card-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .skill-card-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.55;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .skill-card-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .skill-toggle {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background: var(--text-dim);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .skill-toggle.on {
+            background: #4ade80;
+        }
+
+        .skill-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .skill-toggle.on::after {
+            transform: translateX(16px);
+        }
+
+        .skill-delete-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            opacity: 0;
+        }
+
+        .skill-card:hover .skill-delete-btn {
+            opacity: 1;
+        }
+
+        .skill-delete-btn:hover {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+            border-color: rgba(248, 113, 113, 0.2);
+        }
+
+        .skill-card-expand {
+            margin-top: 10px;
+        }
+
+        .skill-expand-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-family: 'Sora', sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.15s;
+        }
+
+        .skill-expand-btn:hover {
+            color: #8f84f9;
+        }
+
+        .skill-expand-btn svg {
+            transition: transform 0.2s ease;
+        }
+
+        .skill-expand-btn.open svg {
+            transform: rotate(180deg);
+        }
+
+        .skill-detail {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .skill-detail.show {
+            display: block;
+        }
+
+        .skill-detail-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+
+        .skill-detail-content {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.55;
+            color: #c9d1d9;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .skill-detail-content::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .skill-detail-content::-webkit-scrollbar-thumb {
+            background: var(--scrollbar);
+            border-radius: 99px;
+        }
+
+        .skills-footer {
+            padding: 12px 32px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            background: var(--bg);
+        }
+
+        .skills-save-status {
+            font-size: 12px;
+            color: #4ade80;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: opacity 0.2s ease;
+        }
+
+        .skills-footer-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .skills-footer-btn {
+            padding: 8px 20px;
+            border-radius: 9px;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+        }
+
+        .skills-footer-btn:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+        }
+
+        .skills-footer-btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .skills-footer-btn.primary:hover {
+            background: #8f84f9;
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        .skills-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 32px;
+            gap: 12px;
+        }
+
+        .skills-empty-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(124, 111, 247, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+        }
+
+        .skills-empty-text {
+            font-size: 14px;
+            color: var(--text-muted);
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -1243,6 +1690,12 @@
                       stroke-linecap="round"/>
             </svg>
             频道
+        </button>
+        <button id="skills-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1L8.5 4.5L12.5 5L9.75 7.5L10.5 11.5L7 9.5L3.5 11.5L4.25 7.5L1.5 5L5.5 4.5L7 1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            技能
         </button>
     </div>
 
@@ -1290,6 +1743,7 @@
     </div>
 
     <div id="channel-view" style="display:none;"></div>
+    <div id="skills-view" style="display:none;"></div>
 </main>
 
 <script>
@@ -1495,7 +1949,7 @@
 
                 items.forEach(function (s) {
                     var item = document.createElement('div');
-                    item.className = 'history-item' + (!isChannelView && s.id === currentSessionId ? ' active' : '');
+                    item.className = 'history-item' + (currentView === 'chat' && s.id === currentSessionId ? ' active' : '');
                     item.dataset.id = s.id;
 
                     var effectiveSource = (s.source && s.source !== 'web') ? s.source : 'web';
@@ -1542,7 +1996,7 @@
         }
 
         async function createNewChat() {
-            if (isChannelView) {
+            if (currentView !== 'chat') {
                 showChatView();
             }
             if (currentSessionId && !document.querySelector('#messages .message-row')) {
@@ -1723,7 +2177,9 @@
 
         const chatView = document.getElementById('chat-view');
         const channelView = document.getElementById('channel-view');
+        const skillsView = document.getElementById('skills-view');
         const channelsBtn = document.getElementById('channels-btn');
+        const skillsBtn = document.getElementById('skills-btn');
 
         const CHANNEL_META = {
             web: {name: '本地', icon: '本', iconClass: 'web', badge: '本地'},
@@ -1739,29 +2195,46 @@
         }
 
         var channelsData = null;
-        var isChannelView = false;
+        var skillsData = null;
+        var currentView = 'chat';
+
+        function hideAllViews() {
+            chatView.style.display = 'none';
+            channelView.style.display = 'none';
+            skillsView.style.display = 'none';
+            newChatBtn.classList.remove('active');
+            channelsBtn.classList.remove('active');
+            skillsBtn.classList.remove('active');
+        }
 
         function showChatView() {
-            isChannelView = false;
+            hideAllViews();
+            currentView = 'chat';
             chatView.style.display = 'flex';
-            channelView.style.display = 'none';
-            channelsBtn.classList.remove('active');
             newChatBtn.classList.add('active');
             renderHistory();
         }
 
         function showChannelsPage() {
-            isChannelView = true;
-            chatView.style.display = 'none';
+            hideAllViews();
+            currentView = 'channels';
             channelView.style.display = 'flex';
             channelsBtn.classList.add('active');
-            newChatBtn.classList.remove('active');
             renderHistory();
             renderAllChannels();
         }
 
+        function showSkillsPage() {
+            hideAllViews();
+            currentView = 'skills';
+            skillsView.style.display = 'flex';
+            skillsBtn.classList.add('active');
+            renderHistory();
+            renderSkillsView();
+        }
+
         channelsBtn.addEventListener('click', function () {
-            if (isChannelView) return;
+            if (currentView === 'channels') return;
             if (!channelsData) {
                 fetchChannels().then(function () {
                     showChannelsPage();
@@ -1769,6 +2242,13 @@
             } else {
                 showChannelsPage();
             }
+        });
+
+        skillsBtn.addEventListener('click', function () {
+            if (currentView === 'skills') return;
+            fetchSkills().then(function () {
+                showSkillsPage();
+            });
         });
 
         async function fetchChannels() {
@@ -1898,6 +2378,276 @@
                 saveBtn.textContent = '保存';
             }
         }
+
+        async function fetchSkills() {
+            try {
+                var res = await fetch('/api/skills');
+                skillsData = await res.json();
+            } catch (e) {
+                console.error('Failed to fetch skills:', e);
+                skillsData = { skills: [], sources: [] };
+            }
+        }
+
+        var skillsSearchTerm = '';
+
+        function renderSkillsView() {
+            skillsView.innerHTML = '';
+            if (!skillsData) return;
+
+            var page = document.createElement('div');
+            page.className = 'skills-page';
+
+            var header = document.createElement('div');
+            header.className = 'skills-header';
+            header.innerHTML =
+                '<div class="skills-header-top">' +
+                '<div class="skills-header-icon">' +
+                '<svg width="22" height="22" viewBox="0 0 14 14" fill="none"><path d="M7 1L8.5 4.5L12.5 5L9.75 7.5L10.5 11.5L7 9.5L3.5 11.5L4.25 7.5L1.5 5L5.5 4.5L7 1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+                '</div>' +
+                '<div>' +
+                '<div class="skills-header-title">技能管理</div>' +
+                '<div class="skills-header-count">' + skillsData.skills.length + ' 个技能可用</div>' +
+                '</div>' +
+                '</div>';
+            page.appendChild(header);
+
+            var toolbar = document.createElement('div');
+            toolbar.className = 'skills-toolbar';
+
+            var searchInput = document.createElement('input');
+            searchInput.className = 'skills-search';
+            searchInput.type = 'text';
+            searchInput.placeholder = '搜索技能名称、描述或路径…';
+            searchInput.value = skillsSearchTerm;
+            searchInput.id = 'skills-search-input';
+            searchInput.addEventListener('input', function () {
+                skillsSearchTerm = this.value;
+                renderSkillsList();
+            });
+
+            var refreshBtn = document.createElement('button');
+            refreshBtn.className = 'skills-toolbar-btn';
+            refreshBtn.title = '刷新';
+            refreshBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 7a5.5 5.5 0 0 1 9.35-3.95M12.5 7a5.5 5.5 0 0 1-9.35 3.95" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M10.5 1v2.5H13M3.5 13v-2.5H1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            refreshBtn.addEventListener('click', function () {
+                fetchSkills().then(function () {
+                    renderSkillsView();
+                    showSaveStatus('技能列表已刷新');
+                });
+            });
+
+            var openFolderBtn = document.createElement('button');
+            openFolderBtn.className = 'skills-toolbar-btn';
+            openFolderBtn.title = '打开文件夹';
+            openFolderBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 3.5v7a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H7L5.5 3.5H2.5a1 1 0 0 0-1 1z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            openFolderBtn.addEventListener('click', function () {
+                fetch('/api/skills/open-folder', { method: 'POST' });
+            });
+
+            toolbar.appendChild(searchInput);
+            toolbar.appendChild(refreshBtn);
+            toolbar.appendChild(openFolderBtn);
+            page.appendChild(toolbar);
+
+            var listContainer = document.createElement('div');
+            listContainer.className = 'skills-list';
+            listContainer.id = 'skills-list-container';
+            page.appendChild(listContainer);
+
+            var footer = document.createElement('div');
+            footer.className = 'skills-footer';
+            footer.innerHTML =
+                '<div class="skills-save-status" id="skills-save-status">' +
+                '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+                '所有更改已保存' +
+                '</div>' +
+                '<div class="skills-footer-actions">' +
+                '<button class="skills-footer-btn" id="skills-close-btn">关闭</button>' +
+                '</div>';
+            page.appendChild(footer);
+
+            skillsView.appendChild(page);
+
+            document.getElementById('skills-close-btn').addEventListener('click', function () {
+                showChatView();
+            });
+
+            renderSkillsList();
+        }
+
+        function renderSkillsList() {
+            var container = document.getElementById('skills-list-container');
+            if (!container || !skillsData) return;
+            container.innerHTML = '';
+
+            var term = skillsSearchTerm.toLowerCase().trim();
+            var filtered = skillsData.skills;
+            if (term) {
+                filtered = filtered.filter(function (s) {
+                    return s.name.toLowerCase().indexOf(term) !== -1 ||
+                        s.description.toLowerCase().indexOf(term) !== -1 ||
+                        s.fullPath.toLowerCase().indexOf(term) !== -1;
+                });
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML =
+                    '<div class="skills-empty">' +
+                    '<div class="skills-empty-icon">' +
+                    '<svg width="20" height="20" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="M9.5 9.5L12.5 12.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+                    '</div>' +
+                    '<div class="skills-empty-text">' + (term ? '没有找到匹配的技能' : '暂无可用技能') + '</div>' +
+                    '</div>';
+                return;
+            }
+
+            var grouped = {};
+            filtered.forEach(function (s) {
+                if (!grouped[s.source]) grouped[s.source] = [];
+                grouped[s.source].push(s);
+            });
+
+            Object.keys(grouped).forEach(function (source) {
+                var items = grouped[source];
+                var group = document.createElement('div');
+                group.className = 'skills-group';
+
+                var label = document.createElement('div');
+                label.className = 'skills-group-label';
+                label.innerHTML = escapeHtml(source) + ' <span class="skills-group-badge">' + items.length + '</span>';
+                group.appendChild(label);
+
+                items.forEach(function (skill) {
+                    group.appendChild(createSkillCard(skill));
+                });
+
+                container.appendChild(group);
+            });
+        }
+
+        function createSkillCard(skill) {
+            var card = document.createElement('div');
+            card.className = 'skill-card';
+            card.dataset.skillId = skill.id;
+
+            var top = document.createElement('div');
+            top.className = 'skill-card-top';
+
+            var info = document.createElement('div');
+            info.className = 'skill-card-info';
+            info.innerHTML =
+                '<div class="skill-card-name">' + escapeHtml(skill.name) + '</div>' +
+                '<div class="skill-card-desc">' + escapeHtml(skill.description || '暂无描述') + '</div>';
+
+            var actions = document.createElement('div');
+            actions.className = 'skill-card-actions';
+
+            var toggle = document.createElement('button');
+            toggle.className = 'skill-toggle' + (skill.enabled ? ' on' : '');
+            toggle.title = skill.enabled ? '点击禁用' : '点击启用';
+            toggle.addEventListener('click', function () {
+                var newState = !toggle.classList.contains('on');
+                toggle.classList.toggle('on');
+                toggle.title = newState ? '点击禁用' : '点击启用';
+                skill.enabled = newState;
+                fetch('/api/skills/' + encodeURIComponent(skill.id) + '/toggle', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: newState }),
+                }).then(function () {
+                    showSaveStatus(newState ? '已启用: ' + skill.name : '已禁用: ' + skill.name);
+                }).catch(function () {
+                    showError('切换技能状态失败');
+                });
+            });
+
+            var delBtn = document.createElement('button');
+            delBtn.className = 'skill-delete-btn';
+            delBtn.title = '删除技能';
+            delBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4.5 3V2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3 3v7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V3" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            delBtn.addEventListener('click', function () {
+                if (!confirm('确定要删除技能 "' + skill.name + '" 吗？此操作不可撤销。')) return;
+                fetch('/api/skills/' + encodeURIComponent(skill.id), {
+                    method: 'DELETE',
+                }).then(function (res) {
+                    if (res.ok) {
+                        card.style.transition = 'opacity 0.2s, transform 0.2s';
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateX(10px)';
+                        setTimeout(function () {
+                            card.remove();
+                            skillsData.skills = skillsData.skills.filter(function (s) { return s.id !== skill.id; });
+                            var countEl = document.querySelector('.skills-header-count');
+                            if (countEl) countEl.textContent = skillsData.skills.length + ' 个技能可用';
+                            showSaveStatus('已删除: ' + skill.name);
+                        }, 200);
+                    } else {
+                        showError('删除技能失败');
+                    }
+                }).catch(function () {
+                    showError('删除技能失败');
+                });
+            });
+
+            actions.appendChild(toggle);
+            actions.appendChild(delBtn);
+            top.appendChild(info);
+            top.appendChild(actions);
+            card.appendChild(top);
+
+            var expand = document.createElement('div');
+            expand.className = 'skill-card-expand';
+
+            var expandBtn = document.createElement('button');
+            expandBtn.className = 'skill-expand-btn';
+            expandBtn.innerHTML = '查看详情 <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+            var detail = document.createElement('div');
+            detail.className = 'skill-detail';
+            detail.innerHTML =
+                '<div class="skill-detail-path">📁 ' + escapeHtml(skill.fullPath) + '</div>' +
+                '<div class="skill-detail-content">' + escapeHtml(skill.content) + '</div>';
+
+            expandBtn.addEventListener('click', function () {
+                var isOpen = detail.classList.contains('show');
+                detail.classList.toggle('show');
+                expandBtn.classList.toggle('open');
+                expandBtn.innerHTML = (isOpen ? '查看详情' : '收起详情') +
+                    ' <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            });
+
+            expand.appendChild(expandBtn);
+            expand.appendChild(detail);
+            card.appendChild(expand);
+
+            return card;
+        }
+
+        function showSaveStatus(msg) {
+            var el = document.getElementById('skills-save-status');
+            if (!el) return;
+            el.innerHTML =
+                '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> ' +
+                escapeHtml(msg);
+            el.style.opacity = '1';
+            clearTimeout(el._timer);
+            el._timer = setTimeout(function () {
+                el.innerHTML =
+                    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> 所有更改已保存';
+            }, 3000);
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (currentView !== 'skills') return;
+            if (e.key === '/' || (e.metaKey && e.key === 'f') || (e.ctrlKey && e.key === 'f')) {
+                var searchEl = document.getElementById('skills-search-input');
+                if (searchEl && document.activeElement !== searchEl) {
+                    e.preventDefault();
+                    searchEl.focus();
+                }
+            }
+        });
 
         async function init() {
             await Promise.all([fetchSessions(), fetchModelConfig()]);

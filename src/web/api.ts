@@ -13,6 +13,7 @@ import {
   getRegisteredChannelTypes,
   channelManager,
 } from "../channels/index.js";
+import { listSkills, toggleSkill, deleteSkill, openSkillsFolder } from "./skills.js";
 
 const codexBin = process.env.CODEX_BIN || "codex";
 const codexSandboxRaw = process.env.CODEX_SANDBOX || "read-only";
@@ -158,6 +159,50 @@ export function chatRouter(): Router {
     } catch (error) {
       const msg = error instanceof Error ? error.message : "更新频道配置失败";
       res.status(400).json({ error: msg });
+    }
+  });
+
+  router.get("/skills", (_req: Request, res: Response) => {
+    try {
+      res.json(listSkills());
+    } catch (error) {
+      res.status(500).json({ error: "读取技能列表失败" });
+    }
+  });
+
+  router.put("/skills/:id/toggle", (req: Request, res: Response) => {
+    const id = decodeURIComponent(req.params.id as string);
+    const { enabled } = req.body as { enabled?: boolean };
+    if (typeof enabled !== "boolean") {
+      res.status(400).json({ error: "缺少 enabled 参数" });
+      return;
+    }
+    try {
+      toggleSkill(id, enabled);
+      logger.info("skill.toggled", { id, enabled });
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ error: "切换技能状态失败" });
+    }
+  });
+
+  router.delete("/skills/:id", (req: Request, res: Response) => {
+    const id = decodeURIComponent(req.params.id as string);
+    const result = deleteSkill(id);
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    logger.info("skill.deleted", { id });
+    res.json({ ok: true });
+  });
+
+  router.post("/skills/open-folder", (_req: Request, res: Response) => {
+    try {
+      openSkillsFolder();
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ error: "打开文件夹失败" });
     }
   });
 
