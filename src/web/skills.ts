@@ -157,11 +157,7 @@ export function deleteSkill(id: string): { ok: boolean; error?: string } {
   }
 }
 
-export function openSkillsFolder(skillPath?: string): void {
-  const dir = skillPath
-    ? path.dirname(skillPath)
-    : (getSkillSources()[0]?.dir || path.join(getCodexHome(), "skills"));
-
+function openDirectory(dir: string): void {
   const platform = os.platform();
   let cmd: string;
   if (platform === "darwin") {
@@ -169,8 +165,41 @@ export function openSkillsFolder(skillPath?: string): void {
   } else if (platform === "win32") {
     cmd = `explorer "${dir}"`;
   } else {
-    cmd = `nautilus --show-hidden "${dir}" 2>/dev/null || thunar "${dir}" 2>/dev/null || dolphin "${dir}" 2>/dev/null || xdg-open "${dir}"`;
+    cmd = `nautilus "${dir}" 2>/dev/null || thunar "${dir}" 2>/dev/null || dolphin "${dir}" 2>/dev/null || xdg-open "${dir}"`;
+  }
+  exec(cmd, () => {});
+}
+
+export function openSkillsFolder(skillPath?: string): void {
+  if (skillPath) {
+    openDirectory(path.dirname(skillPath));
+    return;
   }
 
-  exec(cmd, () => {});
+  const baseDir = getSkillSources()[0]?.dir || path.join(getCodexHome(), "skills");
+  const dirs = new Set<string>();
+
+  try {
+    const entries = fs.readdirSync(baseDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const sub = path.join(baseDir, entry.name);
+      if (entry.name.startsWith(".")) {
+        try {
+          const inner = fs.readdirSync(sub, { withFileTypes: true });
+          if (inner.some((e) => e.isDirectory() && fs.existsSync(path.join(sub, e.name, "SKILL.md")))) {
+            dirs.add(sub);
+          }
+        } catch {}
+      } else if (fs.existsSync(path.join(sub, "SKILL.md"))) {
+        dirs.add(baseDir);
+      }
+    }
+  } catch {}
+
+  if (dirs.size === 0) dirs.add(baseDir);
+
+  for (const d of dirs) {
+    openDirectory(d);
+  }
 }
