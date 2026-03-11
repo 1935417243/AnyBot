@@ -163,12 +163,14 @@ export function openSkillsFolder(skillPath?: string): void {
     : (getSkillSources()[0]?.dir || path.join(getCodexHome(), "skills"));
 
   const platform = os.platform();
-  const cmd =
-    platform === "darwin"
-      ? `open "${dir}"`
-      : platform === "win32"
-        ? `explorer "${dir}"`
-        : `xdg-open "${dir}"`;
+  let cmd: string;
+  if (platform === "darwin") {
+    cmd = `open "${dir}"`;
+  } else if (platform === "win32") {
+    cmd = `explorer "${dir}"`;
+  } else {
+    cmd = `nautilus --show-hidden "${dir}" 2>/dev/null || thunar "${dir}" 2>/dev/null || dolphin "${dir}" 2>/dev/null || xdg-open "${dir}"`;
+  }
 
   exec(cmd, () => {});
 }
