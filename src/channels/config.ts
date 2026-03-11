@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ChannelsConfig, FeishuChannelConfig, QQBotChannelConfig } from "./types.js";
+import type { ChannelsConfig, FeishuChannelConfig, QQBotChannelConfig, TelegramChannelConfig } from "./types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.resolve(__dirname, "../../.data/channels.json");
@@ -21,6 +21,10 @@ const DEFAULT_CONFIG: ChannelsConfig = {
     appId: "",
     appSecret: "",
   } satisfies QQBotChannelConfig,
+  telegram: {
+    enabled: false,
+    token: "",
+  } satisfies TelegramChannelConfig,
 };
 
 function ensureConfig(): void {

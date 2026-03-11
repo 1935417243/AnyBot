@@ -1045,98 +1045,248 @@
             max-width: 360px;
         }
 
-        .channel-config-view {
+        .channel-page {
             flex: 1;
             display: flex;
             flex-direction: column;
-            overflow-y: auto;
-            padding: 32px;
+            overflow: hidden;
             position: relative;
             z-index: 1;
         }
 
-        .channel-config-view::-webkit-scrollbar {
-            width: 4px;
+        .channel-page-header {
+            padding: 28px 32px 0;
+            flex-shrink: 0;
         }
 
-        .channel-config-view::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .channel-config-view::-webkit-scrollbar-thumb {
-            background: var(--scrollbar);
-            border-radius: 99px;
-        }
-
-        .channel-config-header {
+        .channel-page-header-top {
             display: flex;
             align-items: center;
             gap: 14px;
-            margin-bottom: 28px;
+            margin-bottom: 6px;
         }
 
-        .channel-config-icon {
+        .channel-page-header-icon {
             width: 44px;
             height: 44px;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
-            font-weight: 600;
-        }
-
-        .channel-config-icon.feishu {
-            background: rgba(51, 112, 255, 0.15);
-            color: #3370ff;
-        }
-
-        .channel-config-icon.qq {
-            background: rgba(18, 183, 245, 0.15);
-            color: #12b7f5;
-        }
-
-        .channel-config-icon.dingtalk {
-            background: rgba(0, 122, 255, 0.15);
-            color: #007aff;
-        }
-
-        .channel-config-icon.default {
             background: var(--accent-dim);
+            border: 1px solid rgba(124, 111, 247, 0.2);
             color: var(--accent);
+            flex-shrink: 0;
         }
 
-        .channel-config-title {
+        .channel-page-title {
             font-size: 20px;
             font-weight: 600;
             color: var(--text);
         }
 
-        .channel-config-subtitle {
+        .channel-page-subtitle {
             font-size: 13px;
             color: var(--text-muted);
             margin-top: 2px;
         }
 
-        .channel-config-card {
-            background: var(--sidebar);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 24px;
-            max-width: 480px;
+        .channel-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 32px;
         }
 
-        .channel-config-row {
+        .channel-list::-webkit-scrollbar { width: 4px; }
+        .channel-list::-webkit-scrollbar-track { background: transparent; }
+        .channel-list::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 99px; }
+
+        .channel-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-bottom: 4px;
+            border: 1px solid transparent;
+        }
+
+        .channel-item:hover {
+            background: var(--sidebar-hover);
+            border-color: var(--border);
+        }
+
+        .channel-item.active {
+            background: var(--sidebar-active);
+            border-color: rgba(124, 111, 247, 0.25);
+        }
+
+        .channel-item-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .channel-item-icon.feishu { background: rgba(51, 112, 255, 0.15); color: #3370ff; }
+        .channel-item-icon.qq { background: rgba(18, 183, 245, 0.15); color: #12b7f5; }
+        .channel-item-icon.telegram { background: rgba(38, 166, 222, 0.15); color: #26a6de; }
+        .channel-item-icon.dingtalk { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+        .channel-item-icon.discord { background: rgba(88, 101, 242, 0.15); color: #5865f2; }
+        .channel-item-icon.default { background: var(--accent-dim); color: var(--accent); }
+
+        .channel-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .channel-item-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .channel-item-status {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 1px;
+        }
+
+        .channel-item-status.on {
+            color: #4ade80;
+        }
+
+        .channel-item-arrow {
+            color: var(--text-dim);
+            flex-shrink: 0;
+            transition: color 0.15s;
+        }
+
+        .channel-item:hover .channel-item-arrow {
+            color: var(--text-muted);
+        }
+
+        .channel-drawer-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .channel-drawer-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .channel-drawer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 360px;
+            max-width: 90%;
+            background: var(--sidebar);
+            border-left: 1px solid var(--border);
+            z-index: 11;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .channel-drawer.open {
+            transform: translateX(0);
+        }
+
+        .channel-drawer-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .channel-drawer-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .channel-drawer-icon.feishu { background: rgba(51, 112, 255, 0.15); color: #3370ff; }
+        .channel-drawer-icon.qq { background: rgba(18, 183, 245, 0.15); color: #12b7f5; }
+        .channel-drawer-icon.telegram { background: rgba(38, 166, 222, 0.15); color: #26a6de; }
+        .channel-drawer-icon.dingtalk { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+        .channel-drawer-icon.discord { background: rgba(88, 101, 242, 0.15); color: #5865f2; }
+        .channel-drawer-icon.default { background: var(--accent-dim); color: var(--accent); }
+
+        .channel-drawer-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+            flex: 1;
+        }
+
+        .channel-drawer-close {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .channel-drawer-close:hover {
+            color: var(--text);
+            background: var(--sidebar-hover);
+            border-color: var(--border);
+        }
+
+        .channel-drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .channel-drawer-body::-webkit-scrollbar { width: 3px; }
+        .channel-drawer-body::-webkit-scrollbar-track { background: transparent; }
+        .channel-drawer-body::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 99px; }
+
+        .channel-drawer-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border);
         }
 
-        .channel-config-row-label {
-            font-size: 14px;
+        .channel-drawer-row-label {
+            font-size: 13px;
             color: var(--text);
             font-weight: 500;
         }
@@ -1173,25 +1323,25 @@
             transform: translateX(16px);
         }
 
-        .channel-config-fields {
+        .channel-drawer-fields {
             display: flex;
             flex-direction: column;
             gap: 14px;
         }
 
-        .channel-config-field {
+        .channel-drawer-field {
             display: flex;
             flex-direction: column;
             gap: 5px;
         }
 
-        .channel-config-field-label {
+        .channel-drawer-field-label {
             font-size: 12px;
             font-weight: 500;
             color: var(--text-muted);
         }
 
-        .channel-config-input {
+        .channel-drawer-input {
             background: var(--input-bg);
             border: 1px solid var(--border);
             border-radius: 9px;
@@ -1204,23 +1354,25 @@
             width: 100%;
         }
 
-        .channel-config-input:focus {
+        .channel-drawer-input:focus {
             border-color: rgba(124, 111, 247, 0.4);
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
 
-        .channel-config-input::placeholder {
+        .channel-drawer-input::placeholder {
             color: var(--text-dim);
         }
 
-        .channel-config-actions {
+        .channel-drawer-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-top: 20px;
+            flex-shrink: 0;
         }
 
-        .channel-config-save {
+        .channel-drawer-save {
             padding: 9px 24px;
             border-radius: 9px;
             font-family: 'Sora', sans-serif;
@@ -1231,14 +1383,15 @@
             border: none;
             background: var(--accent);
             color: #fff;
+            flex: 1;
         }
 
-        .channel-config-save:hover {
+        .channel-drawer-save:hover {
             background: #8f84f9;
             box-shadow: 0 0 16px var(--accent-glow);
         }
 
-        .channel-config-save:disabled {
+        .channel-drawer-save:disabled {
             background: var(--text-dim);
             cursor: default;
             box-shadow: none;
@@ -1252,6 +1405,7 @@
             gap: 4px;
             opacity: 0;
             transition: opacity 0.2s ease;
+            white-space: nowrap;
         }
 
         .channel-save-ok.show {
@@ -2262,88 +2416,163 @@
             }
         }
 
+        var openDrawerType = null;
+
         function renderAllChannels() {
             channelView.innerHTML = '';
             if (!channelsData || !channelsData.registered) return;
 
-            var wrapper = document.createElement('div');
-            wrapper.className = 'channel-config-view';
+            var page = document.createElement('div');
+            page.className = 'channel-page';
 
             var header = document.createElement('div');
-            header.className = 'channel-config-header';
+            header.className = 'channel-page-header';
             header.innerHTML =
-                '<div class="channel-config-icon default">' +
+                '<div class="channel-page-header-top">' +
+                '<div class="channel-page-header-icon">' +
                 '<svg width="20" height="20" viewBox="0 0 14 14" fill="none"><path d="M1.5 5h11M1.5 9h11M5 1.5l-1.5 11M10.5 1.5L9 12.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
                 '</div>' +
                 '<div>' +
-                '<div class="channel-config-title">频道管理</div>' +
-                '<div class="channel-config-subtitle">配置和管理你的消息频道</div>' +
+                '<div class="channel-page-title">频道管理</div>' +
+                '<div class="channel-page-subtitle">点击频道进行配置</div>' +
+                '</div>' +
                 '</div>';
-            wrapper.appendChild(header);
+            page.appendChild(header);
+
+            var list = document.createElement('div');
+            list.className = 'channel-list';
 
             channelsData.registered.forEach(function (type) {
                 var cfg = (channelsData.config && channelsData.config[type]) || {};
                 var meta = getChannelMeta(type);
                 var isOn = !!cfg.enabled;
 
-                var card = document.createElement('div');
-                card.className = 'channel-config-card';
-                card.style.marginBottom = '20px';
-                card.innerHTML =
-                    '<div class="channel-config-row">' +
-                    '<div style="display:flex;align-items:center;gap:10px">' +
-                    '<div class="channel-config-icon ' + meta.iconClass + '" style="width:32px;height:32px;border-radius:8px;font-size:15px">' + escapeHtml(meta.icon) + '</div>' +
-                    '<span class="channel-config-row-label">' + escapeHtml(meta.name) + '</span>' +
+                var item = document.createElement('div');
+                item.className = 'channel-item';
+                item.dataset.type = type;
+                item.innerHTML =
+                    '<div class="channel-item-icon ' + meta.iconClass + '">' + escapeHtml(meta.icon) + '</div>' +
+                    '<div class="channel-item-info">' +
+                    '<div class="channel-item-name">' + escapeHtml(meta.name) + '</div>' +
+                    '<div class="channel-item-status ' + (isOn ? 'on' : '') + '">' + (isOn ? '已启用' : '未启用') + '</div>' +
                     '</div>' +
-                    '<button class="channel-toggle ' + (isOn ? 'on' : '') + '" id="ch-toggle-' + type + '"></button>' +
-                    '</div>' +
-                    '<div class="channel-config-fields">' +
-                    '<div class="channel-config-field">' +
-                    '<label class="channel-config-field-label">App ID</label>' +
-                    '<input class="channel-config-input" id="ch-appid-' + type + '" value="' + escapeHtml(cfg.appId || '') + '" placeholder="输入 App ID" spellcheck="false">' +
-                    '</div>' +
-                    '<div class="channel-config-field">' +
-                    '<label class="channel-config-field-label">App Secret</label>' +
-                    '<input class="channel-config-input" id="ch-secret-' + type + '" type="password" value="' + escapeHtml(cfg.appSecret || '') + '" placeholder="输入 App Secret" spellcheck="false">' +
-                    '</div>' +
-                    '</div>' +
-                    '<div class="channel-config-actions">' +
-                    '<button class="channel-config-save" id="ch-save-' + type + '">保存</button>' +
-                    '<span class="channel-save-ok" id="save-ok-' + type + '">' +
-                    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-                    '已保存' +
-                    '</span>' +
+                    '<svg class="channel-item-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+                item.addEventListener('click', function () {
+                    openChannelDrawer(type);
+                });
+                list.appendChild(item);
+            });
+
+            page.appendChild(list);
+
+            var overlay = document.createElement('div');
+            overlay.className = 'channel-drawer-overlay';
+            overlay.id = 'channel-drawer-overlay';
+            overlay.addEventListener('click', closeChannelDrawer);
+
+            var drawer = document.createElement('div');
+            drawer.className = 'channel-drawer';
+            drawer.id = 'channel-drawer';
+
+            page.appendChild(overlay);
+            page.appendChild(drawer);
+            channelView.appendChild(page);
+        }
+
+        function openChannelDrawer(type) {
+            openDrawerType = type;
+            var cfg = (channelsData.config && channelsData.config[type]) || {};
+            var meta = getChannelMeta(type);
+            var isOn = !!cfg.enabled;
+
+            document.querySelectorAll('.channel-item').forEach(function (el) {
+                el.classList.toggle('active', el.dataset.type === type);
+            });
+
+            var drawer = document.getElementById('channel-drawer');
+            var fieldsHtml = '';
+            if (type === 'telegram') {
+                fieldsHtml =
+                    '<div class="channel-drawer-field">' +
+                    '<label class="channel-drawer-field-label">Bot Token</label>' +
+                    '<input class="channel-drawer-input" id="ch-token-' + type + '" type="password" value="' + escapeHtml(cfg.token || '') + '" placeholder="从 @BotFather 获取的 Token" spellcheck="false">' +
                     '</div>';
+            } else {
+                fieldsHtml =
+                    '<div class="channel-drawer-field">' +
+                    '<label class="channel-drawer-field-label">App ID</label>' +
+                    '<input class="channel-drawer-input" id="ch-appid-' + type + '" value="' + escapeHtml(cfg.appId || '') + '" placeholder="输入 App ID" spellcheck="false">' +
+                    '</div>' +
+                    '<div class="channel-drawer-field">' +
+                    '<label class="channel-drawer-field-label">App Secret</label>' +
+                    '<input class="channel-drawer-input" id="ch-secret-' + type + '" type="password" value="' + escapeHtml(cfg.appSecret || '') + '" placeholder="输入 App Secret" spellcheck="false">' +
+                    '</div>';
+            }
 
-                wrapper.appendChild(card);
+            drawer.innerHTML =
+                '<div class="channel-drawer-header">' +
+                '<div class="channel-drawer-icon ' + meta.iconClass + '">' + escapeHtml(meta.icon) + '</div>' +
+                '<span class="channel-drawer-title">' + escapeHtml(meta.name) + '</span>' +
+                '<button class="channel-drawer-close" id="drawer-close-btn">' +
+                '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>' +
+                '</button>' +
+                '</div>' +
+                '<div class="channel-drawer-body">' +
+                '<div class="channel-drawer-row">' +
+                '<span class="channel-drawer-row-label">启用频道</span>' +
+                '<button class="channel-toggle ' + (isOn ? 'on' : '') + '" id="ch-toggle-' + type + '"></button>' +
+                '</div>' +
+                '<div class="channel-drawer-fields">' + fieldsHtml + '</div>' +
+                '</div>' +
+                '<div class="channel-drawer-footer">' +
+                '<button class="channel-drawer-save" id="ch-save-' + type + '">保存</button>' +
+                '<span class="channel-save-ok" id="save-ok-' + type + '">' +
+                '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+                '已保存' +
+                '</span>' +
+                '</div>';
+
+            document.getElementById('drawer-close-btn').addEventListener('click', closeChannelDrawer);
+            document.getElementById('ch-toggle-' + type).addEventListener('click', function () {
+                this.classList.toggle('on');
+            });
+            document.getElementById('ch-save-' + type).addEventListener('click', function () {
+                saveChannel(type);
             });
 
-            channelView.appendChild(wrapper);
-
-            channelsData.registered.forEach(function (type) {
-                var toggle = document.getElementById('ch-toggle-' + type);
-                toggle.addEventListener('click', function () {
-                    toggle.classList.toggle('on');
-                });
-
-                var saveBtn = document.getElementById('ch-save-' + type);
-                saveBtn.addEventListener('click', function () {
-                    saveChannel(type);
-                });
+            requestAnimationFrame(function () {
+                document.getElementById('channel-drawer-overlay').classList.add('open');
+                drawer.classList.add('open');
             });
+        }
+
+        function closeChannelDrawer() {
+            var drawer = document.getElementById('channel-drawer');
+            var overlay = document.getElementById('channel-drawer-overlay');
+            if (drawer) drawer.classList.remove('open');
+            if (overlay) overlay.classList.remove('open');
+            document.querySelectorAll('.channel-item').forEach(function (el) {
+                el.classList.remove('active');
+            });
+            openDrawerType = null;
         }
 
         async function saveChannel(type) {
             var toggle = document.getElementById('ch-toggle-' + type);
-            var appIdInput = document.getElementById('ch-appid-' + type);
-            var appSecretInput = document.getElementById('ch-secret-' + type);
             var saveBtn = document.getElementById('ch-save-' + type);
 
-            var payload = {
-                enabled: toggle.classList.contains('on'),
-                appId: appIdInput.value.trim(),
-                appSecret: appSecretInput.value.trim(),
-            };
+            var payload = { enabled: toggle.classList.contains('on') };
+
+            if (type === 'telegram') {
+                var tokenInput = document.getElementById('ch-token-' + type);
+                payload.token = tokenInput.value.trim();
+            } else {
+                var appIdInput = document.getElementById('ch-appid-' + type);
+                var appSecretInput = document.getElementById('ch-secret-' + type);
+                payload.appId = appIdInput.value.trim();
+                payload.appSecret = appSecretInput.value.trim();
+            }
 
             saveBtn.disabled = true;
             saveBtn.textContent = '保存中…';
@@ -2373,6 +2602,13 @@
                 setTimeout(function () {
                     okEl.classList.remove('show');
                 }, 2000);
+
+                var statusEl = document.querySelector('.channel-item[data-type="' + type + '"] .channel-item-status');
+                if (statusEl) {
+                    var nowOn = toggle.classList.contains('on');
+                    statusEl.textContent = nowOn ? '已启用' : '未启用';
+                    statusEl.className = 'channel-item-status' + (nowOn ? ' on' : '');
+                }
             } catch (e) {
                 showError('保存频道配置失败');
             } finally {
@@ -2658,6 +2894,10 @@
         }
 
         document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && openDrawerType) {
+                closeChannelDrawer();
+                return;
+            }
             if (currentView !== 'skills') return;
             if (e.key === '/' || (e.metaKey && e.key === 'f') || (e.ctrlKey && e.key === 'f')) {
                 var searchEl = document.getElementById('skills-search-input');

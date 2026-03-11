@@ -16,10 +16,17 @@ export interface QQBotChannelConfig extends ChannelConfig {
   [key: string]: unknown;
 }
 
+export interface TelegramChannelConfig {
+  enabled: boolean;
+  token: string;
+  [key: string]: unknown;
+}
+
 export interface ChannelsConfig {
-  [channelType: string]: ChannelConfig | undefined;
+  [channelType: string]: ChannelConfig | TelegramChannelConfig | undefined;
   feishu?: FeishuChannelConfig;
   qqbot?: QQBotChannelConfig;
+  telegram?: TelegramChannelConfig;
 }
 
 export interface ChannelCallbacks {
