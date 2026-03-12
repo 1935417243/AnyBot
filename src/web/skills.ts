@@ -28,7 +28,7 @@ const PROVIDER_SKILL_DIRS: Record<string, () => SkillSource[]> = {
     return [{ label: "Claude Code 规则", dir: path.join(os.homedir(), ".claude") }];
   },
   "gemini-cli": () => {
-    return [{ label: "Gemini CLI 配置", dir: path.join(os.homedir(), ".gemini") }];
+    return [{ label: "Gemini CLI 技能", dir: path.join(os.homedir(), ".agents", "skills") }];
   },
   "cursor-cli": () => {
     return [{ label: "Cursor 规则", dir: path.join(process.cwd(), ".cursor", "rules") }];
