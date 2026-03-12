@@ -273,6 +273,29 @@ AnyBot 使用可插拔的 Provider 架构，每个 AI CLI 工具对应一个 Pro
 
 ---
 
+## 常见问题排查
+
+### Cursor CLI 在 Linux 上报 Sandbox 错误
+
+**错误信息：**
+
+```
+Sandbox mode is enabled but not available on this system.
+Sandbox failed to start, possibly due to AppArmor configuration.
+```
+
+**原因：** Cursor CLI 的 Sandbox 模式依赖内核级进程隔离，在 Linux（尤其是 Ubuntu）上需要 AppArmor 正确配置。VPS、Docker 容器或非桌面 Linux 环境通常不满足条件，导致沙盒无法启动。macOS 使用不同的沙盒机制，不受影响。
+
+**解决方法：** 在 Linux 服务器上执行以下命令，关闭 Cursor CLI 的全局沙盒配置：
+
+```bash
+agent sandbox disable
+```
+
+AnyBot 已在代码层面做了处理——在 Linux 上会自动以 `--sandbox disabled` 运行 Cursor CLI，无需额外配置。如果仍然报错，请确认已执行上述命令。
+
+---
+
 ## 环境变量
 
 在 `.env` 文件中配置（通过 `setup.sh` 生成或手动从 `.env.example` 复制）。
