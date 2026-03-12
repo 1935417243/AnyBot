@@ -26,6 +26,22 @@ Supports **macOS** and **Linux**.
 
 ---
 
+## Screenshots
+
+| Chat Interface | Model Switching |
+|:---:|:---:|
+| ![Chat Interface](assets/webUI聊天展示.png) | ![Model Switching](assets/模型配置.png) |
+
+| Provider Switching | Channel Management |
+|:---:|:---:|
+| ![Provider Switching](assets/供应商.png) | ![Channel Management](assets/频道管理.png) |
+
+| Skill Management |
+|:---:|
+| ![Skill Management](assets/技能管理.png) |
+
+---
+
 ## Quick Start
 
 ### 1. Prerequisites
