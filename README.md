@@ -2,7 +2,7 @@
 
 把 AI CLI 工具变成可远程使用的 AI 助手——通过内置 **Web UI** 在浏览器里对话，或通过 **飞书机器人** / **QQ 机器人** / **Telegram 机器人** 在手机 / 桌面端随时向你这台机器上的 AI 发消息。
 
-目前支持 [OpenAI Codex CLI](https://github.com/openai/codex) 作为 Provider，架构已为接入更多 CLI 工具（Gemini CLI、Claude Code、Cursor CLI 等）做好准备。
+目前支持 [OpenAI Codex CLI](https://github.com/openai/codex) 和 [Google Gemini CLI](https://github.com/google-gemini/gemini-cli) 作为 Provider，架构已为接入更多 CLI 工具（Claude Code、Cursor CLI 等）做好准备。
 
 支持 **macOS** 和 **Linux**。
 
@@ -10,7 +10,7 @@
 
 ## 特性
 
-- **多 Provider 架构** — 可插拔的 AI CLI 后端，当前支持 Codex CLI，未来可扩展
+- **多 Provider 架构** — 可插拔的 AI CLI 后端，当前支持 Codex CLI 和 Gemini CLI，未来可扩展更多
 - **Web UI** — 开箱即用的本地聊天界面，支持 Markdown 渲染、代码高亮、会话管理
 - **多平台集成** — 同时支持飞书（长连接）、QQ 机器人（WebSocket）、Telegram，手机上也能用
 - **技能管理** — 在 Web UI 中浏览、启用 / 禁用 / 删除技能
@@ -19,7 +19,7 @@
 - **文件回传** — 生成的图片、文件自动发送回聊天
 - **模型切换** — 在 Web UI 中随时切换 Provider 和模型
 - **后台运行** — 支持 daemon 模式，开机即用
-- **一键配置** — 交互式 `setup.sh` 引导完成所有配置
+- **一键配置** — 交互式 `setup.sh` 引导完成所有配置，自动检测依赖、选择 Provider
 
 ---
 
@@ -31,7 +31,13 @@
 |------|---------|------|
 | [Node.js](https://nodejs.org/) | 18+ | 运行环境 |
 | npm | 随 Node.js 附带 | 包管理 |
-| [Codex CLI](https://github.com/openai/codex) | — | `npm install -g @openai/codex`（默认 Provider） |
+
+以及至少安装一个 Provider CLI：
+
+| Provider | 安装方式 | 说明 |
+|----------|---------|------|
+| [Codex CLI](https://github.com/openai/codex) | `npm install -g @openai/codex` | OpenAI 的 CLI 工具 |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | 参见 [官方文档](https://github.com/google-gemini/gemini-cli) | Google 的 CLI 工具 |
 
 <details>
 <summary><b>Linux 安装指南</b></summary>
@@ -58,12 +64,6 @@ source ~/.bashrc   # 或 source ~/.zshrc
 nvm install --lts
 ```
 
-**安装 Codex CLI：**
-
-```bash
-npm install -g @openai/codex
-```
-
 </details>
 
 <details>
@@ -71,7 +71,6 @@ npm install -g @openai/codex
 
 ```bash
 brew install node
-npm install -g @openai/codex
 ```
 
 </details>
@@ -85,11 +84,13 @@ sh setup.sh
 ```
 
 `setup.sh` 会引导你完成：
-- 检测操作系统与依赖
+- 检测操作系统与基础依赖（Node.js、npm）
+- **选择默认 Provider**（Codex CLI / Gemini CLI）
+- 检测对应 CLI 是否已安装，并提供安装指引
 - 设置工作目录
-- 选择安全模式（只读 / 可写 / 完全访问）
+- 配置安全模式（Codex: Sandbox 模式 / Gemini: Approval Mode）
 - 配置 Web UI 端口
-- 生成 `.env` 配置文件
+- 生成 `.env` 配置文件（包含所有 Provider 的配置）
 - 安装 npm 依赖
 
 ### 3. 启动
@@ -116,7 +117,7 @@ npm run bot:stop
 
 ```bash
 cp .env.example .env
-# 编辑 .env，按需填写配置
+# 编辑 .env，设置 PROVIDER 和对应 CLI 的配置
 npm install
 npm start
 ```
@@ -129,12 +130,12 @@ AnyBot 使用可插拔的 Provider 架构，每个 AI CLI 工具对应一个 Pro
 
 | Provider | 状态 | CLI 工具 | 说明 |
 |----------|------|---------|------|
-| `codex` | ✅ 可用 | [Codex CLI](https://github.com/openai/codex) | 默认 Provider |
+| `codex` | ✅ 可用 | [Codex CLI](https://github.com/openai/codex) | OpenAI 的 CLI，支持 Sandbox 模式 |
+| `gemini-cli` | ✅ 可用 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | Google 的 CLI，支持会话续聊 |
 | `claude-code` | 🔜 计划中 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Anthropic 的 CLI |
-| `gemini-cli` | 🔜 计划中 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | Google 的 CLI |
 | `cursor-cli` | 🔜 计划中 | Cursor CLI | Cursor 编辑器 CLI |
 
-通过环境变量 `PROVIDER=codex` 切换当前使用的 Provider。
+通过环境变量 `PROVIDER=codex` 或 `PROVIDER=gemini-cli` 切换默认 Provider，也可在 Web UI 中随时切换。
 
 ---
 
@@ -242,24 +243,48 @@ AnyBot 使用可插拔的 Provider 架构，每个 AI CLI 工具对应一个 Pro
 - 删除不需要的技能
 - 快速打开技能所在文件夹
 
+切换 Provider 后，技能列表自动切换到对应 Provider 的技能目录：
+
+| Provider | 技能目录 |
+|----------|---------|
+| `codex` | `~/.codex/skills/` |
+| `gemini-cli` | `~/.gemini/` |
+| `claude-code` | `~/.claude/` |
+| `cursor-cli` | `./.cursor/rules/` |
+
 ---
 
 ## 环境变量
 
 在 `.env` 文件中配置（通过 `setup.sh` 生成或手动从 `.env.example` 复制）。
 
+### 通用配置
+
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `PROVIDER` | `codex` | 使用的 Provider：`codex`（未来支持更多） |
+| `PROVIDER` | `codex` | 使用的 Provider：`codex`、`gemini-cli` |
+| `WEB_PORT` | `19981` | Web UI 端口 |
+| `LOG_LEVEL` | `info` | 日志级别：`debug` / `info` / `warn` / `error` |
+| `LOG_INCLUDE_CONTENT` | `false` | 日志中包含消息内容（调试用） |
+| `LOG_INCLUDE_PROMPT` | `false` | 日志中包含完整 prompt（调试用） |
+
+### Codex CLI 配置
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
 | `CODEX_BIN` | `codex` | Codex CLI 可执行文件路径 |
 | `CODEX_MODEL` | — | 覆盖使用的模型 |
 | `CODEX_SANDBOX` | `read-only` | 安全模式：`read-only` / `workspace-write` / `danger-full-access` |
 | `CODEX_SYSTEM_PROMPT` | — | 追加到内置提示词后面的自定义系统提示词 |
 | `CODEX_WORKDIR` | 当前目录 | 工作目录 |
-| `WEB_PORT` | `19981` | Web UI 端口 |
-| `LOG_LEVEL` | `info` | 日志级别：`debug` / `info` / `warn` / `error` |
-| `LOG_INCLUDE_CONTENT` | `false` | 日志中包含消息内容（调试用） |
-| `LOG_INCLUDE_PROMPT` | `false` | 日志中包含完整 prompt（调试用） |
+
+### Gemini CLI 配置
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `GEMINI_CLI_BIN` | `gemini` | Gemini CLI 可执行文件路径 |
+| `GEMINI_CLI_MODEL` | — | 覆盖使用的模型 |
+| `GEMINI_CLI_APPROVAL_MODE` | `yolo` | 操作审批模式：`yolo` / `auto-edit` / `confirm` |
 
 ---
 
@@ -311,7 +336,8 @@ AnyBot/
 │   ├── providers/           # Provider 抽象层
 │   │   ├── types.ts        # IProvider 接口定义
 │   │   ├── index.ts        # ProviderManager（工厂 + 注册）
-│   │   └── codex.ts        # Codex CLI Provider 实现
+│   │   ├── codex.ts        # Codex CLI Provider 实现
+│   │   └── gemini-cli.ts   # Gemini CLI Provider 实现
 │   ├── lark.ts             # 飞书 API（消息、文件、图片）
 │   ├── logger.ts           # 结构化日志
 │   ├── message.ts          # 消息解析（输入输出）
@@ -345,6 +371,18 @@ AnyBot/
 ├── .env.example            # 环境变量模板
 └── package.json
 ```
+
+---
+
+## 添加新 Provider
+
+AnyBot 的 Provider 架构是可扩展的，添加新 CLI 工具只需三步：
+
+1. **实现 `IProvider` 接口** — 在 `src/providers/` 下创建新文件，实现 `listModels()` 和 `run()` 方法
+2. **注册到工厂** — 在 `src/providers/index.ts` 的 `providerFactories` 中添加新条目
+3. **添加环境变量** — 在 `src/index.ts` 的 `getProviderConfig()` 中读取对应的环境变量
+
+可参考 `src/providers/codex.ts` 和 `src/providers/gemini-cli.ts` 作为实现模板。
 
 ---
 
