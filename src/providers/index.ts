@@ -1,10 +1,16 @@
 import type { IProvider } from "./types.js";
 import { CodexProvider } from "./codex.js";
+import { GeminiCliProvider } from "./gemini-cli.js";
 
 type ProviderFactory = (config?: Record<string, unknown>) => IProvider;
 
 const providerFactories: Record<string, ProviderFactory> = {
   codex: (config) => new CodexProvider({ bin: config?.bin as string | undefined }),
+  "gemini-cli": (config) =>
+    new GeminiCliProvider({
+      bin: config?.bin as string | undefined,
+      approvalMode: config?.approvalMode as string | undefined,
+    }),
 };
 
 export function getRegisteredProviderTypes(): string[] {
@@ -49,6 +55,7 @@ export type {
   ProviderConfig,
 } from "./types.js";
 export { CodexProvider } from "./codex.js";
+export { GeminiCliProvider } from "./gemini-cli.js";
 export {
   ProviderTimeoutError,
   ProviderProcessError,

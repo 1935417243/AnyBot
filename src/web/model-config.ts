@@ -46,9 +46,6 @@ export function readModelConfig(): ModelConfig {
   const raw = readFileSync(CONFIG_PATH, "utf-8");
   const config = JSON.parse(raw) as ModelConfig;
 
-  if (!config.provider) {
-    config.provider = getProvider().type;
-  }
   if (!config.lastSelected) {
     config.lastSelected = {};
   }
@@ -58,6 +55,7 @@ export function readModelConfig(): ModelConfig {
     config.provider = provider.type;
     config.models = provider.listModels();
     config.currentModel = config.lastSelected[provider.type] || config.models[0]?.id || "";
+    writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
   }
 
   return config;

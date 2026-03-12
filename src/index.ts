@@ -29,8 +29,22 @@ import {
 } from "./shared.js";
 
 const providerType = process.env.PROVIDER || "codex";
-const providerBin = process.env.CODEX_BIN || undefined;
-const provider = initProvider(providerType, { bin: providerBin });
+
+function getProviderConfig(type: string): Record<string, unknown> {
+  switch (type) {
+    case "codex":
+      return { bin: process.env.CODEX_BIN };
+    case "gemini-cli":
+      return {
+        bin: process.env.GEMINI_CLI_BIN,
+        approvalMode: process.env.GEMINI_CLI_APPROVAL_MODE || "yolo",
+      };
+    default:
+      return {};
+  }
+}
+
+const provider = initProvider(providerType, getProviderConfig(providerType));
 
 const shouldLogContent = includeContentInLogs();
 const shouldLogPrompt = includePromptInLogs();
