@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { exec } from "node:child_process";
+import { getProvider } from "../providers/index.js";
 
 export interface SkillInfo {
   id: string;
@@ -18,17 +19,26 @@ interface SkillSource {
   dir: string;
 }
 
-function getCodexHome(): string {
-  return process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
-}
+const PROVIDER_SKILL_DIRS: Record<string, () => SkillSource[]> = {
+  codex: () => {
+    const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+    return [{ label: "Codex 技能", dir: path.join(codexHome, "skills") }];
+  },
+  "claude-code": () => {
+    return [{ label: "Claude Code 规则", dir: path.join(os.homedir(), ".claude") }];
+  },
+  "gemini-cli": () => {
+    return [{ label: "Gemini CLI 配置", dir: path.join(os.homedir(), ".gemini") }];
+  },
+  "cursor-cli": () => {
+    return [{ label: "Cursor 规则", dir: path.join(process.cwd(), ".cursor", "rules") }];
+  },
+};
 
 function getSkillSources(): SkillSource[] {
-  const home = os.homedir();
-  const codexHome = getCodexHome();
-
-  const sources: SkillSource[] = [
-    { label: "Codex 技能", dir: path.join(codexHome, "skills") },
-  ];
+  const providerType = getProvider().type;
+  const factory = PROVIDER_SKILL_DIRS[providerType] ?? PROVIDER_SKILL_DIRS.codex!;
+  const sources = factory();
 
   return sources.filter((s) => {
     try {
@@ -40,7 +50,7 @@ function getSkillSources(): SkillSource[] {
 }
 
 function getDisabledSkillsPath(): string {
-  const dataDir = process.env.CODEX_DATA_DIR || path.join(process.cwd(), ".data");
+  const dataDir = process.env.DATA_DIR || process.env.CODEX_DATA_DIR || path.join(process.cwd(), ".data");
   fs.mkdirSync(dataDir, { recursive: true });
   return path.join(dataDir, "disabled-skills.json");
 }
@@ -176,7 +186,9 @@ export function openSkillsFolder(skillPath?: string): void {
     return;
   }
 
-  const baseDir = getSkillSources()[0]?.dir || path.join(getCodexHome(), "skills");
+  const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+  const defaultDir = path.join(codexHome, "skills");
+  const baseDir = getSkillSources()[0]?.dir || defaultDir;
   const dirs = new Set<string>();
 
   try {

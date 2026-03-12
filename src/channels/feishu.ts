@@ -48,7 +48,7 @@ export class FeishuChannel implements IChannel {
   private callbacks: ChannelCallbacks | null = null;
   private handledMessageIds = new CappedSet<string>(MAX_HANDLED_IDS);
   private queueByChat = new Map<string, Promise<void>>();
-  private codexWorkdir = process.env.CODEX_WORKDIR || process.cwd();
+  private workdir = process.env.CODEX_WORKDIR || process.cwd();
   private startedAtMs: number = 0;
 
   async start(callbacks: ChannelCallbacks): Promise<void> {
@@ -235,7 +235,7 @@ export class FeishuChannel implements IChannel {
           undefined,
           "feishu",
         );
-        await sendReply(client, message.chat_id, reply, this.codexWorkdir);
+        await sendReply(client, message.chat_id, reply, this.workdir);
       } catch (error) {
         logger.error("feishu.text.failed", {
           messageId: message.message_id,
@@ -279,7 +279,7 @@ export class FeishuChannel implements IChannel {
           [imagePath],
           "feishu",
         );
-        await sendReply(client, message.chat_id, reply, this.codexWorkdir);
+        await sendReply(client, message.chat_id, reply, this.workdir);
       } catch (error) {
         logger.error("feishu.image.failed", {
           messageId: message.message_id,

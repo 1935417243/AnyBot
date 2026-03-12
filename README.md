@@ -1,6 +1,8 @@
-# CodexDesktopControl
+# AnyBot
 
-把 [OpenAI Codex CLI](https://github.com/openai/codex) 变成可远程使用的 AI 助手——通过内置 **Web UI** 在浏览器里对话，或通过 **飞书机器人** / **QQ 机器人** 在手机 / 桌面端随时向你这台机器上的 Codex 发消息。
+把 AI CLI 工具变成可远程使用的 AI 助手——通过内置 **Web UI** 在浏览器里对话，或通过 **飞书机器人** / **QQ 机器人** / **Telegram 机器人** 在手机 / 桌面端随时向你这台机器上的 AI 发消息。
+
+目前支持 [OpenAI Codex CLI](https://github.com/openai/codex) 作为 Provider，架构已为接入更多 CLI 工具（Gemini CLI、Claude Code、Cursor CLI 等）做好准备。
 
 支持 **macOS** 和 **Linux**。
 
@@ -8,13 +10,14 @@
 
 ## 特性
 
+- **多 Provider 架构** — 可插拔的 AI CLI 后端，当前支持 Codex CLI，未来可扩展
 - **Web UI** — 开箱即用的本地聊天界面，支持 Markdown 渲染、代码高亮、会话管理
-- **多平台集成** — 同时支持飞书（长连接）和 QQ 机器人（WebSocket），手机上也能用 Codex
-- **技能管理** — 在 Web UI 中浏览、启用 / 禁用 / 删除 Codex 技能（`$CODEX_HOME/skills/`）
-- **会话续聊** — 复用 Codex 原生 session，上下文不丢失；输入 `/new` 开启新会话
-- **图片理解** — 发送图片给 Codex，支持多模态对话
-- **文件回传** — Codex 生成的图片、文件自动发送回聊天
-- **模型切换** — 在 Web UI 中随时切换模型
+- **多平台集成** — 同时支持飞书（长连接）、QQ 机器人（WebSocket）、Telegram，手机上也能用
+- **技能管理** — 在 Web UI 中浏览、启用 / 禁用 / 删除技能
+- **会话续聊** — 复用 Provider 原生 session，上下文不丢失；输入 `/new` 开启新会话
+- **图片理解** — 发送图片，支持多模态对话
+- **文件回传** — 生成的图片、文件自动发送回聊天
+- **模型切换** — 在 Web UI 中随时切换 Provider 和模型
 - **后台运行** — 支持 daemon 模式，开机即用
 - **一键配置** — 交互式 `setup.sh` 引导完成所有配置
 
@@ -28,7 +31,7 @@
 |------|---------|------|
 | [Node.js](https://nodejs.org/) | 18+ | 运行环境 |
 | npm | 随 Node.js 附带 | 包管理 |
-| [Codex CLI](https://github.com/openai/codex) | — | `npm install -g @openai/codex` |
+| [Codex CLI](https://github.com/openai/codex) | — | `npm install -g @openai/codex`（默认 Provider） |
 
 <details>
 <summary><b>Linux 安装指南</b></summary>
@@ -76,14 +79,14 @@ npm install -g @openai/codex
 ### 2. 克隆与配置
 
 ```bash
-git clone https://github.com/1935417243/CodexDesktopControl.git
-cd CodexDesktopControl
+git clone https://github.com/1935417243/AnyBot.git
+cd AnyBot
 sh setup.sh
 ```
 
 `setup.sh` 会引导你完成：
 - 检测操作系统与依赖
-- 设置 Codex 工作目录
+- 设置工作目录
 - 选择安全模式（只读 / 可写 / 完全访问）
 - 配置 Web UI 端口
 - 生成 `.env` 配置文件
@@ -120,14 +123,29 @@ npm start
 
 ---
 
+## Provider 架构
+
+AnyBot 使用可插拔的 Provider 架构，每个 AI CLI 工具对应一个 Provider 实现：
+
+| Provider | 状态 | CLI 工具 | 说明 |
+|----------|------|---------|------|
+| `codex` | ✅ 可用 | [Codex CLI](https://github.com/openai/codex) | 默认 Provider |
+| `claude-code` | 🔜 计划中 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Anthropic 的 CLI |
+| `gemini-cli` | 🔜 计划中 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | Google 的 CLI |
+| `cursor-cli` | 🔜 计划中 | Cursor CLI | Cursor 编辑器 CLI |
+
+通过环境变量 `PROVIDER=codex` 切换当前使用的 Provider。
+
+---
+
 ## Web UI
 
 内置的 Web 聊天界面，无需额外部署：
 
 - 多会话管理，历史记录持久化（SQLite）
 - Markdown 渲染 + 代码语法高亮 + 一键复制
-- 模型切换
-- 频道配置管理（飞书、QQ 机器人）
+- Provider 和模型切换
+- 频道配置管理（飞书、QQ 机器人、Telegram）
 - 技能管理（浏览、启用 / 禁用、删除）
 - 深色主题
 
@@ -186,8 +204,8 @@ npm start
 - **私聊** — 直接发消息给机器人
 - **群聊** — 默认仅 @ 机器人时回复（可改为回复所有消息）
 - 发送 `/new` — 重置当前会话
-- 发送图片 — 自动下载并交给 Codex 处理
-- Codex 回复中的图片 / 文件会自动上传回飞书（单文件上限 30MB）
+- 发送图片 — 自动下载并交给 Provider 处理
+- 回复中的图片 / 文件会自动上传回飞书（单文件上限 30MB）
 
 ---
 
@@ -217,7 +235,7 @@ npm start
 
 ## 技能管理
 
-通过 Web UI 管理 Codex 的技能（读取 `$CODEX_HOME/skills/` 目录下的 `SKILL.md` 文件）：
+通过 Web UI 管理技能（读取 Provider 对应的技能目录下的 `SKILL.md` 文件）：
 
 - 浏览所有已安装技能，查看名称与描述
 - 启用 / 禁用指定技能
@@ -232,11 +250,12 @@ npm start
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
+| `PROVIDER` | `codex` | 使用的 Provider：`codex`（未来支持更多） |
 | `CODEX_BIN` | `codex` | Codex CLI 可执行文件路径 |
-| `CODEX_MODEL` | — | 覆盖 `codex exec` 使用的模型 |
+| `CODEX_MODEL` | — | 覆盖使用的模型 |
 | `CODEX_SANDBOX` | `read-only` | 安全模式：`read-only` / `workspace-write` / `danger-full-access` |
 | `CODEX_SYSTEM_PROMPT` | — | 追加到内置提示词后面的自定义系统提示词 |
-| `CODEX_WORKDIR` | 当前目录 | Codex 的工作目录 |
+| `CODEX_WORKDIR` | 当前目录 | 工作目录 |
 | `WEB_PORT` | `19981` | Web UI 端口 |
 | `LOG_LEVEL` | `info` | 日志级别：`debug` / `info` / `warn` / `error` |
 | `LOG_INCLUDE_CONTENT` | `false` | 日志中包含消息内容（调试用） |
@@ -255,10 +274,12 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 | `GET` | `/api/sessions/:id` | 获取会话详情（含消息） |
 | `DELETE` | `/api/sessions/:id` | 删除会话 |
 | `POST` | `/api/sessions/:id/messages` | 发送消息 `{ "content": "..." }` |
-| `GET` | `/api/model-config` | 获取当前模型配置 |
+| `GET` | `/api/model-config` | 获取当前模型配置（含 Provider 信息） |
 | `PUT` | `/api/model-config` | 切换模型 `{ "modelId": "..." }` |
+| `GET` | `/api/providers` | 获取可用 Provider 列表 |
+| `PUT` | `/api/providers/current` | 切换 Provider `{ "provider": "codex" }` |
 | `GET` | `/api/channels` | 获取频道配置 |
-| `PUT` | `/api/channels/:type` | 更新频道配置（支持 `feishu`、`qqbot`） |
+| `PUT` | `/api/channels/:type` | 更新频道配置 |
 | `GET` | `/api/skills` | 获取技能列表 |
 | `PUT` | `/api/skills/:id/toggle` | 启用 / 禁用技能 `{ "enabled": true }` |
 | `DELETE` | `/api/skills/:id` | 删除技能 |
@@ -268,13 +289,13 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 
 ## 工作原理
 
-- 每个聊天（Web 会话 / 飞书 chat / QQ 聊天）绑定一个 Codex `thread_id`，后续消息通过 `codex exec resume` 续聊
+- 每个聊天（Web 会话 / 飞书 chat / QQ 聊天）绑定一个 Provider session，后续消息通过续聊机制保持上下文
 - 会话绑定关系保存在 SQLite 中；各频道的绑定在进程重启后自动重建
-- 飞书消息先加一个 reaction（默认 ✅）表示已收到，再等待 Codex 完整回复
+- 飞书消息先加一个 reaction（默认 ✅）表示已收到，再等待 Provider 完整回复
 - QQ 机器人通过 WebSocket 网关接收消息，OAuth2 自动管理 Token
 - 支持文本和图片消息；其它消息类型会收到提示
 - `/new` 重置当前会话
-- 图片消息先下载到临时目录，通过 `codex exec -i` 传入
+- 图片消息先下载到临时目录，通过 Provider 传入
 - 回复中的本机图片路径（`![alt](/path.png)` 或纯路径）会自动上传
 - 回复中的 `FILE: /path/to/file.ext` 会作为文件发送
 - 日志为单行 JSON，写入 `.run/` 目录，按 10 分钟切分
@@ -284,10 +305,13 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 ## 项目结构
 
 ```
-CodexDesktopControl/
+AnyBot/
 ├── src/
 │   ├── index.ts            # 主入口，会话状态管理
-│   ├── codex.ts            # Codex CLI 子进程封装
+│   ├── providers/           # Provider 抽象层
+│   │   ├── types.ts        # IProvider 接口定义
+│   │   ├── index.ts        # ProviderManager（工厂 + 注册）
+│   │   └── codex.ts        # Codex CLI Provider 实现
 │   ├── lark.ts             # 飞书 API（消息、文件、图片）
 │   ├── logger.ts           # 结构化日志
 │   ├── message.ts          # 消息解析（输入输出）
@@ -297,13 +321,14 @@ CodexDesktopControl/
 │   │   ├── index.ts        # ChannelManager
 │   │   ├── feishu.ts       # 飞书频道实现
 │   │   ├── qqbot.ts        # QQ 机器人频道实现
+│   │   ├── telegram.ts     # Telegram 频道实现
 │   │   ├── config.ts       # channels.json 读写
 │   │   └── types.ts        # 频道接口定义
 │   ├── web/                # Web 层
 │   │   ├── server.ts       # Express 服务
 │   │   ├── api.ts          # REST API
 │   │   ├── db.ts           # SQLite 持久化
-│   │   ├── model-config.ts # 模型配置
+│   │   ├── model-config.ts # Provider + 模型配置
 │   │   ├── skills.ts       # 技能管理
 │   │   └── public/         # 前端静态文件
 │   └── agent/              # Agent 模板文件

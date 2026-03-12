@@ -1,12 +1,15 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { runCodex } from "../codex.js";
-import type { SandboxMode } from "../types.js";
-import { sandboxModes } from "../types.js";
-import { buildSystemPrompt } from "../prompt.js";
+import { getProvider, getRegisteredProviderTypes } from "../providers/index.js";
 import { logger } from "../logger.js";
 import * as db from "./db.js";
-import { readModelConfig, getCurrentModel, setCurrentModel } from "./model-config.js";
+import {
+  readModelConfig,
+  getCurrentModel,
+  setCurrentModel,
+  setCurrentProvider,
+  getProviderTypes,
+} from "./model-config.js";
 import {
   readChannelsConfig,
   updateChannelConfig,
@@ -14,55 +17,14 @@ import {
   channelManager,
 } from "../channels/index.js";
 import { listSkills, toggleSkill, deleteSkill, openSkillsFolder } from "./skills.js";
-
-const codexBin = process.env.CODEX_BIN || "codex";
-const codexSandboxRaw = process.env.CODEX_SANDBOX || "read-only";
-const codexWorkdir = process.env.CODEX_WORKDIR || process.cwd();
-const extraSystemPrompt = process.env.CODEX_SYSTEM_PROMPT;
-
-const codexSandbox: SandboxMode = sandboxModes.includes(codexSandboxRaw as SandboxMode)
-  ? (codexSandboxRaw as SandboxMode)
-  : "read-only";
-
-const outputContract = [
-  "只回复当前这条用户消息。",
-  "如果需要发送图片给用户，在回复中包含图片绝对路径或 Markdown 图片语法 ![描述](/绝对路径.png)。相对路径基于工作目录解析。",
-  "如果需要发送非图片文件，每个文件单独一行，格式：FILE: /绝对路径/文件名.扩展名。",
-].join("\n");
-
-function getSystemPrompt(): string {
-  return buildSystemPrompt({
-    workdir: codexWorkdir,
-    sandbox: codexSandbox,
-    extraPrompt: extraSystemPrompt,
-  });
-}
-
-function buildFirstTurnPrompt(userText: string): string {
-  return `${getSystemPrompt()}
-
-输出要求：
-${outputContract}
-
-用户消息：
-${userText}`;
-}
-
-function buildResumePrompt(userText: string): string {
-  return `${userText}
-
-补充要求：
-${outputContract}`;
-}
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function generateTitle(text: string): string {
-  const clean = text.replace(/\n/g, " ").trim();
-  return clean.length > 20 ? clean.slice(0, 20) + "…" : clean;
-}
+import {
+  buildFirstTurnPrompt,
+  buildResumePrompt,
+  generateId,
+  generateTitle,
+  getWorkdir,
+  getSandbox,
+} from "../shared.js";
 
 export function chatRouter(): Router {
   const router = Router();
@@ -107,6 +69,8 @@ export function chatRouter(): Router {
     res.json({ ok: true });
   });
 
+  // --- Model & Provider config ---
+
   router.get("/model-config", (_req: Request, res: Response) => {
     try {
       res.json(readModelConfig());
@@ -130,6 +94,34 @@ export function chatRouter(): Router {
       res.status(400).json({ error: msg });
     }
   });
+
+  router.get("/providers", (_req: Request, res: Response) => {
+    try {
+      const providers = getProviderTypes();
+      const current = getProvider().type;
+      res.json({ current, providers });
+    } catch (error) {
+      res.status(500).json({ error: "读取 Provider 列表失败" });
+    }
+  });
+
+  router.put("/providers/current", (req: Request, res: Response) => {
+    const { provider } = req.body as { provider?: string };
+    if (!provider) {
+      res.status(400).json({ error: "缺少 provider" });
+      return;
+    }
+    try {
+      const config = setCurrentProvider(provider);
+      logger.info("provider.switched", { provider });
+      res.json(config);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "切换 Provider 失败";
+      res.status(400).json({ error: msg });
+    }
+  });
+
+  // --- Channels ---
 
   router.get("/channels", (_req: Request, res: Response) => {
     try {
@@ -161,6 +153,8 @@ export function chatRouter(): Router {
       res.status(400).json({ error: msg });
     }
   });
+
+  // --- Skills ---
 
   router.get("/skills", (_req: Request, res: Response) => {
     try {
@@ -207,6 +201,8 @@ export function chatRouter(): Router {
     }
   });
 
+  // --- Chat messages ---
+
   router.post("/sessions/:id/messages", async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const session = db.getSession(id);
@@ -233,33 +229,35 @@ export function chatRouter(): Router {
       : buildFirstTurnPrompt(userText);
 
     try {
+      const provider = getProvider();
       logger.info("web.chat.start", {
         sessionId: session.id,
-        codexSessionId: session.sessionId,
+        providerSessionId: session.sessionId,
+        provider: provider.type,
         userTextChars: userText.length,
       });
 
-      const result = await runCodex({
-        bin: codexBin,
-        workdir: codexWorkdir,
-        sandbox: codexSandbox,
+      const result = await provider.run({
+        workdir: getWorkdir(),
+        sandbox: getSandbox(),
         model: getCurrentModel(),
         prompt,
         sessionId: session.sessionId || undefined,
       });
 
-      const codexSessionId = result.sessionId || session.sessionId;
+      const providerSessionId = result.sessionId || session.sessionId;
       db.addMessage(id, "assistant", result.text);
       db.updateSession({
         id,
         title: session.title,
-        sessionId: codexSessionId,
+        sessionId: providerSessionId,
         updatedAt: Date.now(),
       });
 
       logger.info("web.chat.success", {
         sessionId: session.id,
-        codexSessionId,
+        providerSessionId,
+        provider: provider.type,
         replyChars: result.text.length,
       });
 

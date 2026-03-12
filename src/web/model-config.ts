@@ -1,6 +1,12 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  getProvider,
+  getRegisteredProviderTypes,
+  switchProvider,
+  createProvider,
+} from "../providers/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.resolve(__dirname, "../../.data/model-config.json");
@@ -12,33 +18,57 @@ export interface ModelEntry {
 }
 
 export interface ModelConfig {
+  provider: string;
   currentModel: string;
   models: ModelEntry[];
+  lastSelected: Record<string, string>;
 }
 
-const DEFAULT_CONFIG: ModelConfig = {
-  currentModel: "gpt-5.3-codex",
-  models: [
-    { id: "gpt-5.3-codex", name: "GPT-5.3 Codex", description: "默认编程模型" },
-    { id: "gpt-5.4", name: "GPT-5.4", description: "最新通用模型" },
-    { id: "gpt-5.2-codex", name: "GPT-5.2 Codex", description: "稳定编程模型" },
-  ],
-};
+function buildDefaultConfig(): ModelConfig {
+  const provider = getProvider();
+  const models = provider.listModels();
+  return {
+    provider: provider.type,
+    currentModel: models[0]?.id ?? "",
+    models,
+    lastSelected: { [provider.type]: models[0]?.id ?? "" },
+  };
+}
 
 function ensureConfig(): void {
   if (!existsSync(CONFIG_PATH)) {
-    writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2), "utf-8");
+    writeFileSync(CONFIG_PATH, JSON.stringify(buildDefaultConfig(), null, 2), "utf-8");
   }
 }
 
 export function readModelConfig(): ModelConfig {
   ensureConfig();
   const raw = readFileSync(CONFIG_PATH, "utf-8");
-  return JSON.parse(raw) as ModelConfig;
+  const config = JSON.parse(raw) as ModelConfig;
+
+  if (!config.provider) {
+    config.provider = getProvider().type;
+  }
+  if (!config.lastSelected) {
+    config.lastSelected = {};
+  }
+
+  const provider = getProvider();
+  if (config.provider !== provider.type) {
+    config.provider = provider.type;
+    config.models = provider.listModels();
+    config.currentModel = config.lastSelected[provider.type] || config.models[0]?.id || "";
+  }
+
+  return config;
 }
 
 export function getCurrentModel(): string {
   return readModelConfig().currentModel;
+}
+
+export function getCurrentProviderType(): string {
+  return readModelConfig().provider;
 }
 
 export function setCurrentModel(modelId: string): ModelConfig {
@@ -48,6 +78,40 @@ export function setCurrentModel(modelId: string): ModelConfig {
     throw new Error(`不支持的模型: ${modelId}`);
   }
   config.currentModel = modelId;
+  config.lastSelected[config.provider] = modelId;
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
   return config;
+}
+
+export function setCurrentProvider(providerType: string): ModelConfig {
+  const registered = getRegisteredProviderTypes();
+  if (!registered.includes(providerType)) {
+    throw new Error(`不支持的 Provider: ${providerType}。可用: ${registered.join(", ")}`);
+  }
+
+  const config = readModelConfig();
+  config.lastSelected[config.provider] = config.currentModel;
+  config.provider = providerType;
+
+  const newProvider = switchProvider(providerType);
+  config.models = newProvider.listModels();
+  config.currentModel = config.lastSelected[providerType] || config.models[0]?.id || "";
+
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
+  return config;
+}
+
+export function getProviderTypes(): Array<{
+  type: string;
+  displayName: string;
+  capabilities: Record<string, boolean>;
+}> {
+  return getRegisteredProviderTypes().map((type) => {
+    const p = createProvider(type);
+    return {
+      type: p.type,
+      displayName: p.displayName,
+      capabilities: { ...p.capabilities },
+    };
+  });
 }

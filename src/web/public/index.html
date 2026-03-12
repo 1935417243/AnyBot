@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Codex</title>
+    <title>AnyBot</title>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet">
     <link rel="stylesheet"
@@ -360,6 +360,26 @@
         .sidebar-footer {
             padding: 12px 16px;
             border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .provider-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: rgba(92, 184, 92, 0.08);
+            border: 1px solid rgba(92, 184, 92, 0.15);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+            user-select: none;
+        }
+
+        .provider-badge .model-name {
+            color: #5cb85c;
         }
 
         .model-switcher {
@@ -1831,8 +1851,8 @@
 <aside id="sidebar">
     <div class="sidebar-top">
         <div class="logo">
-            <div class="logo-icon">cx</div>
-            <span class="logo-text">Code<span>x</span></span>
+            <div class="logo-icon">Ab</div>
+            <span class="logo-text">Any<span>Bot</span></span>
         </div>
         <button id="new-chat-btn" class="active">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -1859,6 +1879,11 @@
     <div class="history-list" id="history-list"></div>
 
     <div class="sidebar-footer">
+        <div class="provider-badge" id="provider-badge">
+            <div class="model-dot" style="background:#5cb85c"></div>
+            <span>Provider</span>
+            <span class="model-name" id="current-provider-name">codex</span>
+        </div>
         <div class="model-switcher" id="model-switcher">
             <div class="model-dropdown" id="model-dropdown"></div>
             <div class="model-badge" id="model-badge">
@@ -1878,9 +1903,9 @@
     <div id="chat-view">
         <div id="messages">
             <div id="empty-state">
-                <div class="empty-icon">cx</div>
-                <div class="empty-title">Codex 已就绪</div>
-                <div class="empty-sub">向Codex发送消息，开始你的对话</div>
+                <div class="empty-icon">Ab</div>
+                <div class="empty-title">AnyBot 已就绪</div>
+                <div class="empty-sub">发送消息，开始你的对话</div>
             </div>
         </div>
 
@@ -1986,9 +2011,9 @@
         function showEmptyState() {
             messagesEl.innerHTML =
                 '<div id="empty-state">' +
-                '<div class="empty-icon">cx</div>' +
-                '<div class="empty-title">Codex 已就绪</div>' +
-                '<div class="empty-sub">向Codex发送消息，开始你的对话</div>' +
+                '<div class="empty-icon">Ab</div>' +
+                '<div class="empty-title">AnyBot 已就绪</div>' +
+                '<div class="empty-sub">发送消息，开始你的对话</div>' +
                 '</div>';
         }
 
@@ -2003,7 +2028,7 @@
 
                 var avatar = document.createElement('div');
                 avatar.className = 'avatar ai-avatar';
-                avatar.textContent = 'cx';
+                avatar.textContent = 'Ab';
 
                 var content = document.createElement('div');
                 content.className = 'message-content';
@@ -2040,7 +2065,7 @@
             row.id = 'typing-row';
             row.innerHTML =
                 '<div class="bubble">' +
-                '<div class="avatar ai-avatar">cx</div>' +
+                '<div class="avatar ai-avatar">Ab</div>' +
                 '<div class="message-content">' +
                 '<div class="typing-indicator">' +
                 '<div class="typing-dot"></div>' +
@@ -2264,6 +2289,10 @@
                 var res = await fetch('/api/model-config');
                 modelConfig = await res.json();
                 currentModelNameEl.textContent = modelConfig.currentModel;
+                var providerEl = document.getElementById('current-provider-name');
+                if (providerEl && modelConfig.provider) {
+                    providerEl.textContent = modelConfig.provider;
+                }
                 renderModelDropdown();
             } catch (e) {
                 currentModelNameEl.textContent = 'error';
@@ -2313,6 +2342,10 @@
                 }
                 modelConfig = await res.json();
                 currentModelNameEl.textContent = modelConfig.currentModel;
+                var providerEl = document.getElementById('current-provider-name');
+                if (providerEl && modelConfig.provider) {
+                    providerEl.textContent = modelConfig.provider;
+                }
                 renderModelDropdown();
                 modelSwitcher.classList.remove('open');
             } catch (e) {

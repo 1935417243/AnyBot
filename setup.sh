@@ -27,7 +27,7 @@ PROJECT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 
 echo ""
 printf "${BOLD}╔══════════════════════════════════════════╗${NC}\n"
-printf "${BOLD}║     CodexDesktopControl  Setup Wizard    ║${NC}\n"
+printf "${BOLD}║           AnyBot  Setup Wizard           ║${NC}\n"
 printf "${BOLD}╚══════════════════════════════════════════╝${NC}\n"
 echo ""
 
@@ -88,7 +88,7 @@ if [ -n "$MISSING" ]; then
   esac
 
   if echo "$MISSING" | grep -q "codex"; then
-    info "安装 Codex CLI:"
+    info "安装 Codex CLI (默认 Provider):"
     echo "  npm install -g @openai/codex"
     echo ""
   fi
@@ -107,12 +107,12 @@ fi
 echo ""
 printf "${BOLD}── 工作区配置 ──${NC}\n"
 echo ""
-info "工作区是 Codex 执行命令时的工作目录。"
-info "Codex 会在这个目录下读写文件、执行 git 操作等。"
+info "工作区是 AI CLI 执行命令时的工作目录。"
+info "Provider 会在这个目录下读写文件、执行 git 操作等。"
 echo ""
 
 DEFAULT_WORKDIR="$HOME"
-WORKDIR=$(prompt_input "请输入 Codex 工作目录 [$DEFAULT_WORKDIR]: ")
+WORKDIR=$(prompt_input "请输入工作目录 [$DEFAULT_WORKDIR]: ")
 WORKDIR="${WORKDIR:-$DEFAULT_WORKDIR}"
 
 # Expand ~ if user typed it
@@ -159,7 +159,7 @@ fi
 echo ""
 printf "${BOLD}── 安全模式 ──${NC}\n"
 echo ""
-info "Codex sandbox 模式控制 Codex 对文件系统的访问权限："
+info "Sandbox 模式控制 Provider 对文件系统的访问权限："
 echo "  1) read-only          — 只读（最安全，默认）"
 echo "  2) workspace-write    — 可写工作目录"
 echo "  3) danger-full-access — 完全访问（危险）"
@@ -199,17 +199,20 @@ fi
 
 if [ "${SKIP_ENV:-0}" != "1" ]; then
   cat > "$ENV_FILE" <<EOF
-# ── Codex ────────────────────────────────────────────
+# ── Provider ────────────────────────────────────────
+PROVIDER=codex
+
+# ── Codex CLI ───────────────────────────────────────
 CODEX_BIN=codex
 CODEX_MODEL=
 CODEX_SANDBOX=$CODEX_SANDBOX
 CODEX_SYSTEM_PROMPT=
 CODEX_WORKDIR=$WORKDIR
 
-# ── Web ──────────────────────────────────────────────
+# ── Web ─────────────────────────────────────────────
 WEB_PORT=$WEB_PORT
 
-# ── 日志 ─────────────────────────────────────────────
+# ── 日志 ────────────────────────────────────────────
 LOG_LEVEL=info
 LOG_INCLUDE_CONTENT=false
 LOG_INCLUDE_PROMPT=false

@@ -2,15 +2,13 @@ import "dotenv/config";
 
 import { createApp } from "./web/server.js";
 
-import type { SandboxMode } from "./types.js";
-import { sandboxModes } from "./types.js";
-import { buildSystemPrompt } from "./prompt.js";
 import {
-  runCodex,
-  CodexTimeoutError,
-  CodexProcessError,
-  CodexEmptyOutputError,
-} from "./codex.js";
+  initProvider,
+  getProvider,
+  ProviderTimeoutError,
+  ProviderProcessError,
+  ProviderEmptyOutputError,
+} from "./providers/index.js";
 import {
   includeContentInLogs,
   includePromptInLogs,
@@ -21,29 +19,21 @@ import { getCurrentModel } from "./web/model-config.js";
 import { startAllChannels } from "./channels/index.js";
 import type { ChannelCallbacks } from "./channels/index.js";
 import * as db from "./web/db.js";
+import {
+  buildFirstTurnPrompt,
+  buildResumePrompt,
+  generateId,
+  generateTitle,
+  getWorkdir,
+  getSandbox,
+} from "./shared.js";
 
-const codexBin = process.env.CODEX_BIN || "codex";
-const codexSandboxRaw = process.env.CODEX_SANDBOX || "read-only";
-const codexWorkdir = process.env.CODEX_WORKDIR || process.cwd();
-const extraSystemPrompt = process.env.CODEX_SYSTEM_PROMPT;
+const providerType = process.env.PROVIDER || "codex";
+const providerBin = process.env.CODEX_BIN || undefined;
+const provider = initProvider(providerType, { bin: providerBin });
+
 const shouldLogContent = includeContentInLogs();
 const shouldLogPrompt = includePromptInLogs();
-
-if (!sandboxModes.includes(codexSandboxRaw as SandboxMode)) {
-  throw new Error(
-    `CODEX_SANDBOX 配置无效：${codexSandboxRaw}。可选值只有：${sandboxModes.join("、")}`,
-  );
-}
-
-const codexSandbox = codexSandboxRaw as SandboxMode;
-
-function getSystemPrompt(): string {
-  return buildSystemPrompt({
-    workdir: codexWorkdir,
-    sandbox: codexSandbox,
-    extraPrompt: extraSystemPrompt,
-  });
-}
 
 // --- State with bounded memory ---
 
@@ -86,29 +76,6 @@ const sessionGenerationByChat = new Map<string, number>();
 
 // --- Core logic ---
 
-const outputContract = [
-  "只回复当前这条用户消息。",
-  "如果需要发送图片给用户，在回复中包含图片绝对路径或 Markdown 图片语法 ![描述](/绝对路径.png)。相对路径基于工作目录解析。",
-  "如果需要发送非图片文件，每个文件单独一行，格式：FILE: /绝对路径/文件名.扩展名。",
-].join("\n");
-
-function buildFirstTurnPrompt(userText: string): string {
-  return `${getSystemPrompt()}
-
-输出要求：
-${outputContract}
-
-用户消息：
-${userText}`;
-}
-
-function buildResumePrompt(userText: string): string {
-  return `${userText}
-
-补充要求：
-${outputContract}`;
-}
-
 function getSessionGeneration(chatId: string): number {
   return sessionGenerationByChat.get(chatId) || 0;
 }
@@ -121,26 +88,17 @@ function resetChatSession(chatId: string, source?: string): void {
   }
 }
 
-function formatCodexError(error: unknown): string {
-  if (error instanceof CodexTimeoutError) {
+function formatProviderError(error: unknown): string {
+  if (error instanceof ProviderTimeoutError) {
     return "处理超时了，可能是问题太复杂。试试简化一下？";
   }
-  if (error instanceof CodexProcessError) {
+  if (error instanceof ProviderProcessError) {
     return "内部处理出错了，请稍后再试。";
   }
-  if (error instanceof CodexEmptyOutputError) {
+  if (error instanceof ProviderEmptyOutputError) {
     return "没有生成有效回复，请换个方式描述试试。";
   }
   return "处理消息时出错了，请稍后再试。";
-}
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function generateTitle(text: string): string {
-  const clean = text.replace(/\n/g, " ").trim();
-  return clean.length > 20 ? clean.slice(0, 20) + "…" : clean;
 }
 
 function getOrCreateChannelSession(
@@ -186,6 +144,7 @@ async function generateReply(
   logger.info("reply.generate.start", {
     chatId,
     source,
+    provider: getProvider().type,
     mode: sessionId ? "resume" : "new",
     sessionId: sessionId || null,
     dbSessionId: dbSession.id,
@@ -196,10 +155,9 @@ async function generateReply(
     ...(shouldLogPrompt ? { prompt: rawLogString(prompt) } : {}),
   });
 
-  const result = await runCodex({
-    bin: codexBin,
-    workdir: codexWorkdir,
-    sandbox: codexSandbox,
+  const result = await getProvider().run({
+    workdir: getWorkdir(),
+    sandbox: getSandbox(),
     model: getCurrentModel(),
     prompt,
     imagePaths,
@@ -221,6 +179,7 @@ async function generateReply(
   logger.info("reply.generate.success", {
     chatId,
     source,
+    provider: getProvider().type,
     sessionId: result.sessionId,
     dbSessionId: dbSession.id,
     replyChars: result.text.length,
@@ -244,11 +203,11 @@ const WEB_PORT = parseInt(process.env.WEB_PORT || "19981", 10);
 
 async function main(): Promise<void> {
   logger.info("service.starting", {
-    codexBin,
-    codexSandbox,
-    codexModel: getCurrentModel(),
-    codexWorkdir,
-    extraSystemPrompt: extraSystemPrompt ? "<set>" : null,
+    provider: provider.type,
+    providerDisplayName: provider.displayName,
+    model: getCurrentModel(),
+    workdir: getWorkdir(),
+    sandbox: getSandbox(),
     logIncludeContent: shouldLogContent,
     logIncludePrompt: shouldLogPrompt,
     webPort: WEB_PORT,
@@ -260,7 +219,7 @@ async function main(): Promise<void> {
   const webApp = createApp();
   webApp.listen(WEB_PORT, () => {
     logger.info("web.started", { port: WEB_PORT });
-    console.log(`Codex Web UI: http://localhost:${WEB_PORT}`);
+    console.log(`AnyBot Web UI: http://localhost:${WEB_PORT}`);
   });
 
   const channels = await startAllChannels(channelCallbacks);

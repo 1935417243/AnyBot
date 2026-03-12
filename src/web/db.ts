@@ -22,7 +22,7 @@ export type SessionSummary = {
   updatedAt: number;
 };
 
-const dataDir = process.env.CODEX_DATA_DIR || path.join(process.cwd(), ".data");
+const dataDir = process.env.DATA_DIR || process.env.CODEX_DATA_DIR || path.join(process.cwd(), ".data");
 fs.mkdirSync(dataDir, { recursive: true });
 
 const dbPath = path.join(dataDir, "chat.db");
