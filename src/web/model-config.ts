@@ -51,7 +51,13 @@ export function readModelConfig(): ModelConfig {
   }
 
   const provider = getProvider();
-  if (config.provider !== provider.type) {
+  const needsRefresh =
+    config.provider !== provider.type ||
+    !config.models ||
+    config.models.length === 0 ||
+    (config.models.length === 1 && config.models[0].id === "auto");
+
+  if (needsRefresh) {
     config.provider = provider.type;
     config.models = provider.listModels();
     config.currentModel = config.lastSelected[provider.type] || config.models[0]?.id || "";

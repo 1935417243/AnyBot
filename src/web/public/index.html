@@ -552,6 +552,27 @@
             transition: all 0.18s ease;
             z-index: 50;
             box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+            max-height: 60vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(124, 111, 247, 0.3) transparent;
+        }
+
+        .model-dropdown::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .model-dropdown::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .model-dropdown::-webkit-scrollbar-thumb {
+            background: rgba(124, 111, 247, 0.3);
+            border-radius: 4px;
+        }
+
+        .model-dropdown::-webkit-scrollbar-thumb:hover {
+            background: rgba(124, 111, 247, 0.5);
         }
 
         .model-switcher.open .model-dropdown {

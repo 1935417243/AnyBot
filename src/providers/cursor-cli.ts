@@ -17,7 +17,7 @@ import {
 import { logger } from "../logger.js";
 
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
-const MODELS_CACHE_TTL_MS = 10 * 60 * 1000;
+const MODELS_CACHE_TTL_MS = 30 * 60 * 1000;
 
 interface CursorJsonOutput {
   type?: string;
@@ -110,7 +110,7 @@ export class CursorCliProvider implements IProvider {
     }
 
     try {
-      const output = execSync(`${this.bin} models`, {
+      const output = execSync(`${this.bin} --list-models`, {
         timeout: 15_000,
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
@@ -382,16 +382,27 @@ export class CursorCliProvider implements IProvider {
     const lines = output.trim().split("\n");
 
     for (const line of lines) {
-      const match = line.match(/^\s*(\S+)\s+-\s+(.+?)(?:\s+\(.*\))?\s*$/);
+      const match = line.match(/^\s*(\S+)\s+-\s+(.+?)\s*$/);
       if (!match) continue;
 
-      const [, id, name] = match;
+      const [, id, rawName] = match;
       if (id.toLowerCase() === "available" || id.toLowerCase() === "tip:") continue;
+
+      const isCurrent = /\(current\)/i.test(rawName);
+      const isDefault = /\(default\)/i.test(rawName);
+      const name = rawName
+        .replace(/\s*\(current\)/gi, "")
+        .replace(/\s*\(default\)/gi, "")
+        .trim();
+
+      const tags: string[] = [];
+      if (isCurrent) tags.push("current");
+      if (isDefault) tags.push("default");
 
       models.push({
         id,
-        name: name.trim(),
-        description: "",
+        name,
+        description: tags.length > 0 ? tags.join(", ") : "",
       });
     }
 
