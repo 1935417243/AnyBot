@@ -365,6 +365,10 @@
             gap: 8px;
         }
 
+        .provider-switcher {
+            position: relative;
+        }
+
         .provider-badge {
             display: flex;
             align-items: center;
@@ -375,11 +379,94 @@
             border-radius: 8px;
             font-size: 12px;
             color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.18s ease;
             user-select: none;
         }
 
-        .provider-badge .model-name {
+        .provider-badge:hover {
+            background: rgba(92, 184, 92, 0.15);
+            border-color: rgba(92, 184, 92, 0.35);
+            box-shadow: 0 0 16px rgba(92, 184, 92, 0.15);
+        }
+
+        .provider-badge .provider-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
             color: #5cb85c;
+            flex: 1;
+        }
+
+        .provider-badge-arrow {
+            width: 12px;
+            height: 12px;
+            color: var(--text-dim);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .provider-switcher.open .provider-badge-arrow {
+            transform: rotate(180deg);
+        }
+
+        .provider-switcher.open .provider-badge {
+            border-color: rgba(92, 184, 92, 0.4);
+            box-shadow: 0 0 20px rgba(92, 184, 92, 0.15);
+        }
+
+        .provider-dropdown {
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: #16161c;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 4px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(4px);
+            transition: all 0.18s ease;
+            z-index: 51;
+            box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .provider-switcher.open .provider-dropdown {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .provider-option {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 8px 10px;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+
+        .provider-option:hover {
+            background: var(--sidebar-hover);
+        }
+
+        .provider-option.active {
+            background: rgba(92, 184, 92, 0.1);
+            border: 1px solid rgba(92, 184, 92, 0.2);
+        }
+
+        .provider-option:not(.active) {
+            border: 1px solid transparent;
+        }
+
+        .provider-option-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .model-switcher {
@@ -1879,10 +1966,17 @@
     <div class="history-list" id="history-list"></div>
 
     <div class="sidebar-footer">
-        <div class="provider-badge" id="provider-badge">
-            <div class="model-dot" style="background:#5cb85c"></div>
-            <span>Provider</span>
-            <span class="model-name" id="current-provider-name">codex</span>
+        <div class="provider-switcher" id="provider-switcher">
+            <div class="provider-dropdown" id="provider-dropdown"></div>
+            <div class="provider-badge" id="provider-badge">
+                <div class="model-dot" style="background:#5cb85c"></div>
+                <span>Provider</span>
+                <span class="provider-name" id="current-provider-name">加载中…</span>
+                <svg class="provider-badge-arrow" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 5l3-3 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+                          stroke-linejoin="round"/>
+                </svg>
+            </div>
         </div>
         <div class="model-switcher" id="model-switcher">
             <div class="model-dropdown" id="model-dropdown"></div>
@@ -1951,10 +2045,16 @@
         const modelDropdown = document.getElementById('model-dropdown');
         const currentModelNameEl = document.getElementById('current-model-name');
 
+        const providerSwitcher = document.getElementById('provider-switcher');
+        const providerBadge = document.getElementById('provider-badge');
+        const providerDropdown = document.getElementById('provider-dropdown');
+        const currentProviderNameEl = document.getElementById('current-provider-name');
+
         let currentSessionId = null;
         let isTyping = false;
         let sessions = [];
         let modelConfig = null;
+        let providerData = null;
 
         inputEl.addEventListener('input', function () {
             this.style.height = 'auto';
@@ -2289,10 +2389,6 @@
                 var res = await fetch('/api/model-config');
                 modelConfig = await res.json();
                 currentModelNameEl.textContent = modelConfig.currentModel;
-                var providerEl = document.getElementById('current-provider-name');
-                if (providerEl && modelConfig.provider) {
-                    providerEl.textContent = modelConfig.provider;
-                }
                 renderModelDropdown();
             } catch (e) {
                 currentModelNameEl.textContent = 'error';
@@ -2342,10 +2438,6 @@
                 }
                 modelConfig = await res.json();
                 currentModelNameEl.textContent = modelConfig.currentModel;
-                var providerEl = document.getElementById('current-provider-name');
-                if (providerEl && modelConfig.provider) {
-                    providerEl.textContent = modelConfig.provider;
-                }
                 renderModelDropdown();
                 modelSwitcher.classList.remove('open');
             } catch (e) {
@@ -2355,12 +2447,83 @@
 
         modelBadge.addEventListener('click', function (e) {
             e.stopPropagation();
+            providerSwitcher.classList.remove('open');
             modelSwitcher.classList.toggle('open');
+        });
+
+        async function fetchProviders() {
+            try {
+                var res = await fetch('/api/providers');
+                providerData = await res.json();
+                currentProviderNameEl.textContent = providerData.current;
+                renderProviderDropdown();
+            } catch (e) {
+                currentProviderNameEl.textContent = 'error';
+                console.error('Failed to fetch providers:', e);
+            }
+        }
+
+        function renderProviderDropdown() {
+            if (!providerData) return;
+            providerDropdown.innerHTML = '';
+            providerData.providers.forEach(function (p) {
+                var opt = document.createElement('div');
+                opt.className = 'provider-option' + (p.type === providerData.current ? ' active' : '');
+                opt.innerHTML =
+                    '<div class="provider-option-name">' +
+                    (p.type === providerData.current
+                        ? '<svg class="model-option-check" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+                        : '<span style="width:14px;display:inline-block"></span>') +
+                    escapeHtml(p.displayName) +
+                    '</div>';
+                opt.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    switchProviderTo(p.type);
+                });
+                providerDropdown.appendChild(opt);
+            });
+        }
+
+        async function switchProviderTo(providerType) {
+            if (!providerData || providerType === providerData.current) {
+                providerSwitcher.classList.remove('open');
+                return;
+            }
+            try {
+                var res = await fetch('/api/providers/current', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({provider: providerType}),
+                });
+                if (!res.ok) {
+                    var err = await res.json().catch(function () { return {}; });
+                    showError(err.error || '切换 Provider 失败');
+                    return;
+                }
+                modelConfig = await res.json();
+                providerData.current = providerType;
+                currentProviderNameEl.textContent = providerType;
+                currentModelNameEl.textContent = modelConfig.currentModel;
+                renderProviderDropdown();
+                renderModelDropdown();
+                providerSwitcher.classList.remove('open');
+            } catch (e) {
+                showError('切换 Provider 失败');
+            }
+        }
+
+        providerBadge.addEventListener('click', function (e) {
+            e.stopPropagation();
+            modelSwitcher.classList.remove('open');
+            providerSwitcher.classList.toggle('open');
         });
 
         document.addEventListener('click', function (e) {
             if (!modelSwitcher.contains(e.target)) {
                 modelSwitcher.classList.remove('open');
+            }
+            if (!providerSwitcher.contains(e.target)) {
+                providerSwitcher.classList.remove('open');
             }
         });
 
@@ -2942,7 +3105,7 @@
         });
 
         async function init() {
-            await Promise.all([fetchSessions(), fetchModelConfig()]);
+            await Promise.all([fetchSessions(), fetchModelConfig(), fetchProviders()]);
             if (sessions.length > 0) {
                 await loadSession(sessions[0].id);
             } else {
