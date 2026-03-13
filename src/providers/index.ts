@@ -2,6 +2,7 @@ import type { IProvider } from "./types.js";
 import { CodexProvider } from "./codex.js";
 import { GeminiCliProvider } from "./gemini-cli.js";
 import { CursorCliProvider } from "./cursor-cli.js";
+import { QoderCliProvider } from "./qoder-cli.js";
 
 type ProviderFactory = (config?: Record<string, unknown>) => IProvider;
 
@@ -17,6 +18,11 @@ const providerFactories: Record<string, ProviderFactory> = {
       bin: config?.bin as string | undefined,
       workspace: config?.workspace as string | undefined,
       apiKey: config?.apiKey as string | undefined,
+    }),
+  "qoder-cli": (config) =>
+    new QoderCliProvider({
+      bin: config?.bin as string | undefined,
+      maxTurns: config?.maxTurns as number | undefined,
     }),
 };
 
@@ -64,6 +70,7 @@ export type {
 export { CodexProvider } from "./codex.js";
 export { GeminiCliProvider } from "./gemini-cli.js";
 export { CursorCliProvider } from "./cursor-cli.js";
+export { QoderCliProvider } from "./qoder-cli.js";
 export {
   ProviderTimeoutError,
   ProviderProcessError,

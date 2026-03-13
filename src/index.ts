@@ -51,6 +51,13 @@ function getProviderConfig(type: string): Record<string, unknown> {
         workspace: process.env.CURSOR_CLI_WORKSPACE,
         apiKey: process.env.CURSOR_API_KEY,
       };
+    case "qoder-cli":
+      return {
+        bin: process.env.QODER_CLI_BIN,
+        maxTurns: process.env.QODER_CLI_MAX_TURNS
+          ? parseInt(process.env.QODER_CLI_MAX_TURNS, 10)
+          : undefined,
+      };
     default:
       return {};
   }

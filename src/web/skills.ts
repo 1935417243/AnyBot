@@ -38,6 +38,9 @@ const PROVIDER_SKILL_DIRS: Record<string, () => SkillSource[]> = {
       { label: "Agents 技能", dir: path.join(home, ".agents", "skills") },
     ];
   },
+  "qoder-cli": () => {
+    return [{ label: "Qoder CLI Agents", dir: path.join(os.homedir(), ".qoder", "agents") }];
+  },
 };
 
 function getSkillSources(): SkillSource[] {

@@ -106,10 +106,12 @@ info "你可以在启动后随时通过 Web UI 切换。"
 echo ""
 echo "  1) codex       — OpenAI Codex CLI ${DIM}(npm install -g @openai/codex)${NC}"
 echo "  2) gemini-cli  — Google Gemini CLI ${DIM}(npm install -g @anthropic-ai/gemini-cli 或查看官方文档)${NC}"
+echo "  3) qoder-cli   — Qoder CLI ${DIM}(详见 https://docs.qoder.com)${NC}"
 echo ""
 PROVIDER_CHOICE=$(prompt_input "请选择默认 Provider [1]: ")
 case "$PROVIDER_CHOICE" in
   2) PROVIDER="gemini-cli" ;;
+  3) PROVIDER="qoder-cli" ;;
   *) PROVIDER="codex" ;;
 esac
 ok "默认 Provider: $PROVIDER"
@@ -127,6 +129,10 @@ case "$PROVIDER" in
   gemini-cli)
     PROVIDER_BIN="gemini"
     PROVIDER_INSTALL_HINT="详见 https://github.com/google-gemini/gemini-cli"
+    ;;
+  qoder-cli)
+    PROVIDER_BIN="qodercli"
+    PROVIDER_INSTALL_HINT="详见 https://docs.qoder.com"
     ;;
 esac
 
@@ -236,6 +242,10 @@ case "$PROVIDER" in
     esac
     ok "Approval Mode: $GEMINI_APPROVAL_MODE"
     ;;
+  qoder-cli)
+    info "Qoder CLI 默认跳过权限检查（--dangerously-skip-permissions）"
+    ok "安全模式: 自动跳过权限"
+    ;;
 esac
 
 # ── Configure web port ───────────────────────────────────────────────
@@ -266,7 +276,7 @@ fi
 if [ "${SKIP_ENV:-0}" != "1" ]; then
   cat > "$ENV_FILE" <<EOF
 # ── Provider ────────────────────────────────────────
-# 可选: codex, gemini-cli
+# 可选: codex, gemini-cli, cursor-cli, qoder-cli
 PROVIDER=$PROVIDER
 
 # ── Codex CLI ───────────────────────────────────────
@@ -280,6 +290,10 @@ CODEX_WORKDIR=$WORKDIR
 GEMINI_CLI_BIN=gemini
 GEMINI_CLI_MODEL=
 GEMINI_CLI_APPROVAL_MODE=$GEMINI_APPROVAL_MODE
+
+# ── Qoder CLI ──────────────────────────────────────
+QODER_CLI_BIN=qodercli
+QODER_CLI_MAX_TURNS=
 
 # ── Web ─────────────────────────────────────────────
 WEB_PORT=$WEB_PORT
