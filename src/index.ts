@@ -1,5 +1,6 @@
 import "dotenv/config";
 
+import { applyProxy } from "./proxy.js";
 import { createApp } from "./web/server.js";
 
 import {
@@ -280,6 +281,12 @@ const channelCallbacks: ChannelCallbacks = {
 const WEB_PORT = parseInt(process.env.WEB_PORT || "19981", 10);
 
 async function main(): Promise<void> {
+  try {
+    applyProxy();
+  } catch (error) {
+    logger.warn("proxy.init_failed", { error });
+  }
+
   logger.info("service.starting", {
     provider: provider.type,
     providerDisplayName: provider.displayName,

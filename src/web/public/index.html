@@ -202,6 +202,42 @@
             flex-shrink: 0;
         }
 
+        #proxy-btn {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-muted);
+            padding: 9px 14px;
+            cursor: pointer;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.18s ease;
+            letter-spacing: 0.01em;
+            margin-top: 6px;
+        }
+
+        #proxy-btn:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+            border-color: rgba(124, 111, 247, 0.25);
+        }
+
+        #proxy-btn.active {
+            background: var(--accent-dim);
+            border-color: rgba(124, 111, 247, 0.35);
+            color: var(--text);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        #proxy-btn svg {
+            flex-shrink: 0;
+        }
+
         .sidebar-label {
             padding: 14px 16px 6px;
             font-size: 10px;
@@ -1547,6 +1583,11 @@
             flex-direction: column;
         }
 
+        #proxy-view {
+            flex: 1;
+            overflow-y: auto;
+        }
+
         .skills-page {
             flex: 1;
             display: flex;
@@ -1952,6 +1993,314 @@
             color: var(--text-muted);
             text-align: center;
         }
+
+        /* ── Proxy page ── */
+        .proxy-page {
+            padding: 32px;
+            max-width: 560px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .proxy-page-header {
+            margin-bottom: 28px;
+        }
+
+        .proxy-page-header-top {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .proxy-page-header-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(124, 111, 247, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .proxy-page-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .proxy-page-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .proxy-card {
+            background: var(--sidebar);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .proxy-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .proxy-field {
+            margin-bottom: 16px;
+        }
+
+        .proxy-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .proxy-field-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .proxy-field-input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            padding: 9px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.18s;
+        }
+
+        .proxy-field-input:focus {
+            border-color: rgba(124, 111, 247, 0.5);
+        }
+
+        .proxy-field-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .proxy-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .proxy-row .proxy-field {
+            flex: 1;
+        }
+
+        .proxy-row .proxy-field.port {
+            flex: 0 0 120px;
+        }
+
+        .proxy-field-select {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            padding: 9px 12px;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 3.5l3 3 3-3' stroke='%236b6b80' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+            transition: border-color 0.18s;
+        }
+
+        .proxy-field-select:focus {
+            border-color: rgba(124, 111, 247, 0.5);
+        }
+
+        .proxy-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .proxy-toggle-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .proxy-toggle-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .proxy-toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .proxy-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .proxy-toggle-slider {
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            background: var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .proxy-toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            top: 3px;
+            left: 3px;
+            transition: all 0.2s;
+        }
+
+        .proxy-toggle input:checked + .proxy-toggle-slider {
+            background: var(--accent);
+        }
+
+        .proxy-toggle input:checked + .proxy-toggle-slider::before {
+            background: #fff;
+            transform: translateX(20px);
+        }
+
+        .proxy-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .proxy-save-btn {
+            flex: 1;
+            background: var(--accent);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            padding: 10px 20px;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.18s;
+        }
+
+        .proxy-save-btn:hover {
+            filter: brightness(1.1);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .proxy-save-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .proxy-test-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-muted);
+            padding: 10px 20px;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.18s;
+            white-space: nowrap;
+        }
+
+        .proxy-test-btn:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+            border-color: rgba(124, 111, 247, 0.25);
+        }
+
+        .proxy-test-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .proxy-status {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .proxy-status.show {
+            display: flex;
+        }
+
+        .proxy-status.success {
+            background: rgba(92, 184, 92, 0.1);
+            border: 1px solid rgba(92, 184, 92, 0.2);
+            color: #5cb85c;
+        }
+
+        .proxy-status.error {
+            background: rgba(217, 83, 79, 0.1);
+            border: 1px solid rgba(217, 83, 79, 0.2);
+            color: #d9534f;
+        }
+
+        .proxy-status.info {
+            background: var(--accent-dim);
+            border: 1px solid rgba(124, 111, 247, 0.2);
+            color: var(--accent);
+        }
+
+        .proxy-auth-toggle {
+            font-size: 12px;
+            color: var(--accent);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: 'Sora', sans-serif;
+            margin-top: 4px;
+        }
+
+        .proxy-auth-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .proxy-auth-fields {
+            display: none;
+            margin-top: 12px;
+        }
+
+        .proxy-auth-fields.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -1980,6 +2329,13 @@
                 <path d="M7 1L8.5 4.5L12.5 5L9.75 7.5L10.5 11.5L7 9.5L3.5 11.5L4.25 7.5L1.5 5L5.5 4.5L7 1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             技能
+        </button>
+        <button id="proxy-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1C4.24 1 2 3.24 2 6c0 1.86 1.02 3.49 2.53 4.35L4 12.5h6l-.53-2.15C10.98 9.49 12 7.86 12 6c0-2.76-2.24-5-5-5z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="7" cy="6" r="1.5" stroke="currentColor" stroke-width="1.1"/>
+            </svg>
+            代理
         </button>
     </div>
 
@@ -2040,6 +2396,7 @@
 
     <div id="channel-view" style="display:none;"></div>
     <div id="skills-view" style="display:none;"></div>
+    <div id="proxy-view" style="display:none;"></div>
 </main>
 
 <script>
@@ -2551,8 +2908,10 @@
         const chatView = document.getElementById('chat-view');
         const channelView = document.getElementById('channel-view');
         const skillsView = document.getElementById('skills-view');
+        const proxyView = document.getElementById('proxy-view');
         const channelsBtn = document.getElementById('channels-btn');
         const skillsBtn = document.getElementById('skills-btn');
+        const proxyBtn = document.getElementById('proxy-btn');
 
         const CHANNEL_META = {
             web: {name: '本地', icon: '本', iconClass: 'web', badge: '本地'},
@@ -2575,9 +2934,11 @@
             chatView.style.display = 'none';
             channelView.style.display = 'none';
             skillsView.style.display = 'none';
+            proxyView.style.display = 'none';
             newChatBtn.classList.remove('active');
             channelsBtn.classList.remove('active');
             skillsBtn.classList.remove('active');
+            proxyBtn.classList.remove('active');
         }
 
         function showChatView() {
@@ -2623,6 +2984,214 @@
                 showSkillsPage();
             });
         });
+
+        proxyBtn.addEventListener('click', function () {
+            if (currentView === 'proxy') return;
+            showProxyPage();
+        });
+
+        function showProxyPage() {
+            hideAllViews();
+            currentView = 'proxy';
+            proxyView.style.display = 'flex';
+            proxyBtn.classList.add('active');
+            renderHistory();
+            renderProxyView();
+        }
+
+        var proxyConfig = null;
+
+        async function fetchProxyConfig() {
+            try {
+                var res = await fetch('/api/proxy');
+                proxyConfig = await res.json();
+            } catch (e) {
+                console.error('Failed to fetch proxy config:', e);
+            }
+        }
+
+        function renderProxyView() {
+            proxyView.innerHTML = '';
+
+            var page = document.createElement('div');
+            page.className = 'proxy-page';
+
+            var header = document.createElement('div');
+            header.className = 'proxy-page-header';
+            header.innerHTML =
+                '<div class="proxy-page-header-top">' +
+                '<div class="proxy-page-header-icon">' +
+                '<svg width="20" height="20" viewBox="0 0 14 14" fill="none"><path d="M7 1C4.24 1 2 3.24 2 6c0 1.86 1.02 3.49 2.53 4.35L4 12.5h6l-.53-2.15C10.98 9.49 12 7.86 12 6c0-2.76-2.24-5-5-5z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="6" r="1.5" stroke="currentColor" stroke-width="1.1"/></svg>' +
+                '</div>' +
+                '<div>' +
+                '<div class="proxy-page-title">代理设置</div>' +
+                '<div class="proxy-page-subtitle">配置网络代理，让所有请求通过代理服务器</div>' +
+                '</div>' +
+                '</div>';
+            page.appendChild(header);
+
+            var cfg = proxyConfig || { enabled: false, protocol: 'http', host: '127.0.0.1', port: 7890 };
+
+            var card = document.createElement('div');
+            card.className = 'proxy-card';
+
+            var hasAuth = !!(cfg.username || cfg.password);
+
+            card.innerHTML =
+                '<div class="proxy-card-title">' +
+                '<span>代理配置</span>' +
+                '</div>' +
+                '<div class="proxy-toggle-row">' +
+                '<div>' +
+                '<div class="proxy-toggle-label">启用代理</div>' +
+                '<div class="proxy-toggle-hint">开启后所有出站请求都会通过代理</div>' +
+                '</div>' +
+                '<label class="proxy-toggle">' +
+                '<input type="checkbox" id="proxy-enabled" ' + (cfg.enabled ? 'checked' : '') + '>' +
+                '<span class="proxy-toggle-slider"></span>' +
+                '</label>' +
+                '</div>' +
+                '<div style="height:18px"></div>' +
+                '<div class="proxy-row">' +
+                '<div class="proxy-field">' +
+                '<label class="proxy-field-label">协议</label>' +
+                '<select class="proxy-field-select" id="proxy-protocol">' +
+                '<option value="http"' + (cfg.protocol === 'http' ? ' selected' : '') + '>HTTP</option>' +
+                '<option value="socks5"' + (cfg.protocol === 'socks5' ? ' selected' : '') + '>SOCKS5</option>' +
+                '</select>' +
+                '</div>' +
+                '<div class="proxy-field">' +
+                '<label class="proxy-field-label">地址</label>' +
+                '<input class="proxy-field-input" id="proxy-host" type="text" value="' + escapeHtml(cfg.host || '') + '" placeholder="127.0.0.1" spellcheck="false">' +
+                '</div>' +
+                '<div class="proxy-field port">' +
+                '<label class="proxy-field-label">端口</label>' +
+                '<input class="proxy-field-input" id="proxy-port" type="number" value="' + (cfg.port || '') + '" placeholder="7890" min="1" max="65535">' +
+                '</div>' +
+                '</div>' +
+                '<button class="proxy-auth-toggle" id="proxy-auth-toggle">' + (hasAuth ? '隐藏认证' : '认证（可选）') + '</button>' +
+                '<div class="proxy-auth-fields' + (hasAuth ? ' show' : '') + '" id="proxy-auth-fields">' +
+                '<div class="proxy-row">' +
+                '<div class="proxy-field">' +
+                '<label class="proxy-field-label">用户名</label>' +
+                '<input class="proxy-field-input" id="proxy-username" type="text" value="' + escapeHtml(cfg.username || '') + '" placeholder="留空则不使用认证" spellcheck="false">' +
+                '</div>' +
+                '<div class="proxy-field">' +
+                '<label class="proxy-field-label">密码</label>' +
+                '<input class="proxy-field-input" id="proxy-password" type="password" value="' + escapeHtml(cfg.password || '') + '" placeholder="留空则不使用认证">' +
+                '</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="proxy-actions">' +
+                '<button class="proxy-save-btn" id="proxy-save-btn">保存</button>' +
+                '<button class="proxy-test-btn" id="proxy-test-btn">测试连接</button>' +
+                '</div>' +
+                '<div class="proxy-status" id="proxy-status"></div>';
+
+            page.appendChild(card);
+
+            var tipsCard = document.createElement('div');
+            tipsCard.className = 'proxy-card';
+            tipsCard.innerHTML =
+                '<div class="proxy-card-title">常见代理软件端口</div>' +
+                '<div style="font-size:12px;color:var(--text-muted);line-height:2">' +
+                'Clash / ClashX — HTTP <code style="color:var(--text);background:var(--bg);padding:2px 6px;border-radius:4px;font-family:JetBrains Mono,monospace">7890</code> · SOCKS5 <code style="color:var(--text);background:var(--bg);padding:2px 6px;border-radius:4px;font-family:JetBrains Mono,monospace">7891</code><br>' +
+                'V2rayN — HTTP <code style="color:var(--text);background:var(--bg);padding:2px 6px;border-radius:4px;font-family:JetBrains Mono,monospace">10809</code> · SOCKS5 <code style="color:var(--text);background:var(--bg);padding:2px 6px;border-radius:4px;font-family:JetBrains Mono,monospace">10808</code><br>' +
+                'Shadowsocks — SOCKS5 <code style="color:var(--text);background:var(--bg);padding:2px 6px;border-radius:4px;font-family:JetBrains Mono,monospace">1082</code><br>' +
+                'Surge — HTTP <code style="color:var(--text);background:var(--bg);padding:2px 6px;border-radius:4px;font-family:JetBrains Mono,monospace">6152</code> · SOCKS5 <code style="color:var(--text);background:var(--bg);padding:2px 6px;border-radius:4px;font-family:JetBrains Mono,monospace">6153</code>' +
+                '</div>';
+            page.appendChild(tipsCard);
+
+            proxyView.appendChild(page);
+
+            document.getElementById('proxy-auth-toggle').addEventListener('click', function () {
+                var fields = document.getElementById('proxy-auth-fields');
+                var showing = fields.classList.toggle('show');
+                this.textContent = showing ? '隐藏认证' : '认证（可选）';
+            });
+
+            document.getElementById('proxy-save-btn').addEventListener('click', saveProxyConfig);
+            document.getElementById('proxy-test-btn').addEventListener('click', testProxyConnection);
+        }
+
+        async function saveProxyConfig() {
+            var saveBtn = document.getElementById('proxy-save-btn');
+            var statusEl = document.getElementById('proxy-status');
+            saveBtn.disabled = true;
+            saveBtn.textContent = '保存中…';
+
+            var body = {
+                enabled: document.getElementById('proxy-enabled').checked,
+                protocol: document.getElementById('proxy-protocol').value,
+                host: document.getElementById('proxy-host').value.trim(),
+                port: parseInt(document.getElementById('proxy-port').value, 10) || 0,
+                username: document.getElementById('proxy-username').value,
+                password: document.getElementById('proxy-password').value,
+            };
+
+            try {
+                var res = await fetch('/api/proxy', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+
+                if (!res.ok) {
+                    var err = await res.json();
+                    throw new Error(err.error || '保存失败');
+                }
+
+                proxyConfig = await res.json();
+                statusEl.className = 'proxy-status show ' + (body.enabled ? 'success' : 'info');
+                statusEl.textContent = body.enabled ? '代理已保存并启用' : '代理配置已保存（未启用）';
+            } catch (e) {
+                statusEl.className = 'proxy-status show error';
+                statusEl.textContent = e.message || '保存失败';
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = '保存';
+            }
+        }
+
+        async function testProxyConnection() {
+            var testBtn = document.getElementById('proxy-test-btn');
+            var statusEl = document.getElementById('proxy-status');
+            testBtn.disabled = true;
+            testBtn.textContent = '测试中…';
+            statusEl.className = 'proxy-status show info';
+            statusEl.textContent = '正在测试代理连接…';
+
+            var body = {
+                protocol: document.getElementById('proxy-protocol').value,
+                host: document.getElementById('proxy-host').value.trim(),
+                port: parseInt(document.getElementById('proxy-port').value, 10) || 0,
+                username: document.getElementById('proxy-username').value,
+                password: document.getElementById('proxy-password').value,
+            };
+
+            try {
+                var res = await fetch('/api/proxy/test', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+                var data = await res.json();
+
+                if (data.ok) {
+                    statusEl.className = 'proxy-status show success';
+                    statusEl.textContent = '连接成功，延迟 ' + data.latency + 'ms';
+                } else {
+                    statusEl.className = 'proxy-status show error';
+                    statusEl.textContent = '连接失败: ' + (data.error || '未知错误');
+                }
+            } catch (e) {
+                statusEl.className = 'proxy-status show error';
+                statusEl.textContent = '测试请求失败: ' + (e.message || '网络错误');
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '测试连接';
+            }
+        }
 
         async function fetchChannels() {
             try {
@@ -3126,7 +3695,7 @@
         });
 
         async function init() {
-            await Promise.all([fetchSessions(), fetchModelConfig(), fetchProviders()]);
+            await Promise.all([fetchSessions(), fetchModelConfig(), fetchProviders(), fetchProxyConfig()]);
             if (sessions.length > 0) {
                 await loadSession(sessions[0].id);
             } else {
