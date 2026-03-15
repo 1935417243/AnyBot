@@ -1093,8 +1093,8 @@
             border-radius: 14px;
             display: flex;
             align-items: flex-end;
-            gap: 10px;
-            padding: 10px 12px 10px 16px;
+            gap: 6px;
+            padding: 10px 12px 10px 10px;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
@@ -2287,4 +2287,214 @@
 
         .proxy-auth-fields.show {
             display: block;
+        }
+
+        /* ===== 附件功能样式 ===== */
+
+        .attach-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.18s ease;
+        }
+
+        .attach-btn:hover {
+            color: var(--accent);
+            background: var(--accent-dim);
+            border-color: rgba(124, 111, 247, 0.2);
+        }
+
+        .attach-btn:active {
+            transform: scale(0.93);
+        }
+
+        /* 附件预览栏 */
+        .attachment-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 0 4px 10px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 10px;
+            max-width: 240px;
+            animation: slideUp 0.2s ease;
+            transition: border-color 0.15s;
+        }
+
+        .attachment-item:hover {
+            border-color: rgba(124, 111, 247, 0.3);
+        }
+
+        .attachment-item-thumb {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .attachment-item-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .attachment-item-icon.file-type-doc { background: rgba(51, 112, 255, 0.15); color: #3370ff; }
+        .attachment-item-icon.file-type-sheet { background: rgba(52, 199, 89, 0.15); color: #34c759; }
+        .attachment-item-icon.file-type-pdf { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
+        .attachment-item-icon.file-type-code { background: rgba(175, 82, 222, 0.15); color: #af52de; }
+        .attachment-item-icon.file-type-other { background: var(--accent-dim); color: var(--accent); }
+
+        .attachment-item-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .attachment-item-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.3;
+        }
+
+        .attachment-item-size {
+            font-size: 10px;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .attachment-item-remove {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+            opacity: 0;
+        }
+
+        .attachment-item:hover .attachment-item-remove {
+            opacity: 1;
+        }
+
+        .attachment-item-remove:hover {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+        }
+
+        /* 上传中状态 */
+        .attachment-item.uploading {
+            opacity: 0.6;
+        }
+
+        .attachment-item.uploading::after {
+            content: '';
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--text-dim);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 拖拽遮罩层 */
+        .drop-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 10, 24, 0.85);
+            border: 2px dashed var(--accent);
+            border-radius: 14px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.15s ease;
+        }
+
+        .drop-overlay-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: var(--accent);
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .drop-overlay-content svg {
+            opacity: 0.8;
+            animation: bounceDown 1s ease-in-out infinite;
+        }
+
+        @keyframes bounceDown {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(6px); }
+        }
+
+        /* 用户消息中的附件标签 */
+        .message-attachments {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .message-attachment-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            background: rgba(124, 111, 247, 0.1);
+            border: 1px solid rgba(124, 111, 247, 0.15);
+            border-radius: 6px;
+            padding: 3px 8px;
+            color: #c4b5fd;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .message-attachment-tag svg {
+            flex-shrink: 0;
         }

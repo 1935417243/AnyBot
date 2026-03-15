@@ -32,10 +32,125 @@
         let modelConfig = null;
         let providerData = null;
 
+        // 附件相关
+        const fileInput = document.getElementById('file-input');
+        const attachBtn = document.getElementById('attach-btn');
+        const attachmentPreview = document.getElementById('attachment-preview');
+        const dropOverlay = document.getElementById('drop-overlay');
+        let pendingAttachments = []; // { path, name, size, isImage, localUrl? }
+
+        const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif', '.heic', '.heif', '.avif'];
+
+        function getFileTypeClass(name) {
+            var ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+            if (['.doc', '.docx', '.txt', '.rtf'].includes(ext)) return 'file-type-doc';
+            if (['.xls', '.xlsx', '.csv'].includes(ext)) return 'file-type-sheet';
+            if (ext === '.pdf') return 'file-type-pdf';
+            if (['.js', '.ts', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.html', '.css', '.json', '.xml', '.yaml', '.yml', '.sh', '.sql'].includes(ext)) return 'file-type-code';
+            return 'file-type-other';
+        }
+
+        function getFileExt(name) {
+            var ext = (name.match(/\.[^.]+$/) || [''])[0].replace('.', '').toUpperCase();
+            return ext.slice(0, 4) || 'FILE';
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function updateSendBtnState() {
+            sendBtn.disabled = (inputEl.value.trim() === '' && pendingAttachments.length === 0) || isTyping;
+        }
+
+        function renderAttachmentPreview() {
+            if (pendingAttachments.length === 0) {
+                attachmentPreview.style.display = 'none';
+                attachmentPreview.innerHTML = '';
+                return;
+            }
+            attachmentPreview.style.display = 'flex';
+            attachmentPreview.innerHTML = '';
+            pendingAttachments.forEach(function (att, idx) {
+                var item = document.createElement('div');
+                item.className = 'attachment-item' + (att.uploading ? ' uploading' : '');
+
+                if (att.isImage && att.localUrl) {
+                    var thumb = document.createElement('img');
+                    thumb.className = 'attachment-item-thumb';
+                    thumb.src = att.localUrl;
+                    thumb.alt = att.name;
+                    item.appendChild(thumb);
+                } else {
+                    var icon = document.createElement('div');
+                    icon.className = 'attachment-item-icon ' + getFileTypeClass(att.name);
+                    icon.textContent = getFileExt(att.name);
+                    item.appendChild(icon);
+                }
+
+                var info = document.createElement('div');
+                info.className = 'attachment-item-info';
+                info.innerHTML = '<div class="attachment-item-name">' + escapeHtml(att.name) + '</div>' +
+                    '<div class="attachment-item-size">' + formatSize(att.size) + '</div>';
+                item.appendChild(info);
+
+                if (!att.uploading) {
+                    var removeBtn = document.createElement('button');
+                    removeBtn.className = 'attachment-item-remove';
+                    removeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+                    removeBtn.addEventListener('click', function () {
+                        pendingAttachments.splice(idx, 1);
+                        renderAttachmentPreview();
+                        updateSendBtnState();
+                    });
+                    item.appendChild(removeBtn);
+                }
+
+                attachmentPreview.appendChild(item);
+            });
+        }
+
+        async function uploadFile(file) {
+            var isImage = IMAGE_EXTS.some(function (ext) {
+                return file.name.toLowerCase().endsWith(ext);
+            });
+            var localUrl = isImage ? URL.createObjectURL(file) : null;
+            var tempAtt = { name: file.name, size: file.size, isImage: isImage, localUrl: localUrl, uploading: true, path: '' };
+            pendingAttachments.push(tempAtt);
+            renderAttachmentPreview();
+            updateSendBtnState();
+
+            try {
+                var formData = new FormData();
+                formData.append('file', file);
+                var res = await fetch('/api/upload', { method: 'POST', body: formData });
+                if (!res.ok) throw new Error('上传失败');
+                var data = await res.json();
+                tempAtt.path = data.path;
+                tempAtt.uploading = false;
+                renderAttachmentPreview();
+                updateSendBtnState();
+            } catch (e) {
+                var idx = pendingAttachments.indexOf(tempAtt);
+                if (idx !== -1) pendingAttachments.splice(idx, 1);
+                renderAttachmentPreview();
+                updateSendBtnState();
+                showError('文件上传失败: ' + (e.message || '未知错误'));
+            }
+        }
+
+        async function uploadFiles(files) {
+            for (var i = 0; i < files.length; i++) {
+                await uploadFile(files[i]);
+            }
+        }
+
         inputEl.addEventListener('input', function () {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 160) + 'px';
-            sendBtn.disabled = this.value.trim() === '' || isTyping;
+            updateSendBtnState();
         });
 
         inputEl.addEventListener('keydown', function (e) {
@@ -47,6 +162,67 @@
 
         sendBtn.addEventListener('click', sendMessage);
         newChatBtn.addEventListener('click', createNewChat);
+
+        // 附件按钮 - 点击触发文件选择
+        attachBtn.addEventListener('click', function () {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function () {
+            if (this.files && this.files.length > 0) {
+                uploadFiles(this.files);
+            }
+            this.value = ''; // 重置以便重新选择同一文件
+        });
+
+        // 粘贴图片
+        inputEl.addEventListener('paste', function (e) {
+            var items = e.clipboardData && e.clipboardData.items;
+            if (!items) return;
+            var files = [];
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].kind === 'file') {
+                    var file = items[i].getAsFile();
+                    if (file) files.push(file);
+                }
+            }
+            if (files.length > 0) {
+                e.preventDefault();
+                uploadFiles(files);
+            }
+        });
+
+        // 拖拽文件
+        var dragCounter = 0;
+        var chatViewEl = document.getElementById('chat-view');
+
+        chatViewEl.addEventListener('dragenter', function (e) {
+            e.preventDefault();
+            dragCounter++;
+            dropOverlay.style.display = 'flex';
+        });
+
+        chatViewEl.addEventListener('dragleave', function (e) {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter <= 0) {
+                dragCounter = 0;
+                dropOverlay.style.display = 'none';
+            }
+        });
+
+        chatViewEl.addEventListener('dragover', function (e) {
+            e.preventDefault();
+        });
+
+        chatViewEl.addEventListener('drop', function (e) {
+            e.preventDefault();
+            dragCounter = 0;
+            dropOverlay.style.display = 'none';
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                uploadFiles(e.dataTransfer.files);
+            }
+        });
 
         function escapeHtml(s) {
             return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -93,7 +269,7 @@
                 '</div>';
         }
 
-        function appendMessage(role, text) {
+        function appendMessage(role, text, attachmentNames) {
             clearEmpty();
             var row = document.createElement('div');
             row.className = 'message-row ' + role;
@@ -124,6 +300,19 @@
                 var content = document.createElement('div');
                 content.className = 'message-content';
                 content.textContent = text;
+
+                // 显示附件标签
+                if (attachmentNames && attachmentNames.length > 0) {
+                    var attDiv = document.createElement('div');
+                    attDiv.className = 'message-attachments';
+                    attachmentNames.forEach(function (name) {
+                        var tag = document.createElement('span');
+                        tag.className = 'message-attachment-tag';
+                        tag.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M14 8.5l-5.5 5.5a3.5 3.5 0 01-5-5L9 3.5a2 2 0 013 3L6.5 12a.5.5 0 01-.7-.7L11 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> ' + escapeHtml(name);
+                        attDiv.appendChild(tag);
+                    });
+                    content.appendChild(attDiv);
+                }
 
                 bubble.appendChild(content);
                 row.appendChild(bubble);
@@ -293,7 +482,16 @@
                     showEmptyState();
                 } else {
                     data.messages.forEach(function (m) {
-                        appendMessage(m.role === 'user' ? 'user' : 'ai', m.content);
+                        var attNames = null;
+                        if (m.metadata) {
+                            try {
+                                var meta = JSON.parse(m.metadata);
+                                if (meta.attachments && meta.attachments.length > 0) {
+                                    attNames = meta.attachments;
+                                }
+                            } catch (_) {}
+                        }
+                        appendMessage(m.role === 'user' ? 'user' : 'ai', m.content, attNames);
                     });
                 }
 
@@ -319,21 +517,38 @@
 
         async function sendMessage() {
             var text = inputEl.value.trim();
-            if (!text || isTyping || !currentSessionId) return;
+            // 收集已上传完成的附件
+            var readyAttachments = pendingAttachments.filter(function (a) { return !a.uploading && a.path; });
+            if ((!text && readyAttachments.length === 0) || isTyping || !currentSessionId) return;
+
+            // 收集附件名用于显示
+            var attachmentNames = readyAttachments.map(function (a) { return a.name; });
 
             inputEl.value = '';
             inputEl.style.height = 'auto';
             sendBtn.disabled = true;
             isTyping = true;
 
-            appendMessage('user', text);
+            // 清空附件预览
+            pendingAttachments = [];
+            renderAttachmentPreview();
+
+            appendMessage('user', text || '[附件]', attachmentNames);
             showTyping();
+
+            // 构建请求体
+            var body = { content: text };
+            if (readyAttachments.length > 0) {
+                body.attachments = readyAttachments.map(function (a) {
+                    return { path: a.path, name: a.name };
+                });
+            }
 
             try {
                 var res = await fetch('/api/sessions/' + currentSessionId + '/messages', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({content: text}),
+                    body: JSON.stringify(body),
                 });
 
                 removeTyping();
@@ -357,7 +572,7 @@
             }
 
             isTyping = false;
-            sendBtn.disabled = inputEl.value.trim() === '';
+            updateSendBtnState();
         }
 
         async function fetchModelConfig() {

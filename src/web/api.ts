@@ -1,4 +1,8 @@
 import { Router } from "express";
+import multer from "multer";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { Request, Response } from "express";
 import { getProvider, getRegisteredProviderTypes } from "../providers/index.js";
 import { logger } from "../logger.js";
@@ -28,6 +32,30 @@ import {
   getWorkdir,
   getSandbox,
 } from "../shared.js";
+
+// 图片扩展名集合
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg", ".ico", ".tiff", ".tif", ".heic", ".heif", ".avif"]);
+
+function isImageFile(filePath: string): boolean {
+  return IMAGE_EXTS.has(path.extname(filePath).toLowerCase());
+}
+
+// 上传目录
+const __apiDirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOAD_DIR = path.resolve(__apiDirname, "../../tmp/uploads");
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+// multer 配置：保留原始扩展名
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g, "_");
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    cb(null, `${base}-${unique}${ext}`);
+  },
+});
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB 上限
 
 export function chatRouter(): Router {
   const router = Router();
@@ -323,6 +351,24 @@ export function chatRouter(): Router {
     }
   });
 
+  // --- 文件上传 ---
+
+  router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) {
+      res.status(400).json({ error: "未收到文件" });
+      return;
+    }
+    const absPath = path.resolve(file.path);
+    logger.info("web.upload.success", { name: file.originalname, path: absPath, size: file.size });
+    res.json({
+      path: absPath,
+      name: file.originalname,
+      size: file.size,
+      isImage: isImageFile(file.originalname),
+    });
+  });
+
   // --- Chat messages ---
 
   router.post("/sessions/:id/messages", async (req: Request, res: Response) => {
@@ -333,17 +379,48 @@ export function chatRouter(): Router {
       return;
     }
 
-    const { content } = req.body as { content?: string };
-    if (!content?.trim()) {
+    const { content, attachments } = req.body as {
+      content?: string;
+      attachments?: { path: string; name: string }[];
+    };
+    if (!content?.trim() && (!attachments || attachments.length === 0)) {
       res.status(400).json({ error: "消息不能为空" });
       return;
     }
 
-    const userText = content.trim();
-    db.addMessage(id, "user", userText);
+    // 构建包含附件信息的用户文本
+    let userText = (content || "").trim();
+    const imagePaths: string[] = [];
+    const filePaths: { path: string; name: string }[] = [];
+
+    if (attachments && attachments.length > 0) {
+      for (const att of attachments) {
+        if (isImageFile(att.name)) {
+          imagePaths.push(att.path);
+        } else {
+          filePaths.push(att);
+        }
+      }
+      // 非图片文件信息拼接到 prompt
+      if (filePaths.length > 0) {
+        const fileList = filePaths.map(f => `- ${f.name}: ${f.path}`).join("\n");
+        userText = `${userText}\n\n用户附带了以下文件，请读取并处理：\n${fileList}`;
+      }
+      // 图片文件也补充提示
+      if (imagePaths.length > 0) {
+        const imgList = imagePaths.map(p => `- ${path.basename(p)}: ${p}`).join("\n");
+        userText = `${userText}\n\n用户附带了以下图片：\n${imgList}`;
+      }
+    }
+
+    // 构建 metadata（附件名称列表）
+    const attachmentNames = (attachments || []).map(a => a.name);
+    const metadata = attachmentNames.length > 0 ? JSON.stringify({ attachments: attachmentNames }) : null;
+
+    db.addMessage(id, "user", content?.trim() || "[附件]", metadata);
 
     if (session.messages.length <= 1) {
-      session.title = generateTitle(userText);
+      session.title = generateTitle(content?.trim() || "文件分析");
     }
 
     const prompt = session.sessionId
@@ -357,6 +434,8 @@ export function chatRouter(): Router {
         providerSessionId: session.sessionId,
         provider: provider.type,
         userTextChars: userText.length,
+        imageCount: imagePaths.length,
+        fileCount: filePaths.length,
       });
 
       const result = await provider.run({
@@ -364,6 +443,7 @@ export function chatRouter(): Router {
         sandbox: getSandbox(),
         model: getCurrentModel(),
         prompt,
+        imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
         sessionId: session.sessionId || undefined,
       });
 

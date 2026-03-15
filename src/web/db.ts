@@ -8,7 +8,7 @@ export type ChatSession = {
   sessionId: string | null;
   source: string;
   chatId: string | null;
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  messages: Array<{ role: "user" | "assistant"; content: string; metadata?: string | null }>;
   createdAt: number;
   updatedAt: number;
 };
@@ -59,8 +59,11 @@ try {
 try {
   db.exec(`ALTER TABLE sessions ADD COLUMN chat_id TEXT`);
 } catch (_) {}
+try {
+  db.exec(`ALTER TABLE messages ADD COLUMN metadata TEXT`);
+} catch (_) {}
 
-db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_source_chat ON sessions(source, chat_id)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_source_chat ON sessions(source, chat_id)`);;
 
 const stmts = {
   listSessions: db.prepare(`
@@ -79,7 +82,7 @@ const stmts = {
   `),
 
   getMessages: db.prepare(`
-    SELECT role, content FROM messages
+    SELECT role, content, metadata FROM messages
     WHERE session_id = ? ORDER BY id ASC
   `),
 
@@ -96,7 +99,7 @@ const stmts = {
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
 
   insertMessage: db.prepare(`
-    INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)
+    INSERT INTO messages (session_id, role, content, metadata) VALUES (?, ?, ?, ?)
   `),
 
   findBySourceChat: db.prepare(`
@@ -136,6 +139,7 @@ export function getSession(id: string): ChatSession | null {
   const messages = stmts.getMessages.all(id) as Array<{
     role: "user" | "assistant";
     content: string;
+    metadata: string | null;
   }>;
 
   return { ...row, messages };
@@ -172,6 +176,7 @@ export function findSessionBySourceChat(
   const messages = stmts.getMessages.all(row.id) as Array<{
     role: "user" | "assistant";
     content: string;
+    metadata: string | null;
   }>;
   return { ...row, messages };
 }
@@ -194,8 +199,8 @@ export function deleteSession(id: string): void {
   stmts.deleteSession.run(id);
 }
 
-export function addMessage(sessionId: string, role: "user" | "assistant", content: string): void {
-  stmts.insertMessage.run(sessionId, role, content);
+export function addMessage(sessionId: string, role: "user" | "assistant", content: string, metadata?: string | null): void {
+  stmts.insertMessage.run(sessionId, role, content, metadata || null);
 }
 
 export function detachChatId(source: string, chatId: string): void {
