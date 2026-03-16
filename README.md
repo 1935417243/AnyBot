@@ -14,7 +14,9 @@
 
 - **多 Provider 架构** — 可插拔的 AI CLI 后端，当前支持 Codex CLI、Gemini CLI、Cursor CLI 和 Qoder CLI，未来可扩展更多
 - **Web UI** — 开箱即用的本地聊天界面，支持 Markdown 渲染、代码高亮、会话管理
+- **附件支持** — Web UI 中通过 📎 按钮、粘贴图片或拖拽文件发送附件（图片 + 任意文件，50MB 上限）
 - **多平台集成** — 同时支持飞书（长连接）、QQ 机器人（WebSocket）、Telegram，手机上也能用
+- **主动推送** — 通过 API 主动向频道 Owner 发送消息，适合自动化通知场景
 - **技能管理** — 在 Web UI 中浏览、启用 / 禁用 / 删除技能
 - **代理配置** — 在 Web UI 中配置 HTTP / SOCKS5 代理，支持保存与连通性测试
 - **会话续聊** — 复用 Provider 原生 session，上下文不丢失；输入 `/new` 开启新会话
@@ -31,15 +33,19 @@
 
 | 聊天界面 | 模型切换 |
 |:---:|:---:|
-| ![聊天界面](assets/webUI聊天展示.png) | ![模型切换](assets/模型配置.png) |
+| ![聊天界面](assets/webUI聊天展示.png) | ![模型切换](assets/模型切换.png) |
 
-| 供应商切换 | 频道管理 |
+| 提供商切换 | 频道管理 |
 |:---:|:---:|
-| ![供应商切换](assets/供应商.png) | ![频道管理](assets/频道管理.png) |
+| ![提供商切换](assets/提供商切换.png) | ![频道管理](assets/频道管理.png) |
 
-| 技能管理 | 手机端操作 |
+| 技能管理 | 代理设置 |
 |:---:|:---:|
-| ![技能管理](assets/技能管理.png) | ![手机端操作](assets/手机端演示.png) |
+| ![技能管理](assets/技能管理.png) | ![代理设置](assets/代理.png) |
+
+| 手机端操作 |
+|:---:|
+| ![手机端操作](assets/手机端演示.png) |
 
 ---
 
@@ -168,6 +174,9 @@ AnyBot 使用可插拔的 Provider 架构，每个 AI CLI 工具对应一个 Pro
 
 - 多会话管理，历史记录持久化（SQLite）
 - Markdown 渲染 + 代码语法高亮 + 一键复制
+- 附件支持：通过 📎 按钮上传文件、粘贴图片、拖拽文件到对话区（50MB 上限）
+  - 图片附件自动传递给 Provider 做多模态理解
+  - 非图片文件路径作为上下文传入，Provider 可读取处理
 - Provider 和模型切换
 - 频道配置管理（飞书、QQ 机器人、Telegram）
 - 技能管理（浏览、启用 / 禁用、删除）
@@ -212,16 +221,19 @@ AnyBot 使用可插拔的 Provider 架构，每个 AI CLI 工具对应一个 Pro
     "appSecret": "xxxx",
     "groupChatMode": "mention",   // "mention"（仅 @机器人时回复）或 "all"（所有消息都回复）
     "botOpenId": "ou_xxxx",       // 可选；mention 模式下用于精确判断是否 @了机器人
-    "ackReaction": "OK"           // 收到消息后的 reaction 表情，留空可关闭
+    "ackReaction": "OK",          // 收到消息后的 reaction 表情，留空可关闭
+    "ownerChatId": "oc_xxxx"      // 可选；用于 /api/send 主动推送消息的目标聊天 ID
   },
   "qqbot": {
     "enabled": true,
     "appId": "your_app_id",
-    "appSecret": "your_app_secret"
+    "appSecret": "your_app_secret",
+    "ownerChatId": ""             // 可选；主动推送的目标聊天 ID
   },
   "telegram": {
     "enabled": true,
-    "token": "1234567890:AA..."
+    "token": "1234567890:AA...",
+    "ownerChatId": ""             // 可选；主动推送的目标 chat ID
   }
 }
 ```
@@ -453,7 +465,9 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 | `POST` | `/api/sessions` | 创建新会话 |
 | `GET` | `/api/sessions/:id` | 获取会话详情（含消息） |
 | `DELETE` | `/api/sessions/:id` | 删除会话 |
-| `POST` | `/api/sessions/:id/messages` | 发送消息 `{ "content": "..." }` |
+| `POST` | `/api/sessions/:id/messages` | 发送消息，支持附件 `{ "content": "...", "attachments": [...] }` |
+| `POST` | `/api/upload` | 上传文件（50MB 上限），返回文件路径与类型 |
+| `POST` | `/api/send` | 通过频道机器人主动推送消息 `{ "channel": "feishu", "message": "..." }` |
 | `GET` | `/api/model-config` | 获取当前模型配置（含 Provider 信息） |
 | `PUT` | `/api/model-config` | 切换模型 `{ "modelId": "..." }` |
 | `GET` | `/api/providers` | 获取可用 Provider 列表 |
@@ -470,6 +484,20 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 
 ---
 
+## 主动推送消息
+
+通过 `/api/send` 接口可以让频道机器人主动向 Owner 发送消息，适用于自动化通知、告警等场景：
+
+```bash
+curl -X POST http://localhost:19981/api/send \
+  -H "Content-Type: application/json" \
+  -d '{"channel": "telegram", "message": "部署完成 ✅"}'
+```
+
+`channel` 可选 `feishu`、`qqbot`、`telegram`，需要在对应频道配置中设置 `ownerChatId`。
+
+---
+
 ## 工作原理
 
 - 每个聊天（Web 会话 / 飞书 chat / QQ 聊天）绑定一个 Provider session，后续消息通过续聊机制保持上下文
@@ -477,7 +505,8 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 - 飞书消息先加一个 reaction（默认 ✅）表示已收到，再等待 Provider 完整回复
 - QQ 机器人通过 WebSocket 网关接收消息，OAuth2 自动管理 Token
 - 启用代理后，Provider 与 Telegram 等出站请求会走全局代理；飞书、QQ 和本机地址默认直连
-- 支持文本和图片消息；其它消息类型会收到提示
+- 支持文本、图片和附件消息；其它消息类型会收到提示
+- Web UI 附件通过 multer 中间件上传到工作目录下的 `tmp/uploads/`
 - `/new` 重置当前会话，`/provider` 和 `/model` 切换供应商和模型，`/help` 查看命令帮助
 - 图片消息先下载到临时目录，通过 Provider 传入
 - 回复中的本机图片路径（`![alt](/path.png)` 或纯路径）会自动上传
@@ -492,6 +521,7 @@ Web UI 通过以下 API 与后端交互，也可以直接调用：
 AnyBot/
 ├── src/
 │   ├── index.ts            # 主入口，会话状态管理
+│   ├── shared.ts           # 公共工具（prompt 构建、ID 生成、配置读取）
 │   ├── providers/           # Provider 抽象层
 │   │   ├── types.ts        # IProvider 接口定义
 │   │   ├── index.ts        # ProviderManager（工厂 + 注册）
@@ -512,10 +542,10 @@ AnyBot/
 │   │   ├── qqbot.ts        # QQ 机器人频道实现
 │   │   ├── telegram.ts     # Telegram 频道实现
 │   │   ├── config.ts       # channels.json 读写
-│   │   └── types.ts        # 频道接口定义
+│   │   └── types.ts        # 频道接口定义（含 sendToOwner 主动推送）
 │   ├── web/                # Web 层
 │   │   ├── server.ts       # Express 服务
-│   │   ├── api.ts          # REST API
+│   │   ├── api.ts          # REST API（含文件上传、主动推送）
 │   │   ├── db.ts           # SQLite 持久化
 │   │   ├── model-config.ts # Provider + 模型配置
 │   │   ├── proxy-config.ts # proxy.json 读写

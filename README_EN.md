@@ -14,7 +14,9 @@ Supports **macOS** and **Linux**.
 
 - **Multi-Provider Architecture** — Pluggable AI CLI backends; currently supports Codex CLI, Gemini CLI, Cursor CLI, and Qoder CLI, with more to come
 - **Web UI** — Built-in local chat interface with Markdown rendering, code highlighting, and session management
+- **Attachment Support** — Send files via the 📎 button, paste images, or drag-and-drop files in the Web UI (images + any file type, 50MB limit)
 - **Multi-Platform Integration** — Feishu (long connection), QQ Bot (WebSocket), and Telegram simultaneously — works on mobile too
+- **Proactive Messaging** — Push messages to channel owners via API, ideal for automation and notifications
 - **Skill Management** — Browse, enable/disable, and delete skills from the Web UI
 - **Proxy Configuration** — Configure HTTP / SOCKS5 proxies in the Web UI, with save and connectivity testing
 - **Session Continuity** — Reuses Provider's native sessions to preserve context; type `/new` to start fresh
@@ -31,15 +33,19 @@ Supports **macOS** and **Linux**.
 
 | Chat Interface | Model Switching |
 |:---:|:---:|
-| ![Chat Interface](assets/webUI聊天展示.png) | ![Model Switching](assets/模型配置.png) |
+| ![Chat Interface](assets/webUI聊天展示.png) | ![Model Switching](assets/模型切换.png) |
 
 | Provider Switching | Channel Management |
 |:---:|:---:|
-| ![Provider Switching](assets/供应商.png) | ![Channel Management](assets/频道管理.png) |
+| ![Provider Switching](assets/提供商切换.png) | ![Channel Management](assets/频道管理.png) |
 
-| Skill Management | Mobile Usage |
+| Skill Management | Proxy Settings |
 |:---:|:---:|
-| ![Skill Management](assets/技能管理.png) | ![Mobile Usage](assets/手机端演示.png) |
+| ![Skill Management](assets/技能管理.png) | ![Proxy Settings](assets/代理.png) |
+
+| Mobile Usage |
+|:---:|
+| ![Mobile Usage](assets/手机端演示.png) |
 
 ---
 
@@ -168,6 +174,9 @@ Built-in web chat interface, no extra deployment needed:
 
 - Multi-session management with persistent history (SQLite)
 - Markdown rendering + syntax highlighting + one-click copy
+- Attachment support: upload files via 📎 button, paste images, or drag-and-drop files into the chat area (50MB limit)
+  - Image attachments are automatically passed to the Provider for multimodal understanding
+  - Non-image file paths are injected as context for the Provider to read and process
 - Provider and model switching
 - Channel configuration management (Feishu, QQ Bot, Telegram)
 - Skill management (browse, enable/disable, delete)
@@ -212,16 +221,19 @@ Channel configs are stored in `.data/channels.json`. Three ways to manage:
     "appSecret": "xxxx",
     "groupChatMode": "mention",   // "mention" (reply only when @bot) or "all" (reply to all messages)
     "botOpenId": "ou_xxxx",       // Optional; used in mention mode to detect @bot precisely
-    "ackReaction": "OK"           // Reaction emoji on message receipt; leave empty to disable
+    "ackReaction": "OK",          // Reaction emoji on message receipt; leave empty to disable
+    "ownerChatId": "oc_xxxx"      // Optional; target chat ID for /api/send proactive messaging
   },
   "qqbot": {
     "enabled": true,
     "appId": "your_app_id",
-    "appSecret": "your_app_secret"
+    "appSecret": "your_app_secret",
+    "ownerChatId": ""             // Optional; target chat ID for proactive messaging
   },
   "telegram": {
     "enabled": true,
-    "token": "1234567890:AA..."
+    "token": "1234567890:AA...",
+    "ownerChatId": ""             // Optional; target chat ID for proactive messaging
   }
 }
 ```
@@ -453,7 +465,9 @@ The Web UI communicates with the backend through these APIs, which can also be c
 | `POST` | `/api/sessions` | Create a new session |
 | `GET` | `/api/sessions/:id` | Get session details (with messages) |
 | `DELETE` | `/api/sessions/:id` | Delete a session |
-| `POST` | `/api/sessions/:id/messages` | Send a message `{ "content": "..." }` |
+| `POST` | `/api/sessions/:id/messages` | Send a message with optional attachments `{ "content": "...", "attachments": [...] }` |
+| `POST` | `/api/upload` | Upload a file (50MB limit), returns file path and type |
+| `POST` | `/api/send` | Push a message via channel bot `{ "channel": "feishu", "message": "..." }` |
 | `GET` | `/api/model-config` | Get current model config (with Provider info) |
 | `PUT` | `/api/model-config` | Switch model `{ "modelId": "..." }` |
 | `GET` | `/api/providers` | List available Providers |
@@ -470,6 +484,20 @@ The Web UI communicates with the backend through these APIs, which can also be c
 
 ---
 
+## Proactive Messaging
+
+Use the `/api/send` endpoint to have channel bots proactively send messages to the owner, useful for automation, alerts, and notifications:
+
+```bash
+curl -X POST http://localhost:19981/api/send \
+  -H "Content-Type: application/json" \
+  -d '{"channel": "telegram", "message": "Deployment complete ✅"}'
+```
+
+`channel` can be `feishu`, `qqbot`, or `telegram`. You need to set `ownerChatId` in the corresponding channel configuration.
+
+---
+
 ## How It Works
 
 - Each chat (Web session / Feishu chat / QQ chat) is bound to a Provider session; subsequent messages maintain context through session continuity
@@ -477,7 +505,8 @@ The Web UI communicates with the backend through these APIs, which can also be c
 - Feishu messages receive a reaction (default ✅) to acknowledge receipt, then wait for the full Provider reply
 - QQ Bot receives messages via WebSocket gateway with automatic OAuth2 token management
 - When proxy is enabled, Provider and Telegram outbound requests go through the global proxy; Feishu, QQ, and local addresses bypass it by default
-- Text and image messages are supported; other message types receive a prompt
+- Text, image, and attachment messages are supported; other message types receive a prompt
+- Web UI attachments are uploaded via multer middleware to `tmp/uploads/` under the working directory
 - `/new` resets the current session, `/provider` and `/model` switch provider and model, `/help` shows command help
 - Image messages are downloaded to a temp directory and passed to the Provider
 - Local image paths in replies (`![alt](/path.png)` or bare paths) are automatically uploaded
@@ -492,6 +521,7 @@ The Web UI communicates with the backend through these APIs, which can also be c
 AnyBot/
 ├── src/
 │   ├── index.ts            # Main entry, session state management
+│   ├── shared.ts           # Shared utilities (prompt building, ID generation, config reading)
 │   ├── providers/           # Provider abstraction layer
 │   │   ├── types.ts        # IProvider interface definition
 │   │   ├── index.ts        # ProviderManager (factory + registry)
@@ -512,10 +542,10 @@ AnyBot/
 │   │   ├── qqbot.ts        # QQ Bot channel implementation
 │   │   ├── telegram.ts     # Telegram channel implementation
 │   │   ├── config.ts       # channels.json read/write
-│   │   └── types.ts        # Channel interface definitions
+│   │   └── types.ts        # Channel interface definitions (incl. sendToOwner)
 │   ├── web/                # Web layer
 │   │   ├── server.ts       # Express server
-│   │   ├── api.ts          # REST API
+│   │   ├── api.ts          # REST API (incl. file upload, proactive messaging)
 │   │   ├── db.ts           # SQLite persistence
 │   │   ├── model-config.ts # Provider + model configuration
 │   │   ├── proxy-config.ts # proxy.json read/write
