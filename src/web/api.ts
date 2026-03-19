@@ -371,6 +371,26 @@ export function chatRouter(): Router {
     });
   });
 
+  // --- 本地文件代理（让浏览器能访问本地图片） ---
+
+  router.get("/local-file", (req: Request, res: Response) => {
+    const filePath = req.query.path as string;
+    if (!filePath) {
+      res.status(400).json({ error: "缺少 path 参数" });
+      return;
+    }
+    if (!isImageFile(filePath)) {
+      res.status(403).json({ error: "只允许访问图片文件" });
+      return;
+    }
+    const resolved = path.resolve(filePath);
+    if (!fs.existsSync(resolved)) {
+      res.status(404).json({ error: "文件不存在" });
+      return;
+    }
+    res.sendFile(resolved);
+  });
+
   // --- Chat messages ---
 
   router.post("/sessions/:id/messages", async (req: Request, res: Response) => {
@@ -415,9 +435,9 @@ export function chatRouter(): Router {
       }
     }
 
-    // 构建 metadata（附件名称列表）
-    const attachmentNames = (attachments || []).map(a => a.name);
-    const metadata = attachmentNames.length > 0 ? JSON.stringify({ attachments: attachmentNames }) : null;
+    // 构建 metadata（附件信息：名称 + 路径）
+    const attachmentInfo = (attachments || []).map(a => ({ name: a.name, path: a.path }));
+    const metadata = attachmentInfo.length > 0 ? JSON.stringify({ attachments: attachmentInfo }) : null;
 
     db.addMessage(id, "user", content?.trim() || "[附件]", metadata);
 

@@ -1,3 +1,29 @@
+    // 图片灯箱：点击放大查看
+    function openImageModal(src) {
+        var overlay = document.createElement('div');
+        overlay.className = 'image-modal-overlay';
+        var img = document.createElement('img');
+        img.className = 'image-modal-img';
+        img.src = src;
+        overlay.appendChild(img);
+        document.body.appendChild(overlay);
+        // 触发动画
+        requestAnimationFrame(function () { overlay.classList.add('active'); });
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) {
+                overlay.classList.remove('active');
+                setTimeout(function () { overlay.remove(); }, 200);
+            }
+        });
+        document.addEventListener('keydown', function handler(e) {
+            if (e.key === 'Escape') {
+                overlay.classList.remove('active');
+                setTimeout(function () { overlay.remove(); }, 200);
+                document.removeEventListener('keydown', handler);
+            }
+        });
+    }
+
     function copyCode(btn) {
         var code = btn.closest('pre').querySelector('code');
         var text = code.textContent || code.innerText;
@@ -244,6 +270,20 @@
                 return '<pre>' + headerHtml + '<code class="hljs">' + escapeHtml(code) + '</code></pre>';
             };
 
+            // 自定义图片渲染：将本地绝对路径改写为通过后端代理访问，限制尺寸并支持点击放大
+            markedRenderer.image = function (obj) {
+                var href = (typeof obj === 'string') ? obj : (obj.href || '');
+                var title = (typeof obj === 'string') ? '' : (obj.title || '');
+                var alt = (typeof obj === 'string') ? '' : (obj.text || '');
+                // 本地绝对路径：以 / 开头且不是 Web 路径
+                if (href.startsWith('/') && !href.startsWith('/api')) {
+                    href = '/api/local-file?path=' + encodeURIComponent(href);
+                }
+                return '<img src="' + href + '" alt="' + escapeHtml(alt) + '"'
+                    + (title ? ' title="' + escapeHtml(title) + '"' : '')
+                    + ' class="chat-image" onclick="openImageModal(this.src)" />';
+            };
+
             marked.setOptions({
                 renderer: markedRenderer,
                 gfm: true,
@@ -269,7 +309,7 @@
                 '</div>';
         }
 
-        function appendMessage(role, text, attachmentNames) {
+        function appendMessage(role, text, attachments) {
             clearEmpty();
             var row = document.createElement('div');
             row.className = 'message-row ' + role;
@@ -301,15 +341,31 @@
                 content.className = 'message-content';
                 content.textContent = text;
 
-                // 显示附件标签
-                if (attachmentNames && attachmentNames.length > 0) {
+                // 显示附件：图片渲染缩略图，其他渲染标签
+                if (attachments && attachments.length > 0) {
                     var attDiv = document.createElement('div');
                     attDiv.className = 'message-attachments';
-                    attachmentNames.forEach(function (name) {
-                        var tag = document.createElement('span');
-                        tag.className = 'message-attachment-tag';
-                        tag.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M14 8.5l-5.5 5.5a3.5 3.5 0 01-5-5L9 3.5a2 2 0 013 3L6.5 12a.5.5 0 01-.7-.7L11 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> ' + escapeHtml(name);
-                        attDiv.appendChild(tag);
+                    attachments.forEach(function (att) {
+                        var name = (typeof att === 'string') ? att : att.name;
+                        var attPath = (typeof att === 'string') ? null : att.path;
+                        var isImg = IMAGE_EXTS.some(function (ext) { return name.toLowerCase().endsWith(ext); });
+
+                        if (isImg && attPath) {
+                            // 图片缩略图
+                            var imgSrc = '/api/local-file?path=' + encodeURIComponent(attPath);
+                            var img = document.createElement('img');
+                            img.className = 'chat-image user-attachment-image';
+                            img.src = imgSrc;
+                            img.alt = name;
+                            img.onclick = function () { openImageModal(imgSrc); };
+                            attDiv.appendChild(img);
+                        } else {
+                            // 非图片附件标签
+                            var tag = document.createElement('span');
+                            tag.className = 'message-attachment-tag';
+                            tag.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M14 8.5l-5.5 5.5a3.5 3.5 0 01-5-5L9 3.5a2 2 0 013 3L6.5 12a.5.5 0 01-.7-.7L11 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> ' + escapeHtml(name);
+                            attDiv.appendChild(tag);
+                        }
                     });
                     content.appendChild(attDiv);
                 }
@@ -482,16 +538,16 @@
                     showEmptyState();
                 } else {
                     data.messages.forEach(function (m) {
-                        var attNames = null;
+                        var attInfo = null;
                         if (m.metadata) {
                             try {
                                 var meta = JSON.parse(m.metadata);
                                 if (meta.attachments && meta.attachments.length > 0) {
-                                    attNames = meta.attachments;
+                                    attInfo = meta.attachments;
                                 }
                             } catch (_) {}
                         }
-                        appendMessage(m.role === 'user' ? 'user' : 'ai', m.content, attNames);
+                        appendMessage(m.role === 'user' ? 'user' : 'ai', m.content, attInfo);
                     });
                 }
 
@@ -521,8 +577,8 @@
             var readyAttachments = pendingAttachments.filter(function (a) { return !a.uploading && a.path; });
             if ((!text && readyAttachments.length === 0) || isTyping || !currentSessionId) return;
 
-            // 收集附件名用于显示
-            var attachmentNames = readyAttachments.map(function (a) { return a.name; });
+            // 收集附件信息用于显示（包含 path 以便渲染图片）
+            var attachmentInfos = readyAttachments.map(function (a) { return { name: a.name, path: a.path }; });
 
             inputEl.value = '';
             inputEl.style.height = 'auto';
@@ -533,7 +589,7 @@
             pendingAttachments = [];
             renderAttachmentPreview();
 
-            appendMessage('user', text || '[附件]', attachmentNames);
+            appendMessage('user', text || '[附件]', attachmentInfos);
             showTyping();
 
             // 构建请求体
