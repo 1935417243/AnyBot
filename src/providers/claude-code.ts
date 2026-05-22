@@ -34,6 +34,7 @@ import {
 } from "./claude-code-agent-events.js";
 import { getDataDir } from "../app-settings.js";
 import { logger } from "../logger.js";
+import { DEFAULT_SANDBOX } from "../sandbox-config.js";
 import type { SandboxMode } from "../types.js";
 
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
@@ -288,7 +289,7 @@ export class ClaudeCodeProvider implements IProvider {
       signal,
     } = opts;
     const prompt = `${WORKDIR_SAFETY_PROMPT}\n\n${opts.prompt}`;
-    const sandbox = opts.sandbox ?? "read-only";
+    const sandbox = opts.sandbox ?? DEFAULT_SANDBOX;
     const startedAt = Date.now();
     const abortController = new AbortController();
     const permissionMode = this.permissionMode ?? mapSandboxToPermissionMode(sandbox);

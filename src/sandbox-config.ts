@@ -6,6 +6,7 @@ import { sandboxModes, type SandboxMode } from "./types.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DATA_DIR || process.env.CODEX_DATA_DIR || path.resolve(__dirname, "../.data");
 const CONFIG_PATH = path.join(dataDir, "runtime-config.json");
+export const DEFAULT_SANDBOX: SandboxMode = "workspace-write";
 
 export type SandboxConfig = {
   defaultSandbox: SandboxMode;
@@ -38,7 +39,7 @@ function validateSandboxMode(value: unknown): SandboxMode | null {
 }
 
 function getInitialSandbox(): SandboxMode {
-  if (!process.env.CODEX_SANDBOX) return "read-only";
+  if (!process.env.CODEX_SANDBOX) return DEFAULT_SANDBOX;
   const sandbox = validateSandboxMode(process.env.CODEX_SANDBOX);
   if (!sandbox) {
     throw new Error(

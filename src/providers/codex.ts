@@ -25,6 +25,7 @@ import {
   type ClaudeAgentStreamEvent,
 } from "./claude-code-agent-events.js";
 import { logger } from "../logger.js";
+import { DEFAULT_SANDBOX } from "../sandbox-config.js";
 import { resolveExecutable } from "../utils/process.js";
 
 export class ProviderTimeoutError extends Error {
@@ -530,7 +531,7 @@ export class CodexProvider implements IProvider {
       timeoutMs = DEFAULT_TIMEOUT_MS,
       signal,
     } = opts;
-    const sandbox = opts.sandbox ?? process.env.CODEX_SANDBOX ?? "read-only";
+    const sandbox = opts.sandbox ?? process.env.CODEX_SANDBOX ?? DEFAULT_SANDBOX;
     const startedAt = Date.now();
     const abortController = new AbortController();
     const toolStateById = new Map<string, ToolState>();

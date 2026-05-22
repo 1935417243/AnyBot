@@ -92,6 +92,7 @@
         const settingsProviderDetectBtn = document.getElementById('settings-provider-detect-btn');
         const settingsDangerConfirm = document.getElementById('settings-danger-confirm');
         const settingsDefaultWorkdir = document.getElementById('settings-default-workdir');
+        const settingsWorkdirOpenBtn = document.getElementById('settings-workdir-open-btn');
         const settingsWorkdirPickBtn = document.getElementById('settings-workdir-pick-btn');
         const settingsProjectsEntryBtn = document.getElementById('settings-projects-entry-btn');
         const settingsLogLevel = document.getElementById('settings-log-level');
@@ -4842,6 +4843,11 @@
                 } catch (e) {
                     showError('选择目录失败');
                 }
+            });
+        }
+        if (settingsWorkdirOpenBtn) {
+            settingsWorkdirOpenBtn.addEventListener('click', function () {
+                runSettingsAction('/api/app-settings/default-workdir/open', 'POST', '已打开工作区文件夹');
             });
         }
         if (settingsDefaultWorkdir) {

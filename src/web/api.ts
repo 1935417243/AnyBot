@@ -1022,6 +1022,16 @@ export function chatRouter(): Router {
     }
   });
 
+  router.post("/app-settings/default-workdir/open", (_req: Request, res: Response) => {
+    try {
+      const workdir = getWorkdir();
+      openDirectory(workdir);
+      res.json({ ok: true, path: workdir });
+    } catch (error) {
+      res.status(500).json({ error: "打开工作区文件夹失败" });
+    }
+  });
+
   // --- Model & Provider config ---
 
   router.post("/provider-models", async (req: Request, res: Response) => {

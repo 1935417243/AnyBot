@@ -395,7 +395,7 @@ AnyBot no longer reads `.env` files. Common settings such as provider, model, an
 |----------|---------|-------------|
 | `CODEX_BIN` | Bundled Codex CLI | Optional external Codex CLI executable path. Empty or `codex` prefers the bundled native binary |
 | `CODEX_MODEL` | — | Override the model used |
-| `CODEX_SANDBOX` | `read-only` | Safety mode: `read-only` / `workspace-write` / `danger-full-access` |
+| `CODEX_SANDBOX` | `workspace-write` | Safety mode: `read-only` / `workspace-write` / `danger-full-access` |
 | `CODEX_SYSTEM_PROMPT` | — | Custom system prompt appended to the built-in prompt |
 | `CODEX_WORKDIR` | Current directory | Working directory |
 

@@ -422,7 +422,7 @@ AnyBot 不再读取 `.env` 文件。Provider、模型和权限等常用设置会
 |------|--------|------|
 | `CODEX_BIN` | 随包 Codex CLI | 可选；指定外部 Codex CLI 可执行文件路径。留空或设为 `codex` 时优先使用随包 native binary |
 | `CODEX_MODEL` | — | 覆盖使用的模型 |
-| `CODEX_SANDBOX` | `read-only` | 安全模式：`read-only` / `workspace-write` / `danger-full-access` |
+| `CODEX_SANDBOX` | `workspace-write` | 安全模式：`read-only` / `workspace-write` / `danger-full-access` |
 | `CODEX_SYSTEM_PROMPT` | — | 追加到内置提示词后面的自定义系统提示词 |
 | `CODEX_WORKDIR` | 当前目录 | 工作目录 |
 
