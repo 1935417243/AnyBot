@@ -80,7 +80,7 @@ sudo xattr -rd com.apple.quarantine "/Applications/AnyBot.app"
 
 | Provider | 安装方式 | 说明 |
 |----------|---------|------|
-| [Codex CLI](https://github.com/openai/codex) | `npm install -g @openai/codex` | OpenAI 的 CLI 工具 |
+| [Codex CLI](https://github.com/openai/codex) | 随 `@openai/codex-sdk` 依赖安装；需要完成本机 Codex 登录/配置 | OpenAI 的 CLI 工具 |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | 使用本机已登录的 `claude` 命令；项目依赖已包含 SDK | Anthropic 的 CLI 工具 |
 
 桌面 App 不要求用户手动安装 Node.js；只有源码运行或开发时才需要 Node.js 和 npm。
@@ -383,41 +383,21 @@ AnyBot 使用可插拔的 Provider 架构，每个 AI CLI 工具对应一个 Pro
 
 ## 代理配置
 
-AnyBot 支持在 Web UI 中统一配置网络代理，适用于 Provider 请求、Telegram API 请求以及其它出站 HTTP(S) 请求。
+代理功能当前暂时关闭。历史配置会保留在 `.data/proxy.json`，但应用启动、保存配置和导入配置时都不会再向 Provider 注入 `HTTP_PROXY` / `HTTPS_PROXY`。
 
 ### 支持内容
 
-- 支持 `HTTP` 和 `SOCKS5` 代理
-- 支持可选用户名 / 密码认证
-- 支持在 Web UI 中一键测试代理连通性
-- 代理配置持久化保存到 `.data/proxy.json`
+- 暂不启用 `HTTP` / `SOCKS5` 代理
+- Web UI 会显示“代理功能已暂时关闭”
+- 旧代理配置会保留，方便后续重新设计后迁移或恢复
 
 ### 配置方式
 
 | 方式 | 说明 |
 |------|------|
-| **Web UI** | 在左侧“代理”页面中启用、保存并测试连接 |
-| **REST API** | `GET /api/proxy` 查看、`PUT /api/proxy` 更新、`POST /api/proxy/test` 测试 |
-| **手动编辑** | 直接编辑 `.data/proxy.json` |
-
-### proxy.json 示例
-
-```json
-{
-  "enabled": true,
-  "protocol": "http",
-  "host": "127.0.0.1",
-  "port": 7890,
-  "username": "",
-  "password": ""
-}
-```
-
-### 说明
-
-- 启用后会更新全局 `HTTP_PROXY` / `HTTPS_PROXY`
-- 默认会直连 `localhost`、`127.0.0.1`、`::1`、`*.feishu.cn`、`*.larksuite.com`、`*.qq.com`
-- 很适合在本机开代理后，让 Codex / Claude Code / Telegram 统一走代理
+| **Web UI** | 代理控件会禁用 |
+| **REST API** | `GET /api/proxy` 会返回 `featureEnabled: false`；`PUT /api/proxy` 不会启用代理；`POST /api/proxy/test` 返回暂时关闭 |
+| **手动编辑** | `.data/proxy.json` 可保留旧配置，但当前不会生效 |
 
 ---
 
@@ -440,7 +420,7 @@ AnyBot 不再读取 `.env` 文件。Provider、模型和权限等常用设置会
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `CODEX_BIN` | `codex` | Codex CLI 可执行文件路径 |
+| `CODEX_BIN` | 随包 Codex CLI | 可选；指定外部 Codex CLI 可执行文件路径。留空或设为 `codex` 时优先使用随包 native binary |
 | `CODEX_MODEL` | — | 覆盖使用的模型 |
 | `CODEX_SANDBOX` | `read-only` | 安全模式：`read-only` / `workspace-write` / `danger-full-access` |
 | `CODEX_SYSTEM_PROMPT` | — | 追加到内置提示词后面的自定义系统提示词 |

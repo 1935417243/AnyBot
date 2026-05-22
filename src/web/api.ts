@@ -32,7 +32,7 @@ import {
 import { getWeixinLoginStatus } from "../channels/weixin.js";
 import { listSkills, listSkillMentions, toggleSkill, deleteSkill, openSkillsFolder } from "./skills.js";
 import { readProxyConfig, writeProxyConfig, getProxyUrl, type ProxyConfig } from "./proxy-config.js";
-import { applyProxy } from "../proxy.js";
+import { applyProxy, isProxyFeatureEnabled } from "../proxy.js";
 import {
   approveChangeReview,
   getChangeReview,
@@ -1236,7 +1236,12 @@ export function chatRouter(): Router {
 
   router.get("/proxy", (_req: Request, res: Response) => {
     try {
-      res.json(readProxyConfig());
+      const config = readProxyConfig();
+      res.json({
+        ...config,
+        enabled: isProxyFeatureEnabled() ? config.enabled : false,
+        featureEnabled: isProxyFeatureEnabled(),
+      });
     } catch (error) {
       res.status(500).json({ error: "读取代理配置失败" });
     }
@@ -1244,6 +1249,16 @@ export function chatRouter(): Router {
 
   router.put("/proxy", (req: Request, res: Response) => {
     try {
+      if (!isProxyFeatureEnabled()) {
+        applyProxy();
+        res.json({
+          ...readProxyConfig(),
+          enabled: false,
+          featureEnabled: false,
+        });
+        return;
+      }
+
       const body = req.body as Partial<ProxyConfig>;
       const current = readProxyConfig();
       const config: ProxyConfig = {
@@ -1262,7 +1277,7 @@ export function chatRouter(): Router {
         host: config.host,
         port: config.port,
       });
-      res.json(config);
+      res.json({ ...config, featureEnabled: true });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "更新代理配置失败";
       res.status(400).json({ error: msg });
@@ -1270,6 +1285,11 @@ export function chatRouter(): Router {
   });
 
   router.post("/proxy/test", async (req: Request, res: Response) => {
+    if (!isProxyFeatureEnabled()) {
+      res.json({ ok: false, error: "代理功能已暂时关闭" });
+      return;
+    }
+
     const body = req.body as Partial<ProxyConfig> | undefined;
     const testConfig: ProxyConfig = {
       enabled: true,
@@ -1395,8 +1415,12 @@ export function chatRouter(): Router {
       if (payload.modelConfig) writeModelConfig(payload.modelConfig);
       if (payload.sandboxConfig?.defaultSandbox) setDefaultSandbox(payload.sandboxConfig.defaultSandbox);
       if (payload.proxyConfig) {
-        writeProxyConfig(payload.proxyConfig);
-        applyProxy(payload.proxyConfig);
+        if (isProxyFeatureEnabled()) {
+          writeProxyConfig(payload.proxyConfig);
+          applyProxy(payload.proxyConfig);
+        } else {
+          applyProxy();
+        }
       }
       if (payload.channelsConfig) writeChannelsConfig(payload.channelsConfig);
       logger.info("data.imported");

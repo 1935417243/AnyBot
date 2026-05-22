@@ -255,8 +255,8 @@ exec "$(dirname "$0")/start-anybot.command"
 
 function writeReadme() {
   const providerNote = [
-    "Provider CLIs such as codex/claude are not bundled.",
-    "Install and login to the Provider CLI you want to use, then make sure it is available in PATH.",
+    "Codex CLI is resolved from the bundled @openai/codex-sdk dependency when available.",
+    "If you configure an external Provider CLI override, install and log in to that CLI, then make sure the executable path is available.",
   ].join("\n");
 
   const startCommand = platform === "win32"

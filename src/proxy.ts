@@ -14,10 +14,26 @@ const BYPASS_DOMAINS = [
   "::1",
 ];
 
+const PROXY_FEATURE_ENABLED = false;
+
 let currentProxyUrl: string | null = null;
 let originalDispatcher: Dispatcher | null = null;
 
+export function isProxyFeatureEnabled(): boolean {
+  return PROXY_FEATURE_ENABLED;
+}
+
 export function applyProxy(config?: ProxyConfig): void {
+  if (!PROXY_FEATURE_ENABLED) {
+    if (originalDispatcher) {
+      setGlobalDispatcher(originalDispatcher);
+    }
+    currentProxyUrl = null;
+    setProxyEnvVars(null);
+    logger.info("proxy.feature_disabled");
+    return;
+  }
+
   const cfg = config ?? readProxyConfig();
   const proxyUrl = getProxyUrl(cfg);
 

@@ -6,7 +6,9 @@ import {
   type ThreadOptions,
   type Usage,
 } from "@openai/codex-sdk";
+import { accessSync, constants } from "fs";
 import fs from "fs/promises";
+import { createRequire } from "module";
 import os from "os";
 import path from "path";
 import { ProviderCancelledError } from "./types.js";
@@ -23,6 +25,7 @@ import {
   type ClaudeAgentStreamEvent,
 } from "./claude-code-agent-events.js";
 import { logger } from "../logger.js";
+import { resolveExecutable } from "../utils/process.js";
 
 export class ProviderTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -55,8 +58,27 @@ export class ProviderParseError extends Error {
   }
 }
 
+export class ProviderExecutableNotFoundError extends Error {
+  constructor(providerName: string, bin: string) {
+    super(`${providerName} 可执行文件未找到：${bin}。请检查可执行文件路径，或清空自定义路径使用随包 CLI。`);
+    this.name = "ProviderExecutableNotFoundError";
+  }
+}
+
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_CODEX_CONTEXT_WINDOW = 258400;
+const CODEX_NPM_NAME = "@openai/codex";
+const CODEX_BUNDLED_BIN_LABEL = "bundled Codex CLI";
+const moduleRequire = createRequire(import.meta.url);
+
+const CODEX_PLATFORM_PACKAGE_BY_TARGET: Record<string, string> = {
+  "x86_64-unknown-linux-musl": "@openai/codex-linux-x64",
+  "aarch64-unknown-linux-musl": "@openai/codex-linux-arm64",
+  "x86_64-apple-darwin": "@openai/codex-darwin-x64",
+  "aarch64-apple-darwin": "@openai/codex-darwin-arm64",
+  "x86_64-pc-windows-msvc": "@openai/codex-win32-x64",
+  "aarch64-pc-windows-msvc": "@openai/codex-win32-arm64",
+};
 
 type StreamHandler = (event: ClaudeAgentStreamEvent) => void | Promise<void>;
 
@@ -91,6 +113,114 @@ type CodexTokenCountEvent = {
     info?: CodexTokenCountInfo;
   };
 };
+
+export type CodexExecutableResolution = {
+  source: "bundled" | "configured";
+  bin: string;
+  executablePath: string | null;
+  codexPathOverride?: string;
+};
+
+function cleanString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function getCodexTargetTriple(): string | null {
+  switch (process.platform) {
+    case "linux":
+    case "android":
+      if (process.arch === "x64") return "x86_64-unknown-linux-musl";
+      if (process.arch === "arm64") return "aarch64-unknown-linux-musl";
+      return null;
+    case "darwin":
+      if (process.arch === "x64") return "x86_64-apple-darwin";
+      if (process.arch === "arm64") return "aarch64-apple-darwin";
+      return null;
+    case "win32":
+      if (process.arch === "x64") return "x86_64-pc-windows-msvc";
+      if (process.arch === "arm64") return "aarch64-pc-windows-msvc";
+      return null;
+    default:
+      return null;
+  }
+}
+
+function canRun(filePath: string): boolean {
+  try {
+    accessSync(filePath, process.platform === "win32" ? constants.F_OK : constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveBundledCodexExecutable(): string | null {
+  const targetTriple = getCodexTargetTriple();
+  if (!targetTriple) return null;
+
+  const platformPackage = CODEX_PLATFORM_PACKAGE_BY_TARGET[targetTriple];
+  if (!platformPackage) return null;
+
+  try {
+    const codexPackageJsonPath = moduleRequire.resolve(`${CODEX_NPM_NAME}/package.json`);
+    const codexRequire = createRequire(codexPackageJsonPath);
+    const platformPackageJsonPath = codexRequire.resolve(`${platformPackage}/package.json`);
+    const binaryName = process.platform === "win32" ? "codex.exe" : "codex";
+    const binaryPath = path.join(
+      path.dirname(platformPackageJsonPath),
+      "vendor",
+      targetTriple,
+      "codex",
+      binaryName,
+    );
+    return canRun(binaryPath) ? binaryPath : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveCodexExecutable(bin?: string): CodexExecutableResolution {
+  const configuredBin = cleanString(bin);
+  const bundledExecutable = resolveBundledCodexExecutable();
+
+  if (!configuredBin || configuredBin === "codex") {
+    if (bundledExecutable) {
+      return {
+        source: "bundled",
+        bin: CODEX_BUNDLED_BIN_LABEL,
+        executablePath: bundledExecutable,
+      };
+    }
+
+    const pathExecutable = resolveExecutable("codex");
+    if (pathExecutable) {
+      return {
+        source: "configured",
+        bin: "codex",
+        executablePath: pathExecutable,
+        codexPathOverride: pathExecutable,
+      };
+    }
+
+    if (!configuredBin) {
+      return {
+        source: "bundled",
+        bin: CODEX_BUNDLED_BIN_LABEL,
+        executablePath: null,
+        codexPathOverride: "codex",
+      };
+    }
+  }
+
+  const executablePath = resolveExecutable(configuredBin);
+  return {
+    source: "configured",
+    bin: configuredBin,
+    executablePath,
+    codexPathOverride: executablePath || configuredBin,
+  };
+}
 
 function buildInput(prompt: string, imagePaths: string[]): Input {
   if (imagePaths.length === 0) return prompt;
@@ -353,13 +483,19 @@ export class CodexProvider implements IProvider {
   };
 
   private readonly bin: string;
+  private readonly executablePath: string | null;
+  private readonly codexPathOverride: string | undefined;
   private readonly codex: Codex;
 
   constructor(opts?: { bin?: string }) {
-    this.bin = opts?.bin ?? "codex";
-    this.codex = new Codex({
-      codexPathOverride: this.bin,
-    });
+    const executable = resolveCodexExecutable(opts?.bin);
+    const codexOptions = executable.codexPathOverride
+      ? { codexPathOverride: executable.codexPathOverride }
+      : {};
+    this.bin = executable.bin;
+    this.executablePath = executable.executablePath;
+    this.codexPathOverride = executable.codexPathOverride;
+    this.codex = new Codex(codexOptions);
   }
 
   listModels(): ProviderModel[] {
@@ -420,6 +556,7 @@ export class CodexProvider implements IProvider {
     logger.info("provider.exec.start", {
       provider: this.type,
       bin: this.bin,
+      executablePath: this.executablePath,
       workdir,
       sandbox,
       model: model || null,
@@ -430,6 +567,10 @@ export class CodexProvider implements IProvider {
     });
 
     try {
+      if (this.codexPathOverride && !this.executablePath) {
+        throw new ProviderExecutableNotFoundError("Codex CLI", this.bin);
+      }
+
       await onEvent?.({
         type: "agent_status",
         status: "started",

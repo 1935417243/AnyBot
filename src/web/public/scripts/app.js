@@ -4843,6 +4843,7 @@
 
         function renderNetworkSettings() {
             var cfg = proxyConfig || { enabled: false, protocol: 'http', host: '127.0.0.1', port: 7890 };
+            var featureEnabled = cfg.featureEnabled !== false;
             var hasAuth = !!(cfg.username || cfg.password);
             var enabled = document.getElementById('proxy-enabled');
             var protocol = document.getElementById('proxy-protocol');
@@ -4852,18 +4853,32 @@
             var password = document.getElementById('proxy-password');
             var authFields = document.getElementById('proxy-auth-fields');
             var authToggle = document.getElementById('proxy-auth-toggle');
+            var saveBtn = document.getElementById('proxy-save-btn');
+            var testBtn = document.getElementById('proxy-test-btn');
+            var statusEl = document.getElementById('proxy-status');
             if (!enabled || !protocol || !host || !port || !username || !password) return;
-            enabled.checked = !!cfg.enabled;
+            enabled.checked = featureEnabled && !!cfg.enabled;
             protocol.value = cfg.protocol || 'http';
             host.value = cfg.host || '';
             port.value = cfg.port || '';
             username.value = cfg.username || '';
             password.value = cfg.password || '';
+            [enabled, protocol, host, port, username, password].forEach(function (control) {
+                control.disabled = !featureEnabled;
+            });
+            if (authToggle) authToggle.disabled = !featureEnabled;
+            if (saveBtn) saveBtn.disabled = !featureEnabled;
+            if (testBtn) testBtn.disabled = !featureEnabled;
             if (authFields) authFields.classList.toggle('show', hasAuth);
             if (authToggle) authToggle.textContent = hasAuth ? '隐藏认证' : '认证（可选）';
+            if (statusEl && !featureEnabled) {
+                statusEl.className = 'proxy-status show info';
+                statusEl.textContent = '代理功能已暂时关闭';
+            }
         }
 
         async function saveProxyConfig() {
+            if (proxyConfig && proxyConfig.featureEnabled === false) return;
             var saveBtn = document.getElementById('proxy-save-btn');
             var statusEl = document.getElementById('proxy-status');
             saveBtn.disabled = true;
@@ -4903,6 +4918,7 @@
         }
 
         async function testProxyConnection() {
+            if (proxyConfig && proxyConfig.featureEnabled === false) return;
             var testBtn = document.getElementById('proxy-test-btn');
             var statusEl = document.getElementById('proxy-status');
             testBtn.disabled = true;

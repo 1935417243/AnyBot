@@ -1,6 +1,6 @@
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import type { IProvider } from "./types.js";
-import { CodexProvider } from "./codex.js";
+import { CodexProvider, resolveCodexExecutable } from "./codex.js";
 import { ClaudeCodeProvider } from "./claude-code.js";
 import { resolveExecutable } from "../utils/process.js";
 import { getProviderRuntimeSettings } from "../app-settings.js";
@@ -133,7 +133,7 @@ export function getRegisteredProviderTypes(): string[] {
 function getProviderBin(type: string, config: Record<string, unknown>): string {
   switch (normalizeProviderType(type)) {
     case "codex":
-      return (config.bin as string | undefined) || "codex";
+      return resolveCodexExecutable(config.bin as string | undefined).bin;
     case "claude-code":
       return (config.pathToClaudeCodeExecutable as string | undefined) || "bundled Claude Code";
     default:
@@ -144,7 +144,7 @@ function getProviderBin(type: string, config: Record<string, unknown>): string {
 function getProviderInstallHint(type: string): string {
   switch (normalizeProviderType(type)) {
     case "codex":
-      return "npm install -g @openai/codex";
+      return "重新安装 AnyBot 或运行 npm install；如需使用外部 CLI，可设置 CODEX_BIN 为可执行文件路径";
     case "claude-code":
       return "使用随 @anthropic-ai/claude-agent-sdk 安装的 Claude Code native binary；如需指定外部 CLI，可设置 CLAUDE_CODE_BIN";
     default:
@@ -155,6 +155,15 @@ function getProviderInstallHint(type: string): string {
 export function getProviderInstallationStatus(type: string): ProviderInstallationStatus {
   const normalizedType = normalizeProviderType(type);
   const config = getProviderConfig(normalizedType);
+  if (normalizedType === "codex") {
+    const executable = resolveCodexExecutable(config.bin as string | undefined);
+    return {
+      installed: executable.executablePath !== null,
+      bin: executable.bin,
+      executablePath: executable.executablePath,
+      installHint: getProviderInstallHint(normalizedType),
+    };
+  }
   const bin = getProviderBin(normalizedType, config);
   if (normalizedType === "claude-code" && !config.pathToClaudeCodeExecutable) {
     return {
@@ -222,4 +231,5 @@ export {
   ProviderProcessError,
   ProviderEmptyOutputError,
   ProviderParseError,
+  ProviderExecutableNotFoundError,
 } from "./codex.js";

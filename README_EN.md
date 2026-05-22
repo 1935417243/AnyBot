@@ -62,7 +62,7 @@ Plus at least one configured Provider:
 
 | Provider | Installation | Note |
 |----------|-------------|------|
-| [Codex CLI](https://github.com/openai/codex) | `npm install -g @openai/codex` | OpenAI's CLI tool |
+| [Codex CLI](https://github.com/openai/codex) | Installed through the `@openai/codex-sdk` dependency; local Codex login/configuration is still required | OpenAI's CLI tool |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Uses your locally logged-in `claude` command; the SDK is included as a project dependency | Anthropic's CLI tool |
 
 <details>
@@ -356,41 +356,21 @@ After switching Providers, the skill list automatically switches to the correspo
 
 ## Proxy Configuration
 
-AnyBot supports centralized proxy settings in the Web UI for Provider requests, Telegram API calls, and other outbound HTTP(S) traffic.
+Proxy support is currently disabled. Existing settings remain in `.data/proxy.json`, but startup, saving settings, and importing settings no longer inject `HTTP_PROXY` / `HTTPS_PROXY` into Provider processes.
 
 ### Supported Capabilities
 
-- Supports `HTTP` and `SOCKS5` proxies
-- Supports optional username / password authentication
-- Supports one-click connectivity testing in the Web UI
-- Proxy settings are persisted in `.data/proxy.json`
+- `HTTP` / `SOCKS5` proxying is not active for now
+- The Web UI shows that proxy support is temporarily disabled
+- Old proxy settings are preserved for possible migration or restore after the proxy design is revisited
 
 ### Configuration Methods
 
 | Method | Description |
 |--------|-------------|
-| **Web UI** | Use the "Proxy" page in the left sidebar to enable, save, and test the connection |
-| **REST API** | `GET /api/proxy` to view, `PUT /api/proxy` to update, `POST /api/proxy/test` to test |
-| **Manual Edit** | Edit `.data/proxy.json` directly |
-
-### `proxy.json` Example
-
-```json
-{
-  "enabled": true,
-  "protocol": "http",
-  "host": "127.0.0.1",
-  "port": 7890,
-  "username": "",
-  "password": ""
-}
-```
-
-### Notes
-
-- Enabling the proxy updates global `HTTP_PROXY` / `HTTPS_PROXY`
-- `localhost`, `127.0.0.1`, `::1`, `*.feishu.cn`, `*.larksuite.com`, and `*.qq.com` are bypassed by default
-- This is useful when you want Codex / Claude Code / Telegram to use the same local proxy
+| **Web UI** | Proxy controls are disabled |
+| **REST API** | `GET /api/proxy` returns `featureEnabled: false`; `PUT /api/proxy` does not enable proxying; `POST /api/proxy/test` reports that the feature is disabled |
+| **Manual Edit** | `.data/proxy.json` can keep old settings, but they are inactive |
 
 ---
 
@@ -413,7 +393,7 @@ AnyBot no longer reads `.env` files. Common settings such as provider, model, an
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CODEX_BIN` | `codex` | Path to the Codex CLI executable |
+| `CODEX_BIN` | Bundled Codex CLI | Optional external Codex CLI executable path. Empty or `codex` prefers the bundled native binary |
 | `CODEX_MODEL` | — | Override the model used |
 | `CODEX_SANDBOX` | `read-only` | Safety mode: `read-only` / `workspace-write` / `danger-full-access` |
 | `CODEX_SYSTEM_PROMPT` | — | Custom system prompt appended to the built-in prompt |
