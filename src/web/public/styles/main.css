@@ -1664,7 +1664,7 @@
         .settings-about-card {
             min-height: 282px;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(188px, 228px);
+            grid-template-columns: minmax(0, 1fr) max-content;
             gap: 24px;
             padding: 24px 22px;
         }
@@ -1756,12 +1756,17 @@
         .settings-update-actions {
             align-items: flex-end;
             align-content: flex-end;
-            border-left: 1px solid var(--border);
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 10px;
             justify-content: flex-end;
             margin: 0;
-            padding-left: 24px;
+            padding-left: 0;
+            transform: translateY(18px);
+        }
+
+        .settings-update-actions > button {
+            flex: 0 0 auto;
+            white-space: nowrap;
         }
 
         .settings-danger-btn {
@@ -2018,9 +2023,11 @@
             .settings-update-actions {
                 border-left: none;
                 border-top: 1px solid var(--border);
+                flex-wrap: wrap;
                 justify-content: flex-start;
                 padding-left: 0;
                 padding-top: 18px;
+                transform: none;
             }
 
             .settings-inline-input,
