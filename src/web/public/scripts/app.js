@@ -120,6 +120,7 @@
         const contextUsageProviderEl = document.getElementById('context-usage-provider');
 
         let currentSessionId = null;
+        let currentConversationTitle = '新对话';
         let currentSessionProjectId = null;
         let currentSessionProvider = null;
         let activeProjectId = null;
@@ -1385,6 +1386,44 @@
             if (empty) empty.remove();
         }
 
+        function normalizeConversationTitle(title) {
+            var value = String(title || '').trim();
+            return value || '新对话';
+        }
+
+        function conversationHeaderHtml() {
+            return '' +
+                '<header class="conversation-header" aria-label="当前会话">' +
+                '<div class="conversation-header-inner">' +
+                '<div id="conversation-title" class="conversation-title" title="' + escapeAttr(currentConversationTitle) + '">' +
+                escapeHtml(currentConversationTitle) +
+                '</div>' +
+                '</div>' +
+                '</header>';
+        }
+
+        function ensureConversationHeader() {
+            if (document.getElementById('conversation-title')) return;
+            messagesEl.insertAdjacentHTML('afterbegin', conversationHeaderHtml());
+        }
+
+        function updateConversationHeaderTitle(title) {
+            currentConversationTitle = normalizeConversationTitle(title);
+            ensureConversationHeader();
+            var titleEl = document.getElementById('conversation-title');
+            if (!titleEl) return;
+            titleEl.textContent = currentConversationTitle;
+            titleEl.title = currentConversationTitle;
+        }
+
+        function getFirstMessageContentNode() {
+            for (var i = 0; i < messagesEl.children.length; i++) {
+                var child = messagesEl.children[i];
+                if (!child.classList.contains('conversation-header')) return child;
+            }
+            return null;
+        }
+
         async function fetchFullMessageContent(messageId) {
             if (!currentSessionId || !messageId) throw new Error('无法加载完整内容');
             var res = await fetch('/api/sessions/' + currentSessionId + '/messages/' + encodeURIComponent(messageId) + '/content');
@@ -1438,6 +1477,7 @@
 
         function showEmptyState() {
             messagesEl.innerHTML =
+                conversationHeaderHtml() +
                 '<div id="empty-state">' +
                 '<div class="empty-icon">Ab</div>' +
                 '<div class="empty-title">AnyBot 已就绪</div>' +
@@ -1596,7 +1636,7 @@
             btn.textContent = isLoadingOlderMessages ? '加载中...' : '加载更早消息';
             btn.disabled = isLoadingOlderMessages;
             btn.addEventListener('click', loadOlderMessages);
-            messagesEl.insertBefore(btn, messagesEl.firstChild);
+            messagesEl.insertBefore(btn, getFirstMessageContentNode());
         }
 
         function renderMessageRecord(m, beforeNode) {
@@ -2260,6 +2300,8 @@
             try {
                 var res = await fetch('/api/sessions');
                 sessions = sortSessionsByUpdatedAt(await res.json());
+                var currentSummary = currentSessionId ? findSessionSummary(currentSessionId) : null;
+                if (currentSummary) updateConversationHeaderTitle(currentSummary.title);
                 renderHistory();
                 renderProjects();
                 await syncCurrentSessionFromSummary();
@@ -2351,6 +2393,8 @@
             if (canReuseEmptySession) {
                 activeProjectId = targetProjectId;
                 delete sessionModelSelections[currentSessionId];
+                var reusableSummary = findSessionSummary(currentSessionId);
+                updateConversationHeaderTitle(reusableSummary ? reusableSummary.title : '新对话');
                 revealSessionContainer(targetProjectId);
                 renderHistory();
                 renderProjects();
@@ -2371,6 +2415,7 @@
                 currentSessionId = data.id;
                 currentSessionProjectId = data.projectId || targetProjectId || null;
                 currentSessionProvider = data.provider || null;
+                updateConversationHeaderTitle(data.title);
                 currentSessionUpdatedAt = Number(data.updatedAt || Date.now());
                 currentNewestMessageId = 0;
                 activeProjectId = currentSessionProjectId;
@@ -2507,6 +2552,7 @@
                 currentSessionId = id;
                 currentSessionProjectId = data.projectId || null;
                 currentSessionProvider = data.provider || null;
+                updateConversationHeaderTitle(data.title);
                 currentSessionUpdatedAt = Number(data.updatedAt || findSessionSummary(id)?.updatedAt || currentSessionUpdatedAt || 0);
                 activeProjectId = data.projectId || null;
                 currentSessionHasMoreMessages = !!data.hasMoreMessages;
@@ -2523,6 +2569,7 @@
                 if (!wasChatView) showChatView();
 
                 messagesEl.innerHTML = '';
+                ensureConversationHeader();
                 isBatchRenderingMessages = true;
                 try {
                     if (data.messages.length === 0) {
@@ -2561,6 +2608,7 @@
                     currentSessionProvider = null;
                     currentSessionUpdatedAt = 0;
                     currentNewestMessageId = 0;
+                    updateConversationHeaderTitle('新对话');
                     resetInputHistoryFromMessages([], false);
                     clearPromptSkills();
                     updateContextUsage(null);
@@ -2645,6 +2693,9 @@
                         if (streamResult.result && streamResult.result.provider) {
                             currentSessionProvider = streamResult.result.provider;
                         }
+                        if (streamResult.result && streamResult.result.title) {
+                            updateConversationHeaderTitle(streamResult.result.title);
+                        }
                         await fetchSessions();
                         isTyping = false;
                         isCancellingResponse = false;
@@ -2676,6 +2727,7 @@
 
                 var data = await res.json();
                 if (data.provider) currentSessionProvider = data.provider;
+                if (data.title) updateConversationHeaderTitle(data.title);
                 if (data.contextUsage) updateContextUsage(data.contextUsage);
                 appendMessage('ai', data.content, null, data.changeReview, { createdAt: Date.now() });
 
