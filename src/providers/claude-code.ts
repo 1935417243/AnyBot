@@ -5,7 +5,7 @@ import {
   type Options,
   type PermissionMode,
   type SDKMessage,
-  type SDKControlGetContextUsageResponse,
+  type SDKAssistantMessage,
   type SDKResultMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { ProviderCancelledError } from "./types.js";
@@ -84,6 +84,10 @@ function isSdkResultMessage(message: SDKMessage): message is SDKResultMessage {
   return message.type === "result";
 }
 
+function isSdkAssistantMessage(message: SDKMessage): message is SDKAssistantMessage {
+  return message.type === "assistant";
+}
+
 function mapSandboxToPermissionMode(sandbox: SandboxMode): PermissionMode {
   switch (sandbox) {
     case "danger-full-access":
@@ -126,16 +130,33 @@ function getUsageNumber(usage: unknown, key: string): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function extractContextUsage(result: SDKResultMessage): ProviderContextUsage | undefined {
-  const inputTokens = getUsageNumber(result.usage, "input_tokens");
-  const outputTokens = getUsageNumber(result.usage, "output_tokens");
-  const cacheCreationInputTokens = getUsageNumber(result.usage, "cache_creation_input_tokens");
-  const cacheReadInputTokens = getUsageNumber(result.usage, "cache_read_input_tokens");
-  const usedTokens = inputTokens + cacheCreationInputTokens + cacheReadInputTokens;
-  const modelUsages = Object.values(result.modelUsage || {});
-  const maxTokens = modelUsages.find((entry) => entry.contextWindow > 0)?.contextWindow;
+function calculateClaudeAssistantUsageTokens(usage: unknown): number {
+  return (
+    getUsageNumber(usage, "input_tokens") +
+    getUsageNumber(usage, "cache_creation_input_tokens") +
+    getUsageNumber(usage, "cache_read_input_tokens") +
+    getUsageNumber(usage, "output_tokens")
+  );
+}
 
-  if (!usedTokens || !maxTokens) return undefined;
+function extractContextWindowFromResult(result: SDKResultMessage): number | undefined {
+  const modelUsages = Object.values(result.modelUsage || {});
+  return modelUsages.find((entry) => entry.contextWindow > 0)?.contextWindow;
+}
+
+function extractContextUsageFromAssistant(
+  message: SDKAssistantMessage | null,
+  maxTokens: number | undefined,
+): ProviderContextUsage | undefined {
+  const usage = message?.message?.usage;
+  if (!usage || !maxTokens) return undefined;
+
+  const inputTokens = getUsageNumber(usage, "input_tokens");
+  const outputTokens = getUsageNumber(usage, "output_tokens");
+  const cacheCreationInputTokens = getUsageNumber(usage, "cache_creation_input_tokens");
+  const cacheReadInputTokens = getUsageNumber(usage, "cache_read_input_tokens");
+  const usedTokens = calculateClaudeAssistantUsageTokens(usage);
+  if (!usedTokens) return undefined;
 
   const usedPercentage = Math.min(100, Math.round((usedTokens / maxTokens) * 1000) / 10);
   return {
@@ -149,46 +170,6 @@ function extractContextUsage(result: SDKResultMessage): ProviderContextUsage | u
     cacheReadInputTokens,
     source: "claude-code",
   };
-}
-
-function extractContextUsageFromBreakdown(
-  breakdown: SDKControlGetContextUsageResponse | null,
-): ProviderContextUsage | undefined {
-  if (!breakdown || !breakdown.totalTokens || !breakdown.maxTokens) return undefined;
-
-  const usedPercentage =
-    typeof breakdown.percentage === "number" && Number.isFinite(breakdown.percentage)
-      ? Math.min(100, Math.round(breakdown.percentage * 10) / 10)
-      : Math.min(100, Math.round((breakdown.totalTokens / breakdown.maxTokens) * 1000) / 10);
-  const apiUsage = breakdown.apiUsage;
-
-  return {
-    usedTokens: breakdown.totalTokens,
-    maxTokens: breakdown.maxTokens,
-    usedPercentage,
-    remainingPercentage: Math.max(0, Math.round((100 - usedPercentage) * 10) / 10),
-    inputTokens: apiUsage?.input_tokens,
-    outputTokens: apiUsage?.output_tokens,
-    cacheCreationInputTokens: apiUsage?.cache_creation_input_tokens,
-    cacheReadInputTokens: apiUsage?.cache_read_input_tokens,
-    source: "claude-code",
-  };
-}
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeout: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeout = setTimeout(() => {
-          reject(new Error(`等待 Claude Code context usage 分类超时（${timeoutMs}ms）`));
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
 }
 
 function mergeStreamedAndFinalResponse(streamed: string, finalResult: string): string {
@@ -335,10 +316,8 @@ export class ClaudeCodeProvider implements IProvider {
 
     try {
       let resultMessage: SDKResultMessage | null = null;
+      let lastAssistantMessage: SDKAssistantMessage | null = null;
       let streamedResponseText = "";
-      let contextUsageBreakdown: SDKControlGetContextUsageResponse | null = null;
-      let contextUsageBreakdownPromise: Promise<SDKControlGetContextUsageResponse | null> | null =
-        null;
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         CLAUDE_AGENT_SDK_CLIENT_APP: process.env.CLAUDE_AGENT_SDK_CLIENT_APP || "anybot/0.1.0",
@@ -440,19 +419,9 @@ export class ClaudeCodeProvider implements IProvider {
         },
       });
 
-      const requestContextUsageBreakdown = () => {
-        if (contextUsageBreakdownPromise) return;
-        contextUsageBreakdownPromise = withTimeout(stream.getContextUsage(), 5000)
-          .then((breakdown) => {
-            contextUsageBreakdown = breakdown;
-            return breakdown;
-          })
-          .catch(() => null);
-      };
-
       for await (const message of stream) {
-        if (message.type === "assistant") {
-          requestContextUsageBreakdown();
+        if (isSdkAssistantMessage(message)) {
+          lastAssistantMessage = message;
         }
 
         if (onEvent) {
@@ -481,10 +450,6 @@ export class ClaudeCodeProvider implements IProvider {
         if (isSdkResultMessage(message)) {
           resultMessage = message;
         }
-      }
-
-      if (contextUsageBreakdownPromise) {
-        contextUsageBreakdown = await contextUsageBreakdownPromise;
       }
 
       clearTimeout(timer);
@@ -529,8 +494,10 @@ export class ClaudeCodeProvider implements IProvider {
         throw new ProviderEmptyOutputError();
       }
 
-      const contextUsage =
-        extractContextUsageFromBreakdown(contextUsageBreakdown) || extractContextUsage(resultMessage);
+      const contextUsage = extractContextUsageFromAssistant(
+        lastAssistantMessage,
+        extractContextWindowFromResult(resultMessage),
+      );
 
       logger.info("provider.exec.success", {
         provider: this.type,
