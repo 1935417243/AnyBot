@@ -153,6 +153,7 @@
         let inputHistoryCursor = null;
         let inputHistoryDraft = '';
         let inputHistoryDraftSkills = [];
+        let inputHistoryDraftProjects = [];
         let inputHistoryOldestFetchedMessageId = null;
         let inputHistoryHasMore = false;
         let inputHistoryFetchPromise = null;
@@ -169,6 +170,8 @@
         let isSkillPickerOpening = false;
         let promptSkills = [];
         let promptSkillDeleteIndex = null;
+        let promptProjects = [];
+        let promptProjectDeleteIndex = null;
         let isProjectsCollapsed = localStorage.getItem('projectsCollapsed') === 'true';
         let isHistoryCollapsed = localStorage.getItem('historyCollapsed') === 'true';
         let expandedProjectIds = readStoredSet('expandedProjectIds');
@@ -191,7 +194,7 @@
         const REALTIME_REFRESH_DEBOUNCE_MS = 150;
         const REALTIME_RECONNECT_MS = 3000;
         const CHAT_INPUT_PLACEHOLDERS = [
-            '发送消息... 输入 / 使用技能',
+            '发送消息... 输入 / 使用技能或项目',
             '按 ↑ / ↓ 切换历史消息',
             '可粘贴图片或拖拽文件',
             'Enter 发送，Shift+Enter 换行',
@@ -424,7 +427,12 @@
             sendBtn.setAttribute('aria-label', sendBtn.title);
             sendBtn.disabled = isRunning
                 ? isCancellingResponse
-                : (inputEl.value.trim() === '' && pendingAttachments.length === 0 && promptSkills.length === 0);
+                : (
+                    inputEl.value.trim() === '' &&
+                    pendingAttachments.length === 0 &&
+                    promptSkills.length === 0 &&
+                    promptProjects.length === 0
+                );
         }
 
         function resizeChatInput() {
@@ -445,25 +453,28 @@
             inputHistoryCursor = null;
             inputHistoryDraft = '';
             inputHistoryDraftSkills = [];
+            inputHistoryDraftProjects = [];
             inputHistoryNavigationPromise = null;
             inputHistoryNavigationVersion += 1;
         }
 
-        function getHistoryVisibleContent(content, skills) {
+        function getHistoryVisibleContent(content, skills, projects) {
             var value = String(content || '').trim();
-            return isSkillOnlyFallback(value, skills) ? '' : value;
+            return isSelectionOnlyFallback(value, skills, projects) ? '' : value;
         }
 
         function createInputHistoryItem(message) {
             if (!message || message.role !== 'user') return null;
             var meta = parseMessageMetadata(message.metadata);
             var skills = normalizeMessageSkills(meta.skills);
-            var content = getHistoryVisibleContent(message.content, skills);
-            if ((!content && skills.length === 0) || (content === '[附件]' && skills.length === 0)) return null;
+            var projects = normalizeMessageProjects(meta.projects);
+            var content = getHistoryVisibleContent(message.content, skills, projects);
+            if ((!content && skills.length === 0 && projects.length === 0) || (content === '[附件]' && skills.length === 0 && projects.length === 0)) return null;
             return {
                 id: Number(message.id || 0) || null,
                 content: content,
                 skills: skills,
+                projects: projects,
                 contentTruncated: !!message.contentTruncated,
             };
         }
@@ -507,23 +518,27 @@
             return addedCount;
         }
 
-        function rememberSentUserMessage(text, skills) {
+        function rememberSentUserMessage(text, skills, projects) {
             var content = String(text || '').trim();
             var itemSkills = normalizeMessageSkills(skills);
-            if (!content && itemSkills.length === 0) return;
+            var itemProjects = normalizeMessageProjects(projects);
+            if (!content && itemSkills.length === 0 && itemProjects.length === 0) return;
             inputHistoryItems.push({
                 id: null,
                 content: content,
                 skills: itemSkills,
+                projects: itemProjects,
                 contentTruncated: false,
             });
             resetInputHistoryNavigation();
         }
 
-        function setChatInputDraft(value, skills) {
+        function setChatInputDraft(value, skills, projects) {
             inputEl.value = value;
             promptSkills = normalizeMessageSkills(skills);
+            promptProjects = normalizeMessageProjects(projects);
             promptSkillDeleteIndex = null;
+            promptProjectDeleteIndex = null;
             renderPromptSkills();
             resizeChatInput();
             updateSendBtnState();
@@ -590,7 +605,7 @@
                 if (!res.ok) return item.content;
                 var data = await res.json();
                 if (currentSessionId !== requestSessionId || typeof data.content !== 'string') return item.content;
-                item.content = getHistoryVisibleContent(data.content, item.skills);
+                item.content = getHistoryVisibleContent(data.content, item.skills, item.projects);
                 item.contentTruncated = false;
             } catch (_) {}
             return item.content;
@@ -602,7 +617,7 @@
             var content = await getInputHistoryItemContent(item);
             if (navigationVersion !== inputHistoryNavigationVersion) return false;
             inputHistoryCursor = index;
-            setChatInputDraft(content, item.skills);
+            setChatInputDraft(content, item.skills, item.projects);
             return true;
         }
 
@@ -616,6 +631,7 @@
                     if (inputHistoryCursor === null) {
                         inputHistoryDraft = inputEl.value;
                         inputHistoryDraftSkills = promptSkills.slice();
+                        inputHistoryDraftProjects = promptProjects.slice();
                     }
                     if (inputHistoryItems.length === 0) await fetchOlderInputHistoryPage();
 
@@ -642,9 +658,10 @@
 
                 if (navigationVersion !== inputHistoryNavigationVersion) return;
                 inputHistoryCursor = null;
-                setChatInputDraft(inputHistoryDraft, inputHistoryDraftSkills);
+                setChatInputDraft(inputHistoryDraft, inputHistoryDraftSkills, inputHistoryDraftProjects);
                 inputHistoryDraft = '';
                 inputHistoryDraftSkills = [];
+                inputHistoryDraftProjects = [];
             })().catch(function (e) {
                 console.warn('Failed to navigate input history:', e);
             }).finally(function () {
@@ -697,19 +714,38 @@
         }
 
         function getSkillPickerEnabledItems() {
-            var list = skillMentionData && Array.isArray(skillMentionData.skills) ? skillMentionData.skills : [];
-            var selectedIds = new Set(promptSkills.map(function (skill) { return skill.id; }));
-            return list.filter(function (skill) {
-                return skill && skill.enabled && skill.name && !selectedIds.has(skill.id);
+            var skillList = skillMentionData && Array.isArray(skillMentionData.skills) ? skillMentionData.skills : [];
+            var selectedSkillIds = new Set(promptSkills.map(function (skill) { return skill.id; }));
+            var selectedProjectIds = new Set(promptProjects.map(function (project) { return project.id; }));
+            var enabledSkills = skillList.filter(function (skill) {
+                return skill && skill.enabled && skill.name && !selectedSkillIds.has(skill.id);
+            }).map(function (skill) {
+                return Object.assign({}, skill, { pickerType: 'skill' });
             });
+            var projectItems = (Array.isArray(projects) ? projects : []).filter(function (project) {
+                return project && project.id && project.name && project.path && !selectedProjectIds.has(project.id);
+            }).map(function (project) {
+                return {
+                    pickerType: 'project',
+                    id: String(project.id),
+                    name: String(project.name),
+                    path: String(project.path),
+                    description: String(project.path),
+                    source: '项目',
+                };
+            });
+            return enabledSkills.concat(projectItems);
         }
 
         function filterSkillPickerItems() {
             var term = skillPickerQuery.toLowerCase().trim();
             var filtered = skillPickerItems;
             if (term) {
-                filtered = filtered.filter(function (skill) {
-                    return String(skill.name || '').toLowerCase().startsWith(term);
+                filtered = filtered.filter(function (item) {
+                    var name = String(item.name || '').toLowerCase();
+                    var desc = String(item.description || '').toLowerCase();
+                    var itemPath = String(item.path || '').toLowerCase();
+                    return name.startsWith(term) || desc.indexOf(term) !== -1 || itemPath.indexOf(term) !== -1;
                 });
             }
             skillPickerFilteredItems = filtered;
@@ -780,6 +816,12 @@
                 '</svg>';
         }
 
+        function getProjectIconHtml(className) {
+            return '<svg class="' + className + '" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
+                '<path d="M1.5 4.2v6.6a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V5.5a1 1 0 0 0-1-1H7L5.7 3.1H2.5a1 1 0 0 0-1 1.1Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>' +
+                '</svg>';
+        }
+
         function normalizeMessageSkills(skills) {
             if (!Array.isArray(skills)) return [];
             var seen = {};
@@ -796,18 +838,57 @@
             return normalized;
         }
 
+        function normalizeMessageProjects(projectList) {
+            if (!Array.isArray(projectList)) return [];
+            var seen = {};
+            var normalized = [];
+            projectList.forEach(function (project) {
+                var id = String(project && project.id || '').trim();
+                var pathValue = String(project && project.path || '').trim();
+                var name = String(project && project.name || '').trim();
+                var key = id || pathValue || name;
+                if (!key || seen[key]) return;
+                seen[key] = true;
+                normalized.push({
+                    id: id,
+                    name: name || pathValue || id,
+                    path: pathValue,
+                });
+            });
+            return normalized;
+        }
+
         function getSkillFallbackText(skills) {
             return '使用技能：' + skills.map(function (skill) { return skill.name; }).join('、');
         }
 
-        function isSkillOnlyFallback(text, skills) {
-            if (!skills || skills.length === 0) return false;
+        function getProjectFallbackText(projects) {
+            return '涉及项目：' + projects.map(function (project) { return project.name; }).join('、');
+        }
+
+        function getSelectionFallbackText(skills, projects) {
+            var parts = [];
+            if (skills && skills.length > 0) parts.push(getSkillFallbackText(skills));
+            if (projects && projects.length > 0) parts.push(getProjectFallbackText(projects));
+            return parts.join('\n');
+        }
+
+        function isSelectionOnlyFallback(text, skills, projects) {
+            skills = skills || [];
+            projects = projects || [];
+            if (skills.length === 0 && projects.length === 0) return false;
             var value = String(text || '').trim();
             if (!value) return false;
             var names = skills.map(function (skill) { return skill.name; }).join('、');
-            return value === getSkillFallbackText(skills) ||
-                value === ('使用技能:' + names) ||
-                value === ('本轮请使用这些技能：' + names);
+            var projectNames = projects.map(function (project) { return project.name; }).join('、');
+            return value === getSelectionFallbackText(skills, projects) ||
+                (skills.length > 0 && projects.length === 0 && (
+                    value === getSkillFallbackText(skills) ||
+                    value === ('使用技能:' + names) ||
+                    value === ('本轮请使用这些技能：' + names)
+                )) ||
+                (projects.length > 0 && skills.length === 0 && value === getProjectFallbackText(projects)) ||
+                (projects.length > 0 && value === ('本轮涉及项目：' + projectNames));
         }
 
         function createMessageSkillRefs(skills) {
@@ -825,10 +906,25 @@
             return wrap;
         }
 
+        function createMessageProjectRefs(projects) {
+            var wrap = document.createElement('span');
+            wrap.className = 'message-skills';
+            projects.forEach(function (project) {
+                var item = document.createElement('span');
+                item.className = 'message-skill-ref project-ref';
+                item.title = project.path ? ('本轮涉及项目: ' + project.path) : '本轮涉及项目';
+                item.innerHTML =
+                    getProjectIconHtml('message-skill-icon') +
+                    '<span class="message-skill-name">' + escapeHtml(project.name) + '</span>';
+                wrap.appendChild(item);
+            });
+            return wrap;
+        }
+
         function renderPromptSkills() {
             if (!selectedSkillsEl) return;
             selectedSkillsEl.innerHTML = '';
-            selectedSkillsEl.hidden = promptSkills.length === 0;
+            selectedSkillsEl.hidden = promptSkills.length === 0 && promptProjects.length === 0;
             promptSkills.forEach(function (skill, index) {
                 var chip = document.createElement('button');
                 chip.className = 'selected-skill-chip' + (index === promptSkillDeleteIndex ? ' pending-delete' : '');
@@ -847,6 +943,24 @@
                 });
                 selectedSkillsEl.appendChild(chip);
             });
+            promptProjects.forEach(function (project, index) {
+                var chip = document.createElement('button');
+                chip.className = 'selected-skill-chip selected-project-chip' + (index === promptProjectDeleteIndex ? ' pending-delete' : '');
+                chip.type = 'button';
+                chip.title = project.path ? ('移除项目 ' + project.name + ' · ' + project.path) : ('移除项目 ' + project.name);
+                chip.innerHTML =
+                    getProjectIconHtml('selected-skill-icon') +
+                    '<span class="selected-skill-name">' + escapeHtml(project.name) + '</span>' +
+                    '<span class="selected-skill-remove" aria-hidden="true">×</span>';
+                chip.addEventListener('click', function () {
+                    promptProjectDeleteIndex = null;
+                    promptProjects.splice(index, 1);
+                    renderPromptSkills();
+                    updateSendBtnState();
+                    inputEl.focus();
+                });
+                selectedSkillsEl.appendChild(chip);
+            });
         }
 
         function addPromptSkill(skill) {
@@ -856,6 +970,7 @@
             });
             if (alreadySelected) return;
             promptSkillDeleteIndex = null;
+            promptProjectDeleteIndex = null;
             promptSkills.push({
                 id: skill.id,
                 name: skill.name,
@@ -864,16 +979,36 @@
             updateSendBtnState();
         }
 
+        function addPromptProject(project) {
+            if (!project || !project.id || !project.name) return;
+            var alreadySelected = promptProjects.some(function (item) {
+                return item.id === project.id;
+            });
+            if (alreadySelected) return;
+            promptSkillDeleteIndex = null;
+            promptProjectDeleteIndex = null;
+            promptProjects.push({
+                id: project.id,
+                name: project.name,
+                path: project.path || '',
+            });
+            renderPromptSkills();
+            updateSendBtnState();
+        }
+
         function clearPromptSkills() {
             promptSkills = [];
+            promptProjects = [];
             promptSkillDeleteIndex = null;
+            promptProjectDeleteIndex = null;
             renderPromptSkills();
             updateSendBtnState();
         }
 
         function clearPromptSkillDeleteTarget() {
-            if (promptSkillDeleteIndex === null) return;
+            if (promptSkillDeleteIndex === null && promptProjectDeleteIndex === null) return;
             promptSkillDeleteIndex = null;
+            promptProjectDeleteIndex = null;
             renderPromptSkills();
         }
 
@@ -885,7 +1020,7 @@
                 return false;
             }
             if (skillPickerOpen) return false;
-            if (promptSkills.length === 0) return false;
+            if (promptSkills.length === 0 && promptProjects.length === 0) return false;
             if (typeof inputEl.selectionStart !== 'number' || inputEl.selectionStart !== inputEl.selectionEnd) return false;
             if (inputEl.selectionStart !== 0 || inputEl.value.length > 0) {
                 clearPromptSkillDeleteTarget();
@@ -893,6 +1028,21 @@
             }
 
             e.preventDefault();
+            if (promptProjects.length > 0) {
+                var lastProjectIndex = promptProjects.length - 1;
+                if (promptProjectDeleteIndex === lastProjectIndex) {
+                    promptProjects.splice(lastProjectIndex, 1);
+                    promptProjectDeleteIndex = null;
+                    renderPromptSkills();
+                    updateSendBtnState();
+                    return true;
+                }
+                promptSkillDeleteIndex = null;
+                promptProjectDeleteIndex = lastProjectIndex;
+                renderPromptSkills();
+                return true;
+            }
+
             var lastIndex = promptSkills.length - 1;
             if (promptSkillDeleteIndex === lastIndex) {
                 promptSkills.splice(lastIndex, 1);
@@ -902,6 +1052,7 @@
                 return true;
             }
 
+            promptProjectDeleteIndex = null;
             promptSkillDeleteIndex = lastIndex;
             renderPromptSkills();
             return true;
@@ -914,7 +1065,11 @@
             inputEl.value = nextValue;
             inputEl.setSelectionRange(skillPickerTokenStart, skillPickerTokenStart);
             resizeChatInput();
-            addPromptSkill(skill);
+            if (skill.pickerType === 'project') {
+                addPromptProject(skill);
+            } else {
+                addPromptSkill(skill);
+            }
             closeSkillPicker();
             inputEl.focus();
         }
@@ -929,19 +1084,19 @@
             var header = document.createElement('div');
             header.className = 'skill-picker-header';
             header.innerHTML =
-                '<span>技能</span>' +
+                '<span>技能 / 项目</span>' +
                 '<span class="skill-picker-count">' + skillPickerFilteredItems.length + '</span>';
             skillPickerEl.appendChild(header);
 
             var list = document.createElement('div');
             list.className = 'skill-picker-list';
             list.setAttribute('role', 'listbox');
-            list.setAttribute('aria-label', '技能列表');
+            list.setAttribute('aria-label', '技能和项目列表');
 
             if (skillPickerFilteredItems.length === 0) {
                 var empty = document.createElement('div');
                 empty.className = 'skill-picker-empty';
-                empty.textContent = skillPickerItems.length === 0 ? '暂无已启用技能' : '没有匹配的技能';
+                empty.textContent = skillPickerItems.length === 0 ? '暂无已启用技能或项目' : '没有匹配的技能或项目';
                 list.appendChild(empty);
             } else {
                 skillPickerFilteredItems.forEach(function (skill, index) {
@@ -952,7 +1107,7 @@
                     item.setAttribute('role', 'option');
                     item.setAttribute('aria-selected', index === skillPickerActiveIndex ? 'true' : 'false');
                     item.innerHTML =
-                        getSkillIconHtml('skill-picker-icon') +
+                        (skill.pickerType === 'project' ? getProjectIconHtml('skill-picker-icon project') : getSkillIconHtml('skill-picker-icon')) +
                         '<span class="skill-picker-copy">' +
                         '<span class="skill-picker-name">' + escapeHtml(skill.name) + '</span>' +
                         '<span class="skill-picker-desc">' + escapeHtml(skill.description || '') + '</span>' +
@@ -1496,8 +1651,9 @@
             var row = document.createElement('div');
             row.className = 'message-row ' + role;
             var messageSkills = role === 'user' ? normalizeMessageSkills(opts.skills) : [];
+            var messageProjects = role === 'user' ? normalizeMessageProjects(opts.projects) : [];
             var rawText = String(text || '');
-            var visibleText = isSkillOnlyFallback(rawText, messageSkills) ? '' : rawText;
+            var visibleText = isSelectionOnlyFallback(rawText, messageSkills, messageProjects) ? '' : rawText;
 
             if (role === 'ai') {
                 var bubble = document.createElement('div');
@@ -1531,6 +1687,9 @@
                 userLine.className = 'message-user-line';
                 if (messageSkills.length > 0) {
                     userLine.appendChild(createMessageSkillRefs(messageSkills));
+                }
+                if (messageProjects.length > 0) {
+                    userLine.appendChild(createMessageProjectRefs(messageProjects));
                 }
                 var userText = document.createElement('span');
                 userText.className = 'message-user-text';
@@ -1596,8 +1755,8 @@
 
             attachMessageMeta(row, {
                 createdAt: opts.createdAt,
-                copyText: role === 'user' && messageSkills.length > 0
-                    ? (visibleText ? getSkillFallbackText(messageSkills) + '\n' + visibleText : getSkillFallbackText(messageSkills))
+                copyText: role === 'user' && (messageSkills.length > 0 || messageProjects.length > 0)
+                    ? (visibleText ? getSelectionFallbackText(messageSkills, messageProjects) + '\n' + visibleText : getSelectionFallbackText(messageSkills, messageProjects))
                     : rawText,
             });
             messagesEl.appendChild(row);
@@ -1678,6 +1837,7 @@
                     contentChars: m.contentChars,
                     createdAt: m.createdAt,
                     skills: meta.skills,
+                    projects: meta.projects,
                 });
             }
             if (row) {
@@ -2714,9 +2874,10 @@
         async function sendMessage() {
             var text = inputEl.value.trim();
             var messageSkills = promptSkills.slice();
+            var messageProjects = promptProjects.slice();
             // 收集已上传完成的附件
             var readyAttachments = pendingAttachments.filter(function (a) { return !a.uploading && a.path; });
-            if ((!text && readyAttachments.length === 0 && messageSkills.length === 0) || isTyping || !currentSessionId) return;
+            if ((!text && readyAttachments.length === 0 && messageSkills.length === 0 && messageProjects.length === 0) || isTyping || !currentSessionId) return;
             var requestSessionId = currentSessionId;
 
             // 收集附件信息用于显示（包含 path 以便渲染图片）
@@ -2738,8 +2899,9 @@
             appendMessage('user', displayText, attachmentInfos, null, {
                 createdAt: Date.now(),
                 skills: messageSkills,
+                projects: messageProjects,
             });
-            rememberSentUserMessage(text, messageSkills);
+            rememberSentUserMessage(text, messageSkills, messageProjects);
             showTyping();
 
             // 构建请求体
@@ -2747,6 +2909,11 @@
             if (messageSkills.length > 0) {
                 body.skills = messageSkills.map(function (skill) {
                     return { id: skill.id, name: skill.name };
+                });
+            }
+            if (messageProjects.length > 0) {
+                body.projects = messageProjects.map(function (project) {
+                    return { id: project.id, name: project.name, path: project.path };
                 });
             }
             if (modelConfig && modelConfig.currentModel) {
