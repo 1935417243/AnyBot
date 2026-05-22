@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
-import { getProvider } from "../providers/index.js";
+import { getProvider, normalizeProviderType } from "../providers/index.js";
 
 export interface SkillInfo {
   id: string;
@@ -55,10 +55,16 @@ const PROVIDER_SKILL_DIRS: Record<string, () => SkillSource[]> = {
   },
 };
 
-function getConfiguredSkillSources(): SkillSource[] {
-  const providerType = getProvider().type;
-  const factory = PROVIDER_SKILL_DIRS[providerType] ?? PROVIDER_SKILL_DIRS.codex!;
-  return factory();
+function resolveSkillProviderType(providerType?: string): string {
+  const requested = providerType?.trim();
+  if (requested) return normalizeProviderType(requested);
+  return getProvider().type;
+}
+
+function getConfiguredSkillSources(providerType?: string): SkillSource[] {
+  const resolvedProviderType = resolveSkillProviderType(providerType);
+  const factory = PROVIDER_SKILL_DIRS[resolvedProviderType];
+  return factory ? factory() : [];
 }
 
 function ensureSkillSourceDir(source: SkillSource): boolean {
@@ -70,8 +76,8 @@ function ensureSkillSourceDir(source: SkillSource): boolean {
   }
 }
 
-function getSkillSources(): SkillSource[] {
-  return getConfiguredSkillSources().filter(ensureSkillSourceDir);
+function getSkillSources(providerType?: string): SkillSource[] {
+  return getConfiguredSkillSources(providerType).filter(ensureSkillSourceDir);
 }
 
 function getDisabledSkillsPath(): string {
@@ -175,9 +181,11 @@ function syncPersistedDisabledState(id: string, item: ScannedSkill, disabled: Se
   }
 }
 
-export function listSkills(): { skills: SkillInfo[]; sources: Array<{ label: string; dir: string; count: number }> } {
+export function listSkills(
+  providerType?: string,
+): { skills: SkillInfo[]; sources: Array<{ label: string; dir: string; count: number }> } {
   const disabled = readDisabledSkills();
-  const sources = getSkillSources();
+  const sources = getSkillSources(providerType);
   const skills: SkillInfo[] = [];
   const sourceStats: Array<{ label: string; dir: string; count: number }> = [];
 
@@ -208,9 +216,9 @@ export function listSkills(): { skills: SkillInfo[]; sources: Array<{ label: str
   return { skills, sources: sourceStats };
 }
 
-export function listSkillMentions(): SkillMentionInfo[] {
+export function listSkillMentions(providerType?: string): SkillMentionInfo[] {
   const disabled = readDisabledSkills();
-  const sources = getSkillSources();
+  const sources = getSkillSources(providerType);
   const skills: SkillMentionInfo[] = [];
 
   for (const source of sources) {
@@ -234,8 +242,8 @@ export function listSkillMentions(): SkillMentionInfo[] {
   return skills;
 }
 
-export function toggleSkill(id: string, enabled: boolean): { ok: boolean; error?: string } {
-  const { skills } = listSkills();
+export function toggleSkill(id: string, enabled: boolean, providerType?: string): { ok: boolean; error?: string } {
+  const { skills } = listSkills(providerType);
   const skill = skills.find((s) => s.id === id);
   if (!skill) return { ok: false, error: "技能不存在" };
   if (skill.enabled === enabled) return { ok: true };
@@ -268,8 +276,8 @@ export function toggleSkill(id: string, enabled: boolean): { ok: boolean; error?
   return { ok: true };
 }
 
-export function deleteSkill(id: string): { ok: boolean; error?: string } {
-  const { skills } = listSkills();
+export function deleteSkill(id: string, providerType?: string): { ok: boolean; error?: string } {
+  const { skills } = listSkills(providerType);
   const skill = skills.find((s) => s.id === id);
   if (!skill) return { ok: false, error: "技能不存在" };
 
@@ -301,16 +309,18 @@ function openDirectory(dir: string): void {
   }
 }
 
-export function openSkillsFolder(skillPath?: string): void {
+export function openSkillsFolder(skillPath?: string, providerType?: string): void {
   if (skillPath) {
     openDirectory(path.dirname(skillPath));
     return;
   }
 
   const baseDir =
-    getSkillSources()[0]?.dir ||
-    getConfiguredSkillSources()[0]?.dir ||
-    path.join(getCodexHome(), "skills");
+    getSkillSources(providerType)[0]?.dir ||
+    getConfiguredSkillSources(providerType)[0]?.dir ||
+    (providerType ? "" : path.join(getCodexHome(), "skills"));
+  if (!baseDir) return;
+
   const dirs = new Set<string>();
 
   try {

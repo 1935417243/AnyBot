@@ -31,6 +31,7 @@ import {
 } from "../channels/index.js";
 import { getWeixinLoginStatus } from "../channels/weixin.js";
 import { listSkills, listSkillMentions, toggleSkill, deleteSkill, openSkillsFolder } from "./skills.js";
+import { listWebSlashItems } from "./slash-items.js";
 import { readProxyConfig, writeProxyConfig, getProxyUrl, type ProxyConfig } from "./proxy-config.js";
 import { applyProxy, isProxyFeatureEnabled } from "../proxy.js";
 import {
@@ -1239,17 +1240,28 @@ export function chatRouter(): Router {
 
   // --- Skills ---
 
-  router.get("/skills", (_req: Request, res: Response) => {
+  router.get("/slash/items", (req: Request, res: Response) => {
     try {
-      res.json(listSkills());
+      const provider = typeof req.query.provider === "string" ? req.query.provider : undefined;
+      res.json(listWebSlashItems(provider));
+    } catch (error) {
+      res.status(500).json({ error: "读取快捷项失败" });
+    }
+  });
+
+  router.get("/skills", (req: Request, res: Response) => {
+    try {
+      const provider = typeof req.query.provider === "string" ? req.query.provider : undefined;
+      res.json(listSkills(provider));
     } catch (error) {
       res.status(500).json({ error: "读取技能列表失败" });
     }
   });
 
-  router.get("/skills/mentions", (_req: Request, res: Response) => {
+  router.get("/skills/mentions", (req: Request, res: Response) => {
     try {
-      res.json({ skills: listSkillMentions() });
+      const provider = typeof req.query.provider === "string" ? req.query.provider : undefined;
+      res.json({ skills: listSkillMentions(provider) });
     } catch (error) {
       res.status(500).json({ error: "读取技能列表失败" });
     }
@@ -1263,7 +1275,8 @@ export function chatRouter(): Router {
       return;
     }
     try {
-      const result = toggleSkill(id, enabled);
+      const provider = typeof req.query.provider === "string" ? req.query.provider : undefined;
+      const result = toggleSkill(id, enabled, provider);
       if (!result.ok) {
         res.status(400).json({ error: result.error });
         return;
@@ -1277,7 +1290,8 @@ export function chatRouter(): Router {
 
   router.delete("/skills/:id", (req: Request, res: Response) => {
     const id = decodeURIComponent(req.params.id as string);
-    const result = deleteSkill(id);
+    const provider = typeof req.query.provider === "string" ? req.query.provider : undefined;
+    const result = deleteSkill(id, provider);
     if (!result.ok) {
       res.status(400).json({ error: result.error });
       return;
@@ -1289,7 +1303,8 @@ export function chatRouter(): Router {
   router.post("/skills/open-folder", (req: Request, res: Response) => {
     try {
       const skillPath = req.body?.path as string | undefined;
-      openSkillsFolder(skillPath);
+      const provider = typeof req.body?.provider === "string" ? req.body.provider : undefined;
+      openSkillsFolder(skillPath, provider);
       res.json({ ok: true });
     } catch (error) {
       res.status(500).json({ error: "打开文件夹失败" });

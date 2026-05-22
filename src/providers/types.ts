@@ -38,6 +38,12 @@ export interface ProviderContextUsage {
   source: "claude-code" | "codex" | string;
 }
 
+export interface ProviderSlashCommand {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface ProviderCapabilities {
   sessionResume: boolean;
   imageInput: boolean;
@@ -57,6 +63,7 @@ export interface IProvider {
   readonly capabilities: ProviderCapabilities;
 
   listModels(): ProviderModel[];
+  listSlashCommands?(): ProviderSlashCommand[];
   run(opts: RunOptions): Promise<RunResult>;
   runWithEvents?(
     opts: RunOptions & {

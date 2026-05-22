@@ -716,28 +716,36 @@
                 trimmed.split(/\s+/).length >= 2;
         }
 
+        function getSlashPickerType(item) {
+            if (!item) return 'skill';
+            if (item.type === 'project') return 'project';
+            if (item.type === 'provider-command') return 'provider-command';
+            return 'skill';
+        }
+
         function getSkillPickerEnabledItems() {
-            var skillList = skillMentionData && Array.isArray(skillMentionData.skills) ? skillMentionData.skills : [];
+            var providerType = getActiveSlashProviderType();
+            var data = slashItemsDataProvider === providerType ? slashItemsData : null;
+            var groups = data && Array.isArray(data.groups) ? data.groups : [];
             var selectedSkillIds = new Set(promptSkills.map(function (skill) { return skill.id; }));
             var selectedProjectIds = new Set(promptProjects.map(function (project) { return project.id; }));
-            var enabledSkills = skillList.filter(function (skill) {
-                return skill && skill.enabled && skill.name && !selectedSkillIds.has(skill.id);
-            }).map(function (skill) {
-                return Object.assign({}, skill, { pickerType: 'skill' });
+            var pickerItems = [];
+
+            groups.forEach(function (group) {
+                var groupItems = Array.isArray(group.items) ? group.items : [];
+                groupItems.forEach(function (item) {
+                    if (!item || !item.id || !item.name) return;
+                    var pickerType = getSlashPickerType(item);
+                    if (pickerType === 'skill' && (!item.enabled || selectedSkillIds.has(item.id))) return;
+                    if (pickerType === 'project' && (!item.path || selectedProjectIds.has(item.id))) return;
+                    pickerItems.push(Object.assign({}, item, {
+                        pickerType: pickerType,
+                        groupTitle: group.title || (pickerType === 'project' ? '项目' : '技能'),
+                    }));
+                });
             });
-            var projectItems = (Array.isArray(projects) ? projects : []).filter(function (project) {
-                return project && project.id && project.name && project.path && !selectedProjectIds.has(project.id);
-            }).map(function (project) {
-                return {
-                    pickerType: 'project',
-                    id: String(project.id),
-                    name: String(project.name),
-                    path: String(project.path),
-                    description: String(project.path),
-                    source: '项目',
-                };
-            });
-            return enabledSkills.concat(projectItems);
+
+            return pickerItems;
         }
 
         function filterSkillPickerItems() {
@@ -745,9 +753,8 @@
             var filtered = skillPickerItems;
             if (term) {
                 filtered = filtered.filter(function (item) {
-                    return item.pickerType === 'project'
-                        ? matchesPickerTerm([item.name, item.path], term)
-                        : matchesPickerTerm([item.name], term);
+                    if (item.pickerType === 'project') return matchesPickerTerm([item.name, item.path], term);
+                    return matchesPickerTerm([item.name, item.description, item.source], term);
                 });
             }
             skillPickerFilteredItems = filtered;
@@ -833,6 +840,12 @@
         function getProjectIconHtml(className) {
             return '<svg class="' + className + '" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
                 '<path d="M1.5 4.2v6.6a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V5.5a1 1 0 0 0-1-1H7L5.7 3.1H2.5a1 1 0 0 0-1 1.1Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>' +
+                '</svg>';
+        }
+
+        function getCommandIconHtml(className) {
+            return '<svg class="' + className + '" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
+                '<path d="M2.2 4.2 5 7l-2.8 2.8M6.5 10h5.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>' +
                 '</svg>';
         }
 
@@ -1081,6 +1094,8 @@
             resizeChatInput();
             if (skill.pickerType === 'project') {
                 addPromptProject(skill);
+            } else if (skill.pickerType === 'provider-command') {
+                showError('该命令暂未接入执行逻辑');
             } else {
                 addPromptSkill(skill);
             }
@@ -1098,27 +1113,28 @@
             var list = document.createElement('div');
             list.className = 'skill-picker-list';
             list.setAttribute('role', 'listbox');
-            list.setAttribute('aria-label', '技能和项目列表');
+            list.setAttribute('aria-label', '快捷项列表');
 
             if (skillPickerFilteredItems.length === 0) {
                 var empty = document.createElement('div');
                 empty.className = 'skill-picker-empty';
-                empty.textContent = skillPickerItems.length === 0 ? '暂无已启用技能或项目' : '没有匹配的技能或项目';
+                empty.textContent = skillPickerItems.length === 0 ? '暂无可用技能、命令或项目' : '没有匹配的快捷项';
                 list.appendChild(empty);
             } else {
                 var indexedItems = skillPickerFilteredItems.map(function (skill, index) {
                     return { skill: skill, index: index };
                 });
-                [
-                    {
-                        title: '技能',
-                        items: indexedItems.filter(function (entry) { return entry.skill.pickerType !== 'project'; }),
-                    },
-                    {
-                        title: '项目',
-                        items: indexedItems.filter(function (entry) { return entry.skill.pickerType === 'project'; }),
-                    },
-                ].forEach(function (group) {
+                var groups = [];
+                indexedItems.forEach(function (entry) {
+                    var title = entry.skill.groupTitle || (entry.skill.pickerType === 'project' ? '项目' : '技能');
+                    var group = groups.find(function (item) { return item.title === title; });
+                    if (!group) {
+                        group = { title: title, items: [] };
+                        groups.push(group);
+                    }
+                    group.items.push(entry);
+                });
+                groups.forEach(function (group) {
                     if (group.items.length === 0) return;
                     var label = document.createElement('div');
                     label.className = 'skill-picker-group-label';
@@ -1135,8 +1151,13 @@
                         item.type = 'button';
                         item.setAttribute('role', 'option');
                         item.setAttribute('aria-selected', index === skillPickerActiveIndex ? 'true' : 'false');
+                        var iconHtml = skill.pickerType === 'project'
+                            ? getProjectIconHtml('skill-picker-icon project')
+                            : (skill.pickerType === 'provider-command'
+                                ? getCommandIconHtml('skill-picker-icon')
+                                : getSkillIconHtml('skill-picker-icon'));
                         item.innerHTML =
-                            (skill.pickerType === 'project' ? getProjectIconHtml('skill-picker-icon project') : getSkillIconHtml('skill-picker-icon')) +
+                            iconHtml +
                             '<span class="skill-picker-copy">' +
                             '<span class="skill-picker-name">' + escapeHtml(skill.name) + '</span>' +
                             '<span class="skill-picker-desc">' + escapeHtml(skill.description || '') + '</span>' +
@@ -1167,7 +1188,7 @@
             if (!isValidSkillTrigger(startingTrigger)) return;
             isSkillPickerOpening = true;
             try {
-                await fetchSkillMentionData();
+                await fetchSlashItemsData();
             } finally {
                 isSkillPickerOpening = false;
             }
@@ -2585,6 +2606,7 @@
             try {
                 var res = await fetch('/api/projects');
                 projects = await res.json();
+                invalidateSlashItemsData();
                 renderProjects();
             } catch (e) {
                 console.error('Failed to fetch projects:', e);
@@ -5044,9 +5066,12 @@
 
         var channelsData = null;
         var skillsData = null;
-        var skillMentionData = null;
-        var skillMentionDataFetchedAt = 0;
-        var SKILL_MENTION_CACHE_TTL = 5 * 1000;
+        var skillsDataProvider = '';
+        var slashItemsData = null;
+        var slashItemsDataProvider = '';
+        var slashItemsDataFetchedAt = 0;
+        var slashItemsDataCache = {};
+        var SLASH_ITEMS_CACHE_TTL = 5 * 1000;
         var currentView = 'chat';
         var weixinLoginPollTimer = null;
 
@@ -5626,34 +5651,68 @@
             }
         }
 
+        function getActiveSlashProviderType() {
+            return currentSessionProvider || (providerData && providerData.current) || (modelConfig && modelConfig.provider) || '';
+        }
+
+        function getProviderQuery(providerType) {
+            return providerType ? '?provider=' + encodeURIComponent(providerType) : '';
+        }
+
+        function getSlashItemsCacheKey(providerType) {
+            return providerType || '__current__';
+        }
+
         async function fetchSkills() {
+            var providerType = getActiveSlashProviderType();
             try {
-                var res = await fetch('/api/skills');
+                var res = await fetch('/api/skills' + getProviderQuery(providerType));
                 skillsData = await res.json();
-                invalidateSkillMentionData();
+                skillsDataProvider = providerType;
+                invalidateSlashItemsData(providerType);
             } catch (e) {
                 console.error('Failed to fetch skills:', e);
                 skillsData = { skills: [], sources: [] };
+                skillsDataProvider = providerType;
             }
         }
 
-        function invalidateSkillMentionData() {
-            skillMentionData = null;
-            skillMentionDataFetchedAt = 0;
+        function invalidateSlashItemsData(providerType) {
+            if (providerType) {
+                delete slashItemsDataCache[getSlashItemsCacheKey(providerType)];
+                if (slashItemsDataProvider !== providerType) return;
+            } else {
+                slashItemsDataCache = {};
+            }
+            slashItemsData = null;
+            slashItemsDataProvider = '';
+            slashItemsDataFetchedAt = 0;
         }
 
-        async function fetchSkillMentionData(force) {
-            if (!force && skillMentionData && Date.now() - skillMentionDataFetchedAt < SKILL_MENTION_CACHE_TTL) {
+        async function fetchSlashItemsData(force) {
+            var providerType = getActiveSlashProviderType();
+            var cacheKey = getSlashItemsCacheKey(providerType);
+            var cached = slashItemsDataCache[cacheKey];
+            if (!force && cached && Date.now() - cached.fetchedAt < SLASH_ITEMS_CACHE_TTL) {
+                slashItemsData = cached.data;
+                slashItemsDataProvider = providerType;
+                slashItemsDataFetchedAt = cached.fetchedAt;
                 return;
             }
             try {
-                var res = await fetch('/api/skills/mentions');
-                skillMentionData = await res.json();
-                skillMentionDataFetchedAt = Date.now();
+                var res = await fetch('/api/slash/items' + getProviderQuery(providerType));
+                slashItemsData = await res.json();
+                slashItemsDataProvider = providerType;
+                slashItemsDataFetchedAt = Date.now();
+                slashItemsDataCache[cacheKey] = {
+                    data: slashItemsData,
+                    fetchedAt: slashItemsDataFetchedAt,
+                };
             } catch (e) {
-                console.error('Failed to fetch skill mentions:', e);
-                skillMentionData = { skills: [] };
-                skillMentionDataFetchedAt = 0;
+                console.error('Failed to fetch slash items:', e);
+                slashItemsData = { groups: [] };
+                slashItemsDataProvider = providerType;
+                slashItemsDataFetchedAt = 0;
             }
         }
 
@@ -5713,7 +5772,7 @@
                 fetch('/api/skills/open-folder', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}),
+                    body: JSON.stringify({ provider: skillsDataProvider || getActiveSlashProviderType() }),
                 });
             });
 
@@ -5823,13 +5882,14 @@
                 toggle.classList.toggle('on');
                 toggle.title = newState ? '点击禁用' : '点击启用';
                 skill.enabled = newState;
-                fetch('/api/skills/' + encodeURIComponent(skill.id) + '/toggle', {
+                var providerType = skillsDataProvider || getActiveSlashProviderType();
+                fetch('/api/skills/' + encodeURIComponent(skill.id) + '/toggle' + getProviderQuery(providerType), {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ enabled: newState }),
                 }).then(function (res) {
                     if (!res.ok) throw new Error('toggle failed');
-                    invalidateSkillMentionData();
+                    invalidateSlashItemsData(providerType);
                     showSaveStatus(newState ? '已启用: ' + skill.name : '已禁用: ' + skill.name);
                 }).catch(function () {
                     toggle.classList.toggle('on', !newState);
@@ -5847,7 +5907,10 @@
                 fetch('/api/skills/open-folder', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: skill.fullPath }),
+                    body: JSON.stringify({
+                        path: skill.fullPath,
+                        provider: skillsDataProvider || getActiveSlashProviderType(),
+                    }),
                 });
             });
 
@@ -5857,7 +5920,8 @@
             delBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4.5 3V2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M3 3v7a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V3" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
             delBtn.addEventListener('click', function () {
                 if (!confirm('确定要删除技能 "' + skill.name + '" 吗？此操作不可撤销。')) return;
-                fetch('/api/skills/' + encodeURIComponent(skill.id), {
+                var providerType = skillsDataProvider || getActiveSlashProviderType();
+                fetch('/api/skills/' + encodeURIComponent(skill.id) + getProviderQuery(providerType), {
                     method: 'DELETE',
                 }).then(function (res) {
                     if (res.ok) {
@@ -5867,7 +5931,7 @@
                         setTimeout(function () {
                             card.remove();
                             skillsData.skills = skillsData.skills.filter(function (s) { return s.id !== skill.id; });
-                            invalidateSkillMentionData();
+                            invalidateSlashItemsData(providerType);
                             var countEl = document.querySelector('.skills-header-count');
                             if (countEl) countEl.textContent = skillsData.skills.length + ' 个技能可用';
                             showSaveStatus('已删除: ' + skill.name);
