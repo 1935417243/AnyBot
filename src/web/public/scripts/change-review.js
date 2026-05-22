@@ -6,6 +6,10 @@
             .replace(/>/g, '&gt;');
     }
 
+    function escapeAttr(value) {
+        return escapeHtml(value).replace(/"/g, '&quot;');
+    }
+
     function signedCount(value, sign) {
         return sign + String(Math.max(0, value || 0));
     }
@@ -32,63 +36,109 @@
         return '修改';
     }
 
-    function hunkText(line) {
-        var match = /^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@/.exec(line);
-        return match ? '第 ' + match[1] + ' 行附近' : '变更位置';
+    function parseHunkHeader(line) {
+        var match = /^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@(.*)$/.exec(line);
+        if (!match) return null;
+        return {
+            oldStart: Number(match[1]),
+            newStart: Number(match[3]),
+            label: String(match[5] || '').trim(),
+        };
     }
 
-    function renderDiffLine(cls, prefix, content) {
+    function isDiffHeader(line) {
+        return (
+            line.startsWith('diff --git') ||
+            line.startsWith('index ') ||
+            line.startsWith('old mode ') ||
+            line.startsWith('new mode ') ||
+            line.startsWith('deleted file mode ') ||
+            line.startsWith('new file mode ') ||
+            line.startsWith('similarity index ') ||
+            line.startsWith('dissimilarity index ') ||
+            line.startsWith('rename from ') ||
+            line.startsWith('rename to ') ||
+            line.startsWith('copy from ') ||
+            line.startsWith('copy to ') ||
+            line.startsWith('---') ||
+            line.startsWith('+++')
+        );
+    }
+
+    function lineNumber(value) {
+        return typeof value === 'number' && value > 0 ? String(value) : '';
+    }
+
+    function displayLineNumber(cls, oldNumber, newNumber) {
+        if (cls === 'del') return lineNumber(oldNumber);
+        return lineNumber(newNumber) || lineNumber(oldNumber);
+    }
+
+    function renderDiffLine(cls, oldNumber, newNumber, content) {
         return '' +
-            '<span class="line ' + cls + '">' +
-            '<span class="gutter">' + escapeHtml(prefix) + '</span>' +
-            '<span class="code">' + escapeHtml(content || ' ') + '</span>' +
-            '</span>';
+            '<div class="change-review-diff-row ' + cls + '" role="row">' +
+            '<span class="change-review-line-num" role="cell">' + escapeHtml(displayLineNumber(cls, oldNumber, newNumber)) + '</span>' +
+            '<span class="change-review-code" role="cell">' +
+            '<span class="change-review-code-text">' + escapeHtml(content || ' ') + '</span>' +
+            '</span>' +
+            '</div>';
     }
 
     function renderDiff(diff) {
         var lines = String(diff || '').split('\n');
         var rendered = [];
+        var oldLine = null;
+        var newLine = null;
 
         lines.forEach(function (line) {
             var cls = 'ctx';
-            var prefix = '';
             var content = line;
 
-            if (
-                line.startsWith('diff --git') ||
-                line.startsWith('index ') ||
-                line.startsWith('---') ||
-                line.startsWith('+++')
-            ) {
+            if (isDiffHeader(line)) {
                 return;
             }
 
             if (line === 'Binary files differ') {
-                rendered.push(renderDiffLine('meta', '', '二进制文件有变化'));
+                rendered.push(renderDiffLine('meta', null, null, '二进制文件有变化'));
+                return;
+            }
+
+            if (line.startsWith('\\')) {
+                rendered.push(renderDiffLine('meta', null, null, line));
                 return;
             }
 
             if (line.startsWith('@@')) {
-                rendered.push(renderDiffLine('hunk', '', hunkText(line)));
+                var hunk = parseHunkHeader(line);
+                if (hunk) {
+                    oldLine = hunk.oldStart;
+                    newLine = hunk.newStart;
+                }
                 return;
             }
 
             if (line.startsWith('+')) {
                 cls = 'add';
-                prefix = '+';
                 content = line.slice(1);
+                rendered.push(renderDiffLine(cls, null, newLine, content));
+                if (typeof newLine === 'number') newLine += 1;
+                return;
             } else if (line.startsWith('-')) {
                 cls = 'del';
-                prefix = '-';
                 content = line.slice(1);
+                rendered.push(renderDiffLine(cls, oldLine, null, content));
+                if (typeof oldLine === 'number') oldLine += 1;
+                return;
             } else if (line.startsWith(' ')) {
                 content = line.slice(1);
             }
 
-            rendered.push(renderDiffLine(cls, prefix, content));
+            rendered.push(renderDiffLine(cls, oldLine, newLine, content));
+            if (typeof oldLine === 'number') oldLine += 1;
+            if (typeof newLine === 'number') newLine += 1;
         });
 
-        return rendered.join('\n') || renderDiffLine('meta', '', '没有可展示的文本变化');
+        return rendered.join('') || renderDiffLine('meta', null, null, '没有可展示的文本变化');
     }
 
     function renderReviewCounts(review, files) {
@@ -114,21 +164,31 @@
         if (!isTextDiffFile(file)) {
             return '<div class="change-review-file-note">媒体或二进制资源已变更，不展示代码 diff。</div>';
         }
-        return '<pre class="change-review-diff">' + renderDiff(file.diff) + '</pre>';
+        return '' +
+            '<div class="change-review-diff-wrap">' +
+            '<div class="change-review-diff" role="table" aria-label="代码差异">' +
+            renderDiff(file.diff) +
+            '</div>' +
+            '</div>';
     }
 
     function renderFile(file) {
+        var status = file.status || 'modified';
         return '' +
             '<details class="change-review-file">' +
-            '<summary>' +
+            '<summary class="change-review-file-header">' +
             '<span class="change-review-file-main">' +
-            '<span class="change-review-file-path">' + escapeHtml(file.path) + '</span>' +
-            '<span class="change-review-file-status">' + statusLabel(file.status) + '</span>' +
+            '<span class="change-review-file-path" title="' + escapeAttr(file.path) + '">' + escapeHtml(file.path) + '</span>' +
+            '<span class="change-review-file-status ' + escapeAttr(status) + '">' + statusLabel(status) + '</span>' +
             '</span>' +
+            '<span class="change-review-file-meta">' +
             '<span class="change-review-file-counts">' +
             renderFileCounts(file) +
             '</span>' +
-            '<span class="change-review-chevron">›</span>' +
+            '<span class="change-review-file-toggle" aria-hidden="true" title="展开/收起">' +
+            '<svg viewBox="0 0 16 16" fill="none"><path d="M4.5 6.25 8 9.75l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '</span>' +
+            '</span>' +
             '</summary>' +
             renderFileBody(file) +
             '</details>';
