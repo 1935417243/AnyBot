@@ -38,6 +38,7 @@
     (function () {
         const messagesEl = document.getElementById('messages');
         const inputEl = document.getElementById('chat-input');
+        const inputWrapper = document.querySelector('.input-wrapper');
         const sendBtn = document.getElementById('send-btn');
         const sidebar = document.getElementById('sidebar');
         const projectToggle = document.getElementById('project-toggle');
@@ -830,6 +831,18 @@
             renderSkillPicker();
         }
 
+        function setSkillPickerActiveIndex(index) {
+            if (index < 0 || index >= skillPickerFilteredItems.length) return;
+            if (skillPickerActiveIndex === index) return;
+            skillPickerActiveIndex = index;
+            if (!skillPickerEl) return;
+            Array.prototype.forEach.call(skillPickerEl.querySelectorAll('.skill-picker-item'), function (item) {
+                var isActive = Number(item.dataset.index) === skillPickerActiveIndex;
+                item.classList.toggle('active', isActive);
+                item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+        }
+
         function getSkillIconHtml(className) {
             return '<svg class="' + className + '" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
                 '<path d="M7 1.2 11.7 3.9v5.4L7 12 2.3 9.3V3.9L7 1.2Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>' +
@@ -1149,6 +1162,7 @@
                         item.className = 'skill-picker-item' +
                             (index === skillPickerActiveIndex ? ' active' : '');
                         item.type = 'button';
+                        item.dataset.index = String(index);
                         item.setAttribute('role', 'option');
                         item.setAttribute('aria-selected', index === skillPickerActiveIndex ? 'true' : 'false');
                         var iconHtml = skill.pickerType === 'project'
@@ -1156,16 +1170,21 @@
                             : (skill.pickerType === 'provider-command'
                                 ? getCommandIconHtml('skill-picker-icon')
                                 : getSkillIconHtml('skill-picker-icon'));
+                        var detailText = skill.pickerType === 'project'
+                            ? (skill.path || skill.description || '')
+                            : (skill.description || '');
+                        item.title = detailText ? (skill.name + ' · ' + detailText) : skill.name;
                         item.innerHTML =
                             iconHtml +
                             '<span class="skill-picker-copy">' +
                             '<span class="skill-picker-name">' + escapeHtml(skill.name) + '</span>' +
-                            '<span class="skill-picker-desc">' + escapeHtml(skill.description || '') + '</span>' +
-                            '</span>' +
-                            '<span class="skill-picker-source">' + escapeHtml(skill.source || '') + '</span>';
+                            '<span class="skill-picker-desc">' + escapeHtml(detailText) + '</span>' +
+                            '</span>';
                         item.addEventListener('mouseenter', function () {
-                            skillPickerActiveIndex = index;
-                            renderSkillPicker();
+                            setSkillPickerActiveIndex(index);
+                        });
+                        item.addEventListener('mousedown', function (e) {
+                            e.preventDefault();
                         });
                         item.addEventListener('click', function () {
                             commitSkillPickerSkill(skill);
@@ -1326,6 +1345,16 @@
             for (var i = 0; i < files.length; i++) {
                 await uploadFile(files[i]);
             }
+        }
+
+        if (inputWrapper) {
+            inputWrapper.addEventListener('click', function (e) {
+                if (e.target === inputEl) return;
+                if (e.target.closest && e.target.closest('button, input, textarea, [tabindex], .model-switcher')) return;
+                inputEl.focus();
+                var end = inputEl.value.length;
+                if (inputEl.setSelectionRange) inputEl.setSelectionRange(end, end);
+            });
         }
 
         inputEl.addEventListener('input', function () {
