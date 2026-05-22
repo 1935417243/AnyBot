@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DATA_DIR || process.env.CODEX_DATA_DIR || path.resolve(__dirname, "../.data");
 const CONFIG_PATH = path.join(dataDir, "app-settings.json");
+let cachedSettings: AppSettings | null = null;
 
 export type AppLanguage = "auto" | "zh" | "en";
 export type AppLogLevel = "debug" | "info" | "warn" | "error";
@@ -191,15 +192,24 @@ export function getDataDir(): string {
 }
 
 export function readAppSettings(): AppSettings {
+  if (cachedSettings) {
+    return cachedSettings;
+  }
+
   ensureConfig();
   try {
-    const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-    const settings = mergeSettings(raw);
-    writeFileSync(CONFIG_PATH, JSON.stringify(settings, null, 2), "utf-8");
-    return settings;
+    const rawText = readFileSync(CONFIG_PATH, "utf-8");
+    const raw = JSON.parse(rawText);
+    cachedSettings = mergeSettings(raw);
+    const normalizedText = JSON.stringify(cachedSettings, null, 2);
+    if (rawText.trim() !== normalizedText) {
+      writeFileSync(CONFIG_PATH, normalizedText, "utf-8");
+    }
+    return cachedSettings;
   } catch {
-    writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_SETTINGS, null, 2), "utf-8");
-    return DEFAULT_SETTINGS;
+    cachedSettings = DEFAULT_SETTINGS;
+    writeFileSync(CONFIG_PATH, JSON.stringify(cachedSettings, null, 2), "utf-8");
+    return cachedSettings;
   }
 }
 
@@ -207,6 +217,7 @@ export function writeAppSettings(settings: AppSettings): AppSettings {
   const next = mergeSettings(settings);
   ensureConfig();
   writeFileSync(CONFIG_PATH, JSON.stringify(next, null, 2), "utf-8");
+  cachedSettings = next;
   return next;
 }
 

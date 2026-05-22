@@ -194,7 +194,9 @@ function writeLogFile(line: string): void {
   mkdirSync(logDir, { recursive: true });
   const now = new Date();
   sweepExpiredLogs(now);
-  const filePath = path.join(logDir, buildLogFileName(now));
+  const currentLogDir = path.join(logDir, buildLogDayDirName(now));
+  mkdirSync(currentLogDir, { recursive: true });
+  const filePath = path.join(currentLogDir, buildLogFileName(now));
   appendFileSync(filePath, `${line}\n`, "utf8");
 }
 
@@ -208,14 +210,42 @@ function sweepExpiredLogs(now: Date): void {
   const cutoffMs = nowMs - getConfiguredRetentionDays() * dayMs;
   try {
     for (const entry of readdirSync(logDir, { withFileTypes: true })) {
-      if (!entry.isFile()) {
+      const entryPath = path.join(logDir, entry.name);
+      if (entry.isDirectory()) {
+        if (!isLogDayDirName(entry.name)) continue;
+        sweepExpiredLogsInDir(entryPath, cutoffMs);
+        removeDirIfEmpty(entryPath);
         continue;
       }
-      const logTimeMs = parseLogFileTimeMs(entry.name);
-      if (logTimeMs !== null && logTimeMs < cutoffMs) {
-        const filePath = path.join(logDir, entry.name);
-        rmSync(filePath, { force: true });
-      }
+      if (entry.isFile()) removeExpiredLogFile(entryPath, entry.name, cutoffMs);
+    }
+  } catch {
+    // Log cleanup must never prevent writing the current log line.
+  }
+}
+
+function sweepExpiredLogsInDir(dir: string, cutoffMs: number): void {
+  try {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      removeExpiredLogFile(path.join(dir, entry.name), entry.name, cutoffMs);
+    }
+  } catch {
+    // Log cleanup must never prevent writing the current log line.
+  }
+}
+
+function removeExpiredLogFile(filePath: string, fileName: string, cutoffMs: number): void {
+  const logTimeMs = parseLogFileTimeMs(fileName);
+  if (logTimeMs !== null && logTimeMs < cutoffMs) {
+    rmSync(filePath, { force: true });
+  }
+}
+
+function removeDirIfEmpty(dir: string): void {
+  try {
+    if (readdirSync(dir).length === 0) {
+      rmSync(dir, { recursive: true, force: true });
     }
   } catch {
     // Log cleanup must never prevent writing the current log line.
@@ -255,13 +285,22 @@ function buildLogFileName(date: Date): string {
   bucketDate.setSeconds(0, 0);
   bucketDate.setMinutes(Math.floor(bucketDate.getMinutes() / 10) * 10);
 
-  const year = bucketDate.getFullYear();
-  const month = String(bucketDate.getMonth() + 1).padStart(2, "0");
-  const day = String(bucketDate.getDate()).padStart(2, "0");
+  const day = buildLogDayDirName(bucketDate);
   const hour = String(bucketDate.getHours()).padStart(2, "0");
   const minute = String(bucketDate.getMinutes()).padStart(2, "0");
 
-  return `${logBaseName}.${year}${month}${day}-${hour}${minute}`;
+  return `${logBaseName}.${day}-${hour}${minute}`;
+}
+
+function buildLogDayDirName(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+function isLogDayDirName(value: string): boolean {
+  return /^\d{8}$/.test(value);
 }
 
 export const logger = {
