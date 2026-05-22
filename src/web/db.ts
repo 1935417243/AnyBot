@@ -16,6 +16,7 @@ export type ChatSession = {
 };
 
 export type ChatMessage = ChatSession["messages"][number];
+export type ChatSessionMetadata = Omit<ChatSession, "messages">;
 
 export type SessionSummary = {
   id: string;
@@ -259,19 +260,9 @@ export function getSession(id: string): ChatSession | null {
   return { ...row, messages };
 }
 
-export function getSessionMetadata(id: string): Omit<ChatSession, "messages"> | null {
+export function getSessionMetadata(id: string): ChatSessionMetadata | null {
   const row = stmts.getSession.get(id) as
-    | {
-        id: string;
-        title: string;
-        sessionId: string | null;
-        provider: string | null;
-        source: string;
-        chatId: string | null;
-        projectId: string | null;
-        createdAt: number;
-        updatedAt: number;
-      }
+    | ChatSessionMetadata
     | undefined;
   return row || null;
 }
@@ -319,19 +310,7 @@ export function findSessionBySourceChat(
   source: string,
   chatId: string,
 ): ChatSession | null {
-  const row = stmts.findBySourceChat.get(source, chatId) as
-    | {
-        id: string;
-        title: string;
-        sessionId: string | null;
-        provider: string | null;
-        source: string;
-        chatId: string | null;
-        projectId: string | null;
-        createdAt: number;
-        updatedAt: number;
-      }
-    | undefined;
+  const row = findSessionMetadataBySourceChat(source, chatId);
   if (!row) return null;
   const messages = stmts.getMessages.all(row.id) as Array<{
     id: number;
@@ -341,6 +320,16 @@ export function findSessionBySourceChat(
     metadata: string | null;
   }>;
   return { ...row, messages };
+}
+
+export function findSessionMetadataBySourceChat(
+  source: string,
+  chatId: string,
+): ChatSessionMetadata | null {
+  const row = stmts.findBySourceChat.get(source, chatId) as
+    | ChatSessionMetadata
+    | undefined;
+  return row || null;
 }
 
 export function updateSession(session: {

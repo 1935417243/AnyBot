@@ -34,7 +34,7 @@ import {
 } from "./web/change-review.js";
 import { emitSessionsChanged } from "./web/events.js";
 
-export type ChatSessionRecord = Omit<db.ChatSession, "messages"> & {
+export type ChatSessionRecord = db.ChatSessionMetadata & {
   messages?: db.ChatMessage[];
 };
 
@@ -210,8 +210,8 @@ export function createChannelSession(
   return session;
 }
 
-export function getOrCreateChannelSession(source: string, chatId: string): db.ChatSession {
-  const existing = db.findSessionBySourceChat(source, chatId);
+export function getOrCreateChannelSession(source: string, chatId: string): ChatSessionRecord {
+  const existing = db.findSessionMetadataBySourceChat(source, chatId);
   if (existing) return existing;
   return createChannelSession(source, chatId);
 }
