@@ -47,6 +47,8 @@
         const historyList = document.getElementById('history-list');
         const addHistoryChatBtn = document.getElementById('add-history-chat-btn');
         const newChatBtn = document.getElementById('new-chat-btn');
+        var sidebarTooltipEl = null;
+        var sidebarTooltipTarget = null;
 
         const modelSwitcher = document.getElementById('model-switcher');
         const modelBadge = document.getElementById('model-badge');
@@ -1081,13 +1083,6 @@
             skillPickerEl.hidden = false;
             skillPickerEl.innerHTML = '';
 
-            var header = document.createElement('div');
-            header.className = 'skill-picker-header';
-            header.innerHTML =
-                '<span>技能 / 项目</span>' +
-                '<span class="skill-picker-count">' + skillPickerFilteredItems.length + '</span>';
-            skillPickerEl.appendChild(header);
-
             var list = document.createElement('div');
             list.className = 'skill-picker-list';
             list.setAttribute('role', 'listbox');
@@ -1099,28 +1094,51 @@
                 empty.textContent = skillPickerItems.length === 0 ? '暂无已启用技能或项目' : '没有匹配的技能或项目';
                 list.appendChild(empty);
             } else {
-                skillPickerFilteredItems.forEach(function (skill, index) {
-                    var item = document.createElement('button');
-                    item.className = 'skill-picker-item' +
-                        (index === skillPickerActiveIndex ? ' active' : '');
-                    item.type = 'button';
-                    item.setAttribute('role', 'option');
-                    item.setAttribute('aria-selected', index === skillPickerActiveIndex ? 'true' : 'false');
-                    item.innerHTML =
-                        (skill.pickerType === 'project' ? getProjectIconHtml('skill-picker-icon project') : getSkillIconHtml('skill-picker-icon')) +
-                        '<span class="skill-picker-copy">' +
-                        '<span class="skill-picker-name">' + escapeHtml(skill.name) + '</span>' +
-                        '<span class="skill-picker-desc">' + escapeHtml(skill.description || '') + '</span>' +
-                        '</span>' +
-                        '<span class="skill-picker-source">' + escapeHtml(skill.source || '') + '</span>';
-                    item.addEventListener('mouseenter', function () {
-                        skillPickerActiveIndex = index;
-                        renderSkillPicker();
+                var indexedItems = skillPickerFilteredItems.map(function (skill, index) {
+                    return { skill: skill, index: index };
+                });
+                [
+                    {
+                        title: '技能',
+                        items: indexedItems.filter(function (entry) { return entry.skill.pickerType !== 'project'; }),
+                    },
+                    {
+                        title: '项目',
+                        items: indexedItems.filter(function (entry) { return entry.skill.pickerType === 'project'; }),
+                    },
+                ].forEach(function (group) {
+                    if (group.items.length === 0) return;
+                    var label = document.createElement('div');
+                    label.className = 'skill-picker-group-label';
+                    label.setAttribute('role', 'presentation');
+                    label.textContent = group.title;
+                    list.appendChild(label);
+
+                    group.items.forEach(function (entry) {
+                        var skill = entry.skill;
+                        var index = entry.index;
+                        var item = document.createElement('button');
+                        item.className = 'skill-picker-item' +
+                            (index === skillPickerActiveIndex ? ' active' : '');
+                        item.type = 'button';
+                        item.setAttribute('role', 'option');
+                        item.setAttribute('aria-selected', index === skillPickerActiveIndex ? 'true' : 'false');
+                        item.innerHTML =
+                            (skill.pickerType === 'project' ? getProjectIconHtml('skill-picker-icon project') : getSkillIconHtml('skill-picker-icon')) +
+                            '<span class="skill-picker-copy">' +
+                            '<span class="skill-picker-name">' + escapeHtml(skill.name) + '</span>' +
+                            '<span class="skill-picker-desc">' + escapeHtml(skill.description || '') + '</span>' +
+                            '</span>' +
+                            '<span class="skill-picker-source">' + escapeHtml(skill.source || '') + '</span>';
+                        item.addEventListener('mouseenter', function () {
+                            skillPickerActiveIndex = index;
+                            renderSkillPicker();
+                        });
+                        item.addEventListener('click', function () {
+                            commitSkillPickerSkill(skill);
+                        });
+                        list.appendChild(item);
                     });
-                    item.addEventListener('click', function () {
-                        commitSkillPickerSkill(skill);
-                    });
-                    list.appendChild(item);
                 });
             }
 
@@ -2075,6 +2093,82 @@
             localStorage.setItem(key, JSON.stringify(Array.from(value)));
         }
 
+        function ensureSidebarTooltip() {
+            if (sidebarTooltipEl) return sidebarTooltipEl;
+            sidebarTooltipEl = document.createElement('div');
+            sidebarTooltipEl.className = 'sidebar-floating-tooltip';
+            sidebarTooltipEl.setAttribute('role', 'tooltip');
+            document.body.appendChild(sidebarTooltipEl);
+            return sidebarTooltipEl;
+        }
+
+        function updateSidebarTooltipPosition() {
+            if (!sidebarTooltipEl || !sidebarTooltipTarget) return;
+            var targetRect = sidebarTooltipTarget.getBoundingClientRect();
+            var tooltipRect = sidebarTooltipEl.getBoundingClientRect();
+            var gap = 8;
+            var left = targetRect.right + gap;
+            var maxLeft = window.innerWidth - tooltipRect.width - gap;
+            var top = targetRect.top + (targetRect.height / 2);
+            var minTop = (tooltipRect.height / 2) + gap;
+            var maxTop = window.innerHeight - (tooltipRect.height / 2) - gap;
+
+            sidebarTooltipEl.style.left = Math.max(gap, Math.min(left, maxLeft)) + 'px';
+            sidebarTooltipEl.style.top = Math.max(minTop, Math.min(top, maxTop)) + 'px';
+        }
+
+        function showSidebarTooltip(target) {
+            var text = target.getAttribute('data-tooltip');
+            if (!text) return;
+            sidebarTooltipTarget = target;
+            var tooltip = ensureSidebarTooltip();
+            tooltip.textContent = text;
+            updateSidebarTooltipPosition();
+        }
+
+        function hideSidebarTooltip(target) {
+            if (target && sidebarTooltipTarget !== target) return;
+            sidebarTooltipTarget = null;
+            if (sidebarTooltipEl) {
+                sidebarTooltipEl.remove();
+                sidebarTooltipEl = null;
+            }
+        }
+
+        function getSidebarTooltipTarget(target) {
+            if (!(target instanceof Element)) return null;
+            var tooltipTarget = target.closest('[data-tooltip]');
+            if (!tooltipTarget || !sidebar.contains(tooltipTarget)) return null;
+            return tooltipTarget;
+        }
+
+        function setupSidebarTooltips() {
+            sidebar.addEventListener('mouseover', function (e) {
+                var target = getSidebarTooltipTarget(e.target);
+                if (!target) return;
+                if (e.relatedTarget instanceof Node && target.contains(e.relatedTarget)) return;
+                showSidebarTooltip(target);
+            });
+            sidebar.addEventListener('mouseout', function (e) {
+                var target = getSidebarTooltipTarget(e.target);
+                if (!target) return;
+                if (e.relatedTarget instanceof Node && target.contains(e.relatedTarget)) return;
+                hideSidebarTooltip(target);
+            });
+            sidebar.addEventListener('focusin', function (e) {
+                var target = getSidebarTooltipTarget(e.target);
+                if (!target) return;
+                showSidebarTooltip(target);
+            });
+            sidebar.addEventListener('focusout', function (e) {
+                var target = getSidebarTooltipTarget(e.target);
+                if (!target) return;
+                hideSidebarTooltip(target);
+            });
+            window.addEventListener('resize', updateSidebarTooltipPosition);
+            document.addEventListener('scroll', updateSidebarTooltipPosition, true);
+        }
+
         function updateChatInputPlaceholder() {
             inputEl.placeholder = CHAT_INPUT_PLACEHOLDERS[chatInputPlaceholderIndex];
         }
@@ -2316,7 +2410,7 @@
                 row.innerHTML =
                     folderIcon(isExpanded) +
                     '<span class="project-name"></span>' +
-                    '<button class="project-create-chat" type="button" title="新对话" aria-label="在当前项目新建对话">' +
+                    '<button class="project-create-chat" type="button" data-tooltip="新对话" aria-label="在当前项目新建对话">' +
                     '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">' +
                     '<path d="M6.5 1.5v10M1.5 6.5h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
                     '</svg>' +
@@ -5834,6 +5928,7 @@
         });
 
         async function init() {
+            setupSidebarTooltips();
             startChatInputPlaceholderRotation();
             updateProjectsCollapsedState();
             updateHistoryCollapsedState();
