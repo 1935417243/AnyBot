@@ -188,6 +188,8 @@
         const HIGHLIGHT_LIGHT_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
         const SIDEBAR_REFRESH_INTERVAL_MS = 5000;
         const CURRENT_SESSION_REFRESH_INTERVAL_MS = 2000;
+        const REALTIME_REFRESH_DEBOUNCE_MS = 150;
+        const REALTIME_RECONNECT_MS = 3000;
         const CHAT_INPUT_PLACEHOLDERS = [
             '发送消息... 输入 / 使用技能',
             '按 ↑ / ↓ 切换历史消息',
@@ -199,6 +201,9 @@
         let currentThemeSetting = readStoredTheme();
         let sidebarRefreshTimer = null;
         let currentSessionRefreshTimer = null;
+        let realtimeEvents = null;
+        let realtimeReconnectTimer = null;
+        let realtimeRefreshTimer = null;
         let isSidebarRefreshInFlight = false;
         let chatInputPlaceholderIndex = 0;
         let chatInputPlaceholderTimer = null;
@@ -2331,6 +2336,14 @@
             }
         }
 
+        function scheduleRealtimeRefresh() {
+            if (document.hidden) return;
+            clearTimeout(realtimeRefreshTimer);
+            realtimeRefreshTimer = setTimeout(function () {
+                refreshSidebarDirectory();
+            }, REALTIME_REFRESH_DEBOUNCE_MS);
+        }
+
         function startSidebarAutoRefresh() {
             if (sidebarRefreshTimer) clearInterval(sidebarRefreshTimer);
             sidebarRefreshTimer = setInterval(function () {
@@ -2346,6 +2359,82 @@
             }, CURRENT_SESSION_REFRESH_INTERVAL_MS);
         }
 
+        function stopSidebarAutoRefresh() {
+            if (sidebarRefreshTimer) {
+                clearInterval(sidebarRefreshTimer);
+                sidebarRefreshTimer = null;
+            }
+        }
+
+        function stopCurrentSessionAutoRefresh() {
+            if (currentSessionRefreshTimer) {
+                clearInterval(currentSessionRefreshTimer);
+                currentSessionRefreshTimer = null;
+            }
+        }
+
+        function startPollingFallback() {
+            startSidebarAutoRefresh();
+            startCurrentSessionAutoRefresh();
+        }
+
+        function stopPollingFallback() {
+            stopSidebarAutoRefresh();
+            stopCurrentSessionAutoRefresh();
+        }
+
+        function parseRealtimeEvent(event) {
+            try {
+                return JSON.parse(event.data || '{}');
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function handleRealtimeChange(event) {
+            var payload = parseRealtimeEvent(event);
+            if (!payload) return;
+            scheduleRealtimeRefresh();
+        }
+
+        function closeRealtimeEvents() {
+            if (realtimeEvents) {
+                realtimeEvents.close();
+                realtimeEvents = null;
+            }
+        }
+
+        function scheduleRealtimeReconnect() {
+            if (realtimeReconnectTimer) return;
+            realtimeReconnectTimer = setTimeout(function () {
+                realtimeReconnectTimer = null;
+                startRealtimeEvents();
+            }, REALTIME_RECONNECT_MS);
+        }
+
+        function startRealtimeEvents() {
+            if (!window.EventSource) {
+                startPollingFallback();
+                return;
+            }
+            if (realtimeEvents) return;
+
+            var source = new EventSource('/api/events');
+            realtimeEvents = source;
+
+            source.addEventListener('ready', function () {
+                stopPollingFallback();
+            });
+            source.addEventListener('sessions_changed', handleRealtimeChange);
+            source.addEventListener('projects_changed', handleRealtimeChange);
+            source.addEventListener('history_cleared', handleRealtimeChange);
+            source.onerror = function () {
+                closeRealtimeEvents();
+                startPollingFallback();
+                scheduleRealtimeReconnect();
+            };
+        }
+
         document.addEventListener('visibilitychange', function () {
             if (document.hidden) return;
             refreshSidebarDirectory();
@@ -2353,8 +2442,10 @@
         });
 
         window.addEventListener('beforeunload', function () {
-            if (sidebarRefreshTimer) clearInterval(sidebarRefreshTimer);
-            if (currentSessionRefreshTimer) clearInterval(currentSessionRefreshTimer);
+            closeRealtimeEvents();
+            if (realtimeReconnectTimer) clearTimeout(realtimeReconnectTimer);
+            if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
+            stopPollingFallback();
         });
 
         async function addProject() {
@@ -5569,8 +5660,7 @@
             } else {
                 await createNewChat();
             }
-            startSidebarAutoRefresh();
-            startCurrentSessionAutoRefresh();
+            startRealtimeEvents();
             inputEl.focus();
         }
 

@@ -32,6 +32,7 @@ import {
   createChangeSnapshot,
   type PublicChangeReview,
 } from "./web/change-review.js";
+import { emitSessionsChanged } from "./web/events.js";
 
 export type ChatSessionRecord = Omit<db.ChatSession, "messages"> & {
   messages?: db.ChatMessage[];
@@ -205,6 +206,7 @@ export function createChannelSession(
     updatedAt: now,
   };
   db.createSession(session);
+  emitSessionsChanged(session.id, "session_created");
   return session;
 }
 
@@ -307,6 +309,7 @@ export async function runPreparedChatTurn(
     provider: prepared.session.provider,
     updatedAt: Date.now(),
   });
+  emitSessionsChanged(prepared.session.id, "user_message_added");
 
   logger.info(`${opts.logPrefix}.start`, buildLogFields(prepared, opts));
 
@@ -356,6 +359,7 @@ export async function runPreparedChatTurn(
       updatedAt: Date.now(),
     });
     prepared.session.sessionId = providerSessionId;
+    emitSessionsChanged(prepared.session.id, "assistant_message_added");
 
     await emitStream({
       type: "result",
@@ -407,6 +411,7 @@ export async function runPreparedChatTurn(
         provider: prepared.session.provider,
         updatedAt: Date.now(),
       });
+      emitSessionsChanged(prepared.session.id, "assistant_message_cancelled");
       logger.info(`${opts.logPrefix}.cancelled`, {
         sessionId: prepared.session.id,
         source: prepared.source,

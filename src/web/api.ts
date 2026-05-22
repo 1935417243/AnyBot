@@ -55,6 +55,12 @@ import {
   type AgentStreamEvent,
 } from "./agent-stream.js";
 import {
+  attachWebUiEventClient,
+  emitHistoryCleared,
+  emitProjectsChanged,
+  emitSessionsChanged,
+} from "./events.js";
+import {
   ChatTurnValidationError,
   prepareChatTurn,
   runChatTurn,
@@ -490,8 +496,10 @@ function createOrTouchProject(projectPath: string): db.Project {
   const normalizedPath = normalizeProjectPath(projectPath);
   const existing = db.findProjectByPath(normalizedPath);
   if (existing) {
-    db.touchProject(existing.id, Date.now());
-    return { ...existing, updatedAt: Date.now() };
+    const updatedAt = Date.now();
+    db.touchProject(existing.id, updatedAt);
+    emitProjectsChanged(existing.id, "project_touched");
+    return { ...existing, updatedAt };
   }
   const now = Date.now();
   const project: db.Project = {
@@ -502,6 +510,7 @@ function createOrTouchProject(projectPath: string): db.Project {
     updatedAt: now,
   };
   db.createProject(project);
+  emitProjectsChanged(project.id, "project_created");
   return project;
 }
 
@@ -724,6 +733,10 @@ const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 5
 export function chatRouter(): Router {
   const router = Router();
 
+  router.get("/events", (_req: Request, res: Response) => {
+    attachWebUiEventClient(res);
+  });
+
   router.get("/projects", (_req: Request, res: Response) => {
     res.json(db.listProjects());
   });
@@ -796,6 +809,7 @@ export function chatRouter(): Router {
       updatedAt: Date.now(),
     };
     db.createSession(session);
+    emitSessionsChanged(session.id, "session_created");
     res.json({
       id: session.id,
       title: session.title,
@@ -865,6 +879,7 @@ export function chatRouter(): Router {
   router.delete("/sessions/:id", (req: Request, res: Response) => {
     const id = req.params.id as string;
     db.deleteSession(id);
+    emitSessionsChanged(id, "session_deleted");
     res.json({ ok: true });
   });
 
@@ -1340,6 +1355,7 @@ export function chatRouter(): Router {
   router.delete("/data/history", (_req: Request, res: Response) => {
     try {
       db.deleteAllSessions();
+      emitHistoryCleared();
       logger.info("history.cleared");
       res.json({ ok: true });
     } catch (error) {
