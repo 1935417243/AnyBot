@@ -744,16 +744,27 @@
             var filtered = skillPickerItems;
             if (term) {
                 filtered = filtered.filter(function (item) {
-                    var name = String(item.name || '').toLowerCase();
-                    var desc = String(item.description || '').toLowerCase();
-                    var itemPath = String(item.path || '').toLowerCase();
-                    return name.startsWith(term) || desc.indexOf(term) !== -1 || itemPath.indexOf(term) !== -1;
+                    return item.pickerType === 'project'
+                        ? matchesPickerTerm([item.name, item.path], term)
+                        : matchesPickerTerm([item.name], term);
                 });
             }
             skillPickerFilteredItems = filtered;
             if (skillPickerActiveIndex >= skillPickerFilteredItems.length) {
                 skillPickerActiveIndex = Math.max(0, skillPickerFilteredItems.length - 1);
             }
+        }
+
+        function matchesPickerTerm(values, term) {
+            return values.some(function (value) {
+                var normalized = String(value || '').toLowerCase();
+                if (!normalized) return false;
+                if (normalized.startsWith(term)) return true;
+                return normalized
+                    .split(/[^a-z0-9\u4e00-\u9fff]+/)
+                    .filter(Boolean)
+                    .some(function (part) { return part.startsWith(term); });
+            });
         }
 
         function closeSkillPicker(options) {
