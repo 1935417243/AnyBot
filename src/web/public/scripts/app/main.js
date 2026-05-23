@@ -1,3 +1,12 @@
+import { createMessageRenderer } from './chat/message-renderer.js';
+import {
+    getCommandIconHtml,
+    getProjectIconHtml,
+    getSkillIconHtml,
+    isSelectionOnlyFallback,
+    normalizeMessageProjects,
+    normalizeMessageSkills,
+} from './chat/message-selection.js';
 import { renderMarkdown, configureMarkdown } from './markdown.js';
 import { createSkillCard as createSkillCardElement, showSkillsSaveStatus as showSaveStatus } from './skills/skill-card.js';
 import { copyCode } from './ui/code-copy.js';
@@ -817,124 +826,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             });
         }
 
-        function getSkillIconHtml(className) {
-            return '<svg class="' + className + '" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
-                '<path d="M7 1.2 11.7 3.9v5.4L7 12 2.3 9.3V3.9L7 1.2Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>' +
-                '<path d="M2.6 4.1 7 6.7l4.4-2.6M7 6.7V12" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>' +
-                '</svg>';
-        }
-
-        function getProjectIconHtml(className) {
-            return '<svg class="' + className + '" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
-                '<path d="M1.5 4.2v6.6a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V5.5a1 1 0 0 0-1-1H7L5.7 3.1H2.5a1 1 0 0 0-1 1.1Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>' +
-                '</svg>';
-        }
-
-        function getCommandIconHtml(className) {
-            return '<svg class="' + className + '" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
-                '<path d="M2.2 4.2 5 7l-2.8 2.8M6.5 10h5.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>' +
-                '</svg>';
-        }
-
-        function normalizeMessageSkills(skills) {
-            if (!Array.isArray(skills)) return [];
-            var seen = {};
-            var normalized = [];
-            skills.forEach(function (skill) {
-                var name = String(skill && skill.name || '').trim();
-                if (!name || seen[name]) return;
-                seen[name] = true;
-                normalized.push({
-                    id: skill && skill.id ? String(skill.id) : '',
-                    name: name,
-                });
-            });
-            return normalized;
-        }
-
-        function normalizeMessageProjects(projectList) {
-            if (!Array.isArray(projectList)) return [];
-            var seen = {};
-            var normalized = [];
-            projectList.forEach(function (project) {
-                var id = String(project && project.id || '').trim();
-                var pathValue = String(project && project.path || '').trim();
-                var name = String(project && project.name || '').trim();
-                var key = id || pathValue || name;
-                if (!key || seen[key]) return;
-                seen[key] = true;
-                normalized.push({
-                    id: id,
-                    name: name || pathValue || id,
-                    path: pathValue,
-                });
-            });
-            return normalized;
-        }
-
-        function getSkillFallbackText(skills) {
-            return '使用技能：' + skills.map(function (skill) { return skill.name; }).join('、');
-        }
-
-        function getProjectFallbackText(projects) {
-            return '涉及项目：' + projects.map(function (project) { return project.name; }).join('、');
-        }
-
-        function getSelectionFallbackText(skills, projects) {
-            var parts = [];
-            if (skills && skills.length > 0) parts.push(getSkillFallbackText(skills));
-            if (projects && projects.length > 0) parts.push(getProjectFallbackText(projects));
-            return parts.join('\n');
-        }
-
-        function isSelectionOnlyFallback(text, skills, projects) {
-            skills = skills || [];
-            projects = projects || [];
-            if (skills.length === 0 && projects.length === 0) return false;
-            var value = String(text || '').trim();
-            if (!value) return false;
-            var names = skills.map(function (skill) { return skill.name; }).join('、');
-            var projectNames = projects.map(function (project) { return project.name; }).join('、');
-            return value === getSelectionFallbackText(skills, projects) ||
-                (skills.length > 0 && projects.length === 0 && (
-                    value === getSkillFallbackText(skills) ||
-                    value === ('使用技能:' + names) ||
-                    value === ('本轮请使用这些技能：' + names)
-                )) ||
-                (projects.length > 0 && skills.length === 0 && value === getProjectFallbackText(projects)) ||
-                (projects.length > 0 && value === ('本轮涉及项目：' + projectNames));
-        }
-
-        function createMessageSkillRefs(skills) {
-            var wrap = document.createElement('span');
-            wrap.className = 'message-skills';
-            skills.forEach(function (skill) {
-                var item = document.createElement('span');
-                item.className = 'message-skill-ref';
-                item.title = '本轮使用技能';
-                item.innerHTML =
-                    getSkillIconHtml('message-skill-icon') +
-                    '<span class="message-skill-name">' + escapeHtml(skill.name) + '</span>';
-                wrap.appendChild(item);
-            });
-            return wrap;
-        }
-
-        function createMessageProjectRefs(projects) {
-            var wrap = document.createElement('span');
-            wrap.className = 'message-skills';
-            projects.forEach(function (project) {
-                var item = document.createElement('span');
-                item.className = 'message-skill-ref project-ref';
-                item.title = project.path ? ('本轮涉及项目: ' + project.path) : '本轮涉及项目';
-                item.innerHTML =
-                    getProjectIconHtml('message-skill-icon') +
-                    '<span class="message-skill-name">' + escapeHtml(project.name) + '</span>';
-                wrap.appendChild(item);
-            });
-            return wrap;
-        }
-
         function renderPromptSkills() {
             if (!selectedSkillsEl) return;
             selectedSkillsEl.innerHTML = '';
@@ -1460,8 +1351,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         }
 
         function clearEmpty() {
-            var empty = document.getElementById('empty-state');
-            if (empty) empty.remove();
+            messageRenderer.clearEmpty();
         }
 
         function normalizeConversationTitle(title) {
@@ -1510,176 +1400,32 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             return data.content || '';
         }
 
+        const messageRenderer = createMessageRenderer({
+            messagesEl: messagesEl,
+            conversationHeaderHtml: conversationHeaderHtml,
+            largeMessagePreviewChars: LARGE_MESSAGE_PREVIEW_CHARS,
+            imageExts: IMAGE_EXTS,
+            renderMarkdown: renderMarkdown,
+            formatTokenCount: formatTokenCount,
+            fetchFullMessageContent: fetchFullMessageContent,
+            showError: showError,
+            openImageModal: openImageModal,
+            attachMessageMeta: function (row, opts) {
+                attachMessageMeta(row, opts);
+            },
+            scrollBottom: scrollBottom,
+        });
+
         function renderAssistantText(content, text, opts) {
-            opts = opts || {};
-            var fullText = String(text || '');
-            var renderText = fullText;
-            var isLarge = opts.contentTruncated || fullText.length > LARGE_MESSAGE_PREVIEW_CHARS;
-            if (isLarge) {
-                renderText = opts.contentTruncated
-                    ? fullText
-                    : fullText.slice(0, LARGE_MESSAGE_PREVIEW_CHARS) + '\n\n...[内容较长，已折叠]';
-            }
-            try {
-                content.innerHTML = renderMarkdown(renderText);
-            } catch (e) {
-                content.textContent = renderText;
-            }
-            if (!isLarge) return;
-            var expand = document.createElement('button');
-            expand.className = 'large-message-expand';
-            expand.type = 'button';
-            expand.textContent = opts.contentChars ? ('展开完整内容（' + formatTokenCount(opts.contentChars) + ' 字符）') : '展开完整内容';
-            expand.addEventListener('click', async function () {
-                expand.disabled = true;
-                expand.textContent = '加载中...';
-                var nextText = fullText;
-                if (opts.contentTruncated && opts.messageId) {
-                    try {
-                        nextText = await fetchFullMessageContent(opts.messageId);
-                    } catch (e) {
-                        showError(e.message || '加载完整内容失败');
-                        expand.disabled = false;
-                        expand.textContent = '展开完整内容';
-                        return;
-                    }
-                }
-                try {
-                    content.innerHTML = renderMarkdown(nextText);
-                } catch (e) {
-                    content.textContent = nextText;
-                }
-            });
-            content.appendChild(expand);
+            return messageRenderer.renderAssistantText(content, text, opts);
         }
 
         function showEmptyState() {
-            messagesEl.innerHTML =
-                conversationHeaderHtml() +
-                '<div id="empty-state">' +
-                '<div class="empty-icon">Ab</div>' +
-                '<div class="empty-title">AnyBot 已就绪</div>' +
-                '<div class="empty-sub">发送消息，开始你的对话</div>' +
-                '</div>';
+            return messageRenderer.showEmptyState();
         }
 
         function appendMessage(role, text, attachments, changeReview, opts) {
-            opts = opts || {};
-            clearEmpty();
-            var row = document.createElement('div');
-            row.className = 'message-row ' + role;
-            var messageSkills = role === 'user' ? normalizeMessageSkills(opts.skills) : [];
-            var messageProjects = role === 'user' ? normalizeMessageProjects(opts.projects) : [];
-            var rawText = String(text || '');
-            var visibleText = isSelectionOnlyFallback(rawText, messageSkills, messageProjects) ? '' : rawText;
-
-            if (role === 'ai') {
-                var bubble = document.createElement('div');
-                bubble.className = 'bubble';
-
-                var avatar = document.createElement('div');
-                avatar.className = 'avatar ai-avatar';
-                avatar.textContent = 'Ab';
-
-                var content = document.createElement('div');
-                content.className = 'message-content';
-                renderAssistantText(content, text, opts);
-                if (changeReview && window.ChangeReview) {
-                    var reviewCard = window.ChangeReview.render({
-                        review: changeReview,
-                        scrollBottom: scrollBottom,
-                    });
-                    if (reviewCard) content.appendChild(reviewCard);
-                }
-
-                bubble.appendChild(avatar);
-                bubble.appendChild(content);
-                row.appendChild(bubble);
-            } else {
-                var bubble = document.createElement('div');
-                bubble.className = 'bubble';
-
-                var content = document.createElement('div');
-                content.className = 'message-content';
-                var userLine = document.createElement('div');
-                userLine.className = 'message-user-line';
-                if (messageSkills.length > 0) {
-                    userLine.appendChild(createMessageSkillRefs(messageSkills));
-                }
-                if (messageProjects.length > 0) {
-                    userLine.appendChild(createMessageProjectRefs(messageProjects));
-                }
-                var userText = document.createElement('span');
-                userText.className = 'message-user-text';
-                userText.textContent = visibleText;
-                if (visibleText || (opts && opts.contentTruncated && opts.messageId)) {
-                    userLine.appendChild(userText);
-                }
-                if (userLine.childNodes.length > 0) {
-                    content.appendChild(userLine);
-                }
-                if (opts && opts.contentTruncated && opts.messageId) {
-                    var userExpand = document.createElement('button');
-                    userExpand.className = 'large-message-expand';
-                    userExpand.type = 'button';
-                    userExpand.textContent = opts.contentChars ? ('展开完整内容（' + formatTokenCount(opts.contentChars) + ' 字符）') : '展开完整内容';
-                    userExpand.addEventListener('click', async function () {
-                        userExpand.disabled = true;
-                        userExpand.textContent = '加载中...';
-                        try {
-                            userText.textContent = await fetchFullMessageContent(opts.messageId);
-                            userExpand.remove();
-                        } catch (e) {
-                            showError(e.message || '加载完整内容失败');
-                            userExpand.disabled = false;
-                            userExpand.textContent = '展开完整内容';
-                        }
-                    });
-                    content.appendChild(userExpand);
-                }
-
-                // 显示附件：图片渲染缩略图，其他渲染标签
-                if (attachments && attachments.length > 0) {
-                    var attDiv = document.createElement('div');
-                    attDiv.className = 'message-attachments';
-                    attachments.forEach(function (att) {
-                        var name = (typeof att === 'string') ? att : att.name;
-                        var attPath = (typeof att === 'string') ? null : att.path;
-                        var isImg = IMAGE_EXTS.some(function (ext) { return name.toLowerCase().endsWith(ext); });
-
-                        if (isImg && attPath) {
-                            // 图片缩略图
-                            var imgSrc = '/api/local-file?path=' + encodeURIComponent(attPath);
-                            var img = document.createElement('img');
-                            img.className = 'chat-image user-attachment-image';
-                            img.src = imgSrc;
-                            img.alt = name;
-                            img.onclick = function () { openImageModal(imgSrc); };
-                            attDiv.appendChild(img);
-                        } else {
-                            // 非图片附件标签
-                            var tag = document.createElement('span');
-                            tag.className = 'message-attachment-tag';
-                            tag.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M14 8.5l-5.5 5.5a3.5 3.5 0 01-5-5L9 3.5a2 2 0 013 3L6.5 12a.5.5 0 01-.7-.7L11 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> ' + escapeHtml(name);
-                            attDiv.appendChild(tag);
-                        }
-                    });
-                    content.appendChild(attDiv);
-                }
-
-                bubble.appendChild(content);
-                row.appendChild(bubble);
-            }
-
-            attachMessageMeta(row, {
-                createdAt: opts.createdAt,
-                copyText: role === 'user' && (messageSkills.length > 0 || messageProjects.length > 0)
-                    ? (visibleText ? getSelectionFallbackText(messageSkills, messageProjects) + '\n' + visibleText : getSelectionFallbackText(messageSkills, messageProjects))
-                    : rawText,
-            });
-            messagesEl.appendChild(row);
-            scrollBottom();
-            return row;
+            return messageRenderer.appendMessage(role, text, attachments, changeReview, opts);
         }
 
         function getOldestRenderedMessageId() {
