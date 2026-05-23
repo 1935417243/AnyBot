@@ -189,31 +189,13 @@ export function createSessionController(config) {
             config.updateConversationHeaderTitle(data.title);
             currentSessionUpdatedAt = Number(data.updatedAt || config.findSessionSummary(id)?.updatedAt || currentSessionUpdatedAt || 0);
             config.setActiveProjectId(data.projectId || null);
-            config.setCurrentSessionHasMoreMessages(!!data.hasMoreMessages);
-            config.setIsLoadingOlderMessages(false);
             config.resetInputHistoryFromMessages(data.messages || [], !!data.hasMoreMessages);
             config.updateContextUsage(null);
             var didExpandProject = config.expandProject(data.projectId || null);
 
             if (!wasChatView) config.showChatView();
 
-            config.messagesEl.innerHTML = '';
-            config.ensureConversationHeader();
-            config.setBatchRenderingMessages(true);
-            try {
-                if (data.messages.length === 0) {
-                    config.showEmptyState();
-                } else {
-                    data.messages.forEach(function (m) {
-                        config.renderMessageRecord(m);
-                    });
-                }
-            } finally {
-                config.setBatchRenderingMessages(false);
-            }
-            config.renderOlderMessagesControl();
-            currentNewestMessageId = config.getNewestRenderedMessageId();
-            config.scrollBottom();
+            currentNewestMessageId = config.renderSessionMessages(data.messages || [], !!data.hasMoreMessages);
             await config.fetchModelConfig(currentSessionProvider);
 
             if (data.activeStream) {
