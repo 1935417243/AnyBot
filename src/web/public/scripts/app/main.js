@@ -3,6 +3,7 @@ import { bindChatInputEvents } from './chat/input-events.js';
 import { createInputHistoryController } from './chat/input-history.js';
 import { createMessageRenderer } from './chat/message-renderer.js';
 import { createSendMessageController } from './chat/send-message.js';
+import { createSessionController } from './chat/session-controller.js';
 import { createSlashPickerController } from './chat/slash-picker.js';
 import { createChannelsPageController } from './channels/channels-page.js';
 import { createSidebarController } from './sidebar/sidebar-controller.js';
@@ -97,21 +98,13 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         const contextUsageTokensEl = document.getElementById('context-usage-tokens');
         const contextUsageProviderEl = document.getElementById('context-usage-provider');
 
-        let currentSessionId = null;
         let currentConversationTitle = '新对话';
-        let currentSessionProjectId = null;
-        let currentSessionProvider = null;
-        let isTyping = false;
-        let isCancellingResponse = false;
         let latestContextUsage = null;
-        let activeStreamSessionId = null;
-        let activeStreamAbortController = null;
         let isBatchRenderingMessages = false;
         let currentSessionHasMoreMessages = false;
-        let currentSessionUpdatedAt = 0;
-        let currentNewestMessageId = 0;
         let isLoadingOlderMessages = false;
         let slashPickerController = null;
+        let sessionController = null;
         let sidebarController = null;
         let settingsController = null;
         let channelsPageController = null;
@@ -153,10 +146,10 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             currentModelNameEl: currentModelNameEl,
             fetchSessions: fetchSessions,
             getCurrentSessionId: function () {
-                return currentSessionId;
+                return sessionController ? sessionController.getCurrentSessionId() : null;
             },
             getCurrentSessionProvider: function () {
-                return currentSessionProvider;
+                return sessionController ? sessionController.getCurrentSessionProvider() : null;
             },
             getCurrentView: function () {
                 return currentView;
@@ -234,16 +227,17 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         });
 
         function updateSendBtnState() {
-            var isRunning = !!isTyping;
+            var isRunning = !!(sessionController && sessionController.getIsTyping());
+            var isCancelling = !!(sessionController && sessionController.getIsCancellingResponse());
             var promptSelection = slashPickerController
                 ? slashPickerController.getSelection()
                 : { skills: [], projects: [] };
             sendBtn.classList.toggle('is-stop', isRunning);
             sendBtn.innerHTML = isRunning ? STOP_BUTTON_ICON : SEND_BUTTON_ICON;
-            sendBtn.title = isRunning ? (isCancellingResponse ? '正在中断' : '中断') : '发送';
+            sendBtn.title = isRunning ? (isCancelling ? '正在中断' : '中断') : '发送';
             sendBtn.setAttribute('aria-label', sendBtn.title);
             sendBtn.disabled = isRunning
-                ? isCancellingResponse
+                ? isCancelling
                 : (
                     inputEl.value.trim() === '' &&
                     pendingAttachments.length === 0 &&
@@ -274,7 +268,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             skillPickerEl: skillPickerEl,
             fetchSlashItemsData: fetchSlashItemsData,
             getCurrentSessionProjectId: function () {
-                return currentSessionProjectId;
+                return sessionController ? sessionController.getCurrentSessionProjectId() : null;
             },
             getCurrentView: function () {
                 return currentView;
@@ -294,7 +288,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             pageSize: SESSION_MESSAGE_PAGE_SIZE,
             applyDraft: applyChatInputDraft,
             getCurrentSessionId: function () {
-                return currentSessionId;
+                return sessionController ? sessionController.getCurrentSessionId() : null;
             },
             getOldestRenderedMessageId: getOldestRenderedMessageId,
             getPromptSelection: function () {
@@ -388,7 +382,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             dropOverlay: dropOverlay,
             fileInput: fileInput,
             getIsTyping: function () {
-                return isTyping;
+                return sessionController ? sessionController.getIsTyping() : false;
             },
             handlePromptSkillBackspace: handlePromptSkillBackspace,
             handleSkillPickerKeydown: handleSkillPickerKeydown,
@@ -412,20 +406,20 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             currentSessionRefreshIntervalMs: CURRENT_SESSION_REFRESH_INTERVAL_MS,
             deleteSession: deleteSession,
             getActiveStreamSessionId: function () {
-                return activeStreamSessionId;
+                return sessionController ? sessionController.getActiveStreamSessionId() : null;
             },
             getChannelMeta: getChannelMeta,
             getCurrentNewestMessageId: function () {
-                return currentNewestMessageId;
+                return sessionController ? sessionController.getCurrentNewestMessageId() : 0;
             },
             getCurrentSessionId: function () {
-                return currentSessionId;
+                return sessionController ? sessionController.getCurrentSessionId() : null;
             },
             getCurrentSessionProjectId: function () {
-                return currentSessionProjectId;
+                return sessionController ? sessionController.getCurrentSessionProjectId() : null;
             },
             getCurrentSessionUpdatedAt: function () {
-                return currentSessionUpdatedAt;
+                return sessionController ? sessionController.getCurrentSessionUpdatedAt() : 0;
             },
             getCurrentView: function () {
                 return currentView;
@@ -434,7 +428,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 return isLoadingOlderMessages;
             },
             getIsTyping: function () {
-                return isTyping;
+                return sessionController ? sessionController.getIsTyping() : false;
             },
             getNewestMessageId: getNewestMessageId,
             historyList: historyList,
@@ -448,10 +442,10 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             realtimeReconnectMs: REALTIME_RECONNECT_MS,
             realtimeRefreshDebounceMs: REALTIME_REFRESH_DEBOUNCE_MS,
             setCurrentNewestMessageId: function (value) {
-                currentNewestMessageId = value;
+                if (sessionController) sessionController.setCurrentNewestMessageId(value);
             },
             setCurrentSessionUpdatedAt: function (value) {
-                currentSessionUpdatedAt = value;
+                if (sessionController) sessionController.setCurrentSessionUpdatedAt(value);
             },
             showChatView: showChatView,
             showError: showError,
@@ -533,8 +527,9 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         }
 
         async function fetchFullMessageContent(messageId) {
-            if (!currentSessionId || !messageId) throw new Error('无法加载完整内容');
-            var res = await fetch('/api/sessions/' + currentSessionId + '/messages/' + encodeURIComponent(messageId) + '/content');
+            var sessionId = sessionController ? sessionController.getCurrentSessionId() : null;
+            if (!sessionId || !messageId) throw new Error('无法加载完整内容');
+            var res = await fetch('/api/sessions/' + sessionId + '/messages/' + encodeURIComponent(messageId) + '/content');
             if (!res.ok) throw new Error('加载完整内容失败');
             var data = await res.json();
             return data.content || '';
@@ -652,7 +647,8 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         }
 
         async function loadOlderMessages() {
-            if (!currentSessionId || isLoadingOlderMessages) return;
+            var sessionId = sessionController ? sessionController.getCurrentSessionId() : null;
+            if (!sessionId || isLoadingOlderMessages) return;
             var beforeId = getOldestRenderedMessageId();
             if (!beforeId) return;
             var anchor = messagesEl.querySelector('.message-row[data-message-id]');
@@ -660,7 +656,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             try {
                 isLoadingOlderMessages = true;
                 renderOlderMessagesControl();
-                var res = await fetch('/api/sessions/' + currentSessionId + '/messages?before=' + encodeURIComponent(beforeId) + '&limit=' + SESSION_MESSAGE_PAGE_SIZE);
+                var res = await fetch('/api/sessions/' + sessionId + '/messages?before=' + encodeURIComponent(beforeId) + '&limit=' + SESSION_MESSAGE_PAGE_SIZE);
                 if (!res.ok) throw new Error('加载更早消息失败');
                 var data = await res.json();
                 removeOlderMessagesControl();
@@ -942,244 +938,78 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             return sidebarController.addProject();
         }
 
-        async function createNewChat(projectId, options) {
-            options = options || {};
-            var targetProjectId = arguments.length > 0 ? projectId : sidebarController.getActiveProjectId();
-            if (!targetProjectId) targetProjectId = null;
-            if (currentView !== 'chat') {
-                showChatView();
-            }
-            var providerData = settingsController.getProviderData();
-            var currentProviderType = providerData && providerData.current;
-            var canReuseEmptySession =
-                !options.force &&
-                currentSessionId &&
-                currentSessionProjectId === targetProjectId &&
-                (!currentProviderType || currentSessionProvider === currentProviderType) &&
-                !document.querySelector('#messages .message-row');
-            if (canReuseEmptySession) {
-                sidebarController.setActiveProjectId(targetProjectId);
-                settingsController.clearSessionModelSelection(currentSessionId);
-                var reusableSummary = findSessionSummary(currentSessionId);
-                updateConversationHeaderTitle(reusableSummary ? reusableSummary.title : '新对话');
-                revealSessionContainer(targetProjectId);
-                renderHistory();
-                renderProjects();
-                updateSidebarSelection();
-                revealActiveSessionInSidebar();
-                await fetchModelConfig(currentSessionProvider);
-                inputEl.focus();
-                return;
-            }
-            try {
-                var res = await fetch('/api/sessions', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ projectId: targetProjectId }),
-                });
-                var data = await res.json();
-                if (!res.ok) throw new Error(data.error || '创建会话失败');
-                currentSessionId = data.id;
-                currentSessionProjectId = data.projectId || targetProjectId || null;
-                currentSessionProvider = data.provider || null;
-                updateConversationHeaderTitle(data.title);
-                currentSessionUpdatedAt = Number(data.updatedAt || Date.now());
-                currentNewestMessageId = 0;
-                sidebarController.setActiveProjectId(currentSessionProjectId);
-                revealSessionContainer(currentSessionProjectId);
-                showChatView();
-                updateContextUsage(null);
-                resetInputHistoryFromMessages([], false);
-                showEmptyState();
-                inputEl.value = '';
-                clearPromptSkills();
-                resizeChatInput();
-                sendBtn.disabled = true;
-                inputEl.focus();
-                await fetchModelConfig(currentSessionProvider);
-                await fetchSessions();
-                updateSidebarSelection();
-                revealActiveSessionInSidebar();
-            } catch (e) {
-                showError(e.message || '创建会话失败');
-            }
-        }
+        sessionController = createSessionController({
+            clearPromptSkills: clearPromptSkills,
+            clearSessionModelSelection: function (sessionId) {
+                settingsController.clearSessionModelSelection(sessionId);
+            },
+            ensureConversationHeader: ensureConversationHeader,
+            expandProject: function (projectId) {
+                return sidebarController.expandProject(projectId);
+            },
+            fetchModelConfig: fetchModelConfig,
+            fetchSessions: fetchSessions,
+            findSessionSummary: findSessionSummary,
+            getActiveProjectId: function () {
+                return sidebarController.getActiveProjectId();
+            },
+            getCurrentView: function () {
+                return currentView;
+            },
+            getNewestRenderedMessageId: getNewestRenderedMessageId,
+            getProviderData: function () {
+                return settingsController.getProviderData();
+            },
+            inputEl: inputEl,
+            messagesEl: messagesEl,
+            renderHistory: renderHistory,
+            renderMessageRecord: renderMessageRecord,
+            renderOlderMessagesControl: renderOlderMessagesControl,
+            renderProjects: renderProjects,
+            resetInputHistoryFromMessages: resetInputHistoryFromMessages,
+            resizeChatInput: resizeChatInput,
+            revealActiveSessionInSidebar: revealActiveSessionInSidebar,
+            revealSessionContainer: revealSessionContainer,
+            scrollBottom: scrollBottom,
+            sessionMessagePageSize: SESSION_MESSAGE_PAGE_SIZE,
+            setActiveProjectId: function (projectId) {
+                sidebarController.setActiveProjectId(projectId);
+            },
+            setBatchRenderingMessages: function (value) {
+                isBatchRenderingMessages = !!value;
+            },
+            setCurrentSessionHasMoreMessages: function (value) {
+                currentSessionHasMoreMessages = !!value;
+            },
+            setIsLoadingOlderMessages: function (value) {
+                isLoadingOlderMessages = !!value;
+            },
+            setSendButtonDisabled: function (value) {
+                sendBtn.disabled = value;
+            },
+            showChatView: showChatView,
+            showEmptyState: showEmptyState,
+            showError: showError,
+            updateContextUsage: updateContextUsage,
+            updateConversationHeaderTitle: updateConversationHeaderTitle,
+            updateSendBtnState: updateSendBtnState,
+            updateSidebarSelection: updateSidebarSelection,
+        });
 
-        function stopActiveStreamSubscription() {
-            if (activeStreamAbortController) {
-                activeStreamAbortController.abort();
-                activeStreamAbortController = null;
-            }
-            activeStreamSessionId = null;
-            isTyping = false;
-            isCancellingResponse = false;
-            updateSendBtnState();
+        async function createNewChat(projectId, options) {
+            return sessionController.createNewChat(projectId, options);
         }
 
         async function cancelCurrentResponse() {
-            var targetSessionId = activeStreamSessionId || currentSessionId;
-            if (!targetSessionId || isCancellingResponse) return;
-
-            isCancellingResponse = true;
-            updateSendBtnState();
-            try {
-                var res = await fetch('/api/sessions/' + targetSessionId + '/messages/cancel', {
-                    method: 'POST',
-                });
-                if (!res.ok) {
-                    var err = await res.json().catch(function () {
-                        return {};
-                    });
-                    throw new Error(err.error || '中断失败');
-                }
-            } catch (e) {
-                isCancellingResponse = false;
-                updateSendBtnState();
-                showError(e.message || '中断失败');
-            }
-        }
-
-        async function resumeActiveStream(sessionId, activeStream) {
-            if (!window.ClaudeAgentLoop || !window.ClaudeAgentLoop.resume) return;
-
-            var controller = new AbortController();
-            activeStreamAbortController = controller;
-            activeStreamSessionId = sessionId;
-            isTyping = true;
-            isCancellingResponse = false;
-            updateSendBtnState();
-
-            var agentView = window.ClaudeAgentLoop.createMessage({
-                messagesEl: messagesEl,
-                scrollBottom: scrollBottom,
-                startedAt: activeStream && activeStream.startedAt,
-            });
-
-            try {
-                var result = await window.ClaudeAgentLoop.resume({
-                    sessionId: sessionId,
-                    view: agentView,
-                    signal: controller.signal,
-                    onContextUsage: updateContextUsage,
-                });
-
-                if (activeStreamSessionId !== sessionId) return;
-
-                if (result && result.inactive) {
-                    if (agentView.row) agentView.row.remove();
-                    stopActiveStreamSubscription();
-                    isTyping = false;
-                    isCancellingResponse = false;
-                    updateSendBtnState();
-                    await loadSession(sessionId);
-                    return;
-                }
-
-                await fetchSessions();
-            } catch (e) {
-                if (e.name === 'AbortError') return;
-                if (agentView) {
-                    agentView.handleEvent({
-                        type: 'error',
-                        error: e.message || '网络错误，请检查连接',
-                    });
-                }
-                showError(e.message || '网络错误，请检查连接');
-            } finally {
-                if (activeStreamSessionId === sessionId) {
-                    activeStreamAbortController = null;
-                    activeStreamSessionId = null;
-                    isTyping = false;
-                    isCancellingResponse = false;
-                    updateSendBtnState();
-                }
-            }
+            return sessionController.cancelCurrentResponse();
         }
 
         async function loadSession(id, options) {
-            options = options || {};
-            if (id === currentSessionId && activeStreamSessionId === id) {
-                inputEl.focus();
-                return;
-            }
-            if (id === currentSessionId && currentView === 'chat' && !options.force) {
-                inputEl.focus();
-                return;
-            }
-
-            try {
-                stopActiveStreamSubscription();
-                var res = await fetch('/api/sessions/' + id + '?limit=' + SESSION_MESSAGE_PAGE_SIZE);
-                if (!res.ok) {
-                    if (!options.silent) showError('加载会话失败');
-                    return;
-                }
-                var data = await res.json();
-                var wasChatView = currentView === 'chat';
-                currentSessionId = id;
-                currentSessionProjectId = data.projectId || null;
-                currentSessionProvider = data.provider || null;
-                updateConversationHeaderTitle(data.title);
-                currentSessionUpdatedAt = Number(data.updatedAt || findSessionSummary(id)?.updatedAt || currentSessionUpdatedAt || 0);
-                sidebarController.setActiveProjectId(data.projectId || null);
-                currentSessionHasMoreMessages = !!data.hasMoreMessages;
-                isLoadingOlderMessages = false;
-                resetInputHistoryFromMessages(data.messages || [], currentSessionHasMoreMessages);
-                updateContextUsage(null);
-                var didExpandProject = sidebarController.expandProject(data.projectId || null);
-
-                if (!wasChatView) showChatView();
-
-                messagesEl.innerHTML = '';
-                ensureConversationHeader();
-                isBatchRenderingMessages = true;
-                try {
-                    if (data.messages.length === 0) {
-                        showEmptyState();
-                    } else {
-                        data.messages.forEach(function (m) {
-                            renderMessageRecord(m);
-                        });
-                    }
-                } finally {
-                    isBatchRenderingMessages = false;
-                }
-                renderOlderMessagesControl();
-                currentNewestMessageId = getNewestRenderedMessageId();
-                scrollBottom();
-                await fetchModelConfig(currentSessionProvider);
-
-                if (data.activeStream) {
-                    resumeActiveStream(id, data.activeStream);
-                }
-
-                if (wasChatView && didExpandProject) renderProjects();
-                updateSidebarSelection();
-                inputEl.focus();
-            } catch (e) {
-                if (!options.silent) showError('加载会话失败');
-            }
+            return sessionController.loadSession(id, options);
         }
 
         async function deleteSession(id) {
-            try {
-                await fetch('/api/sessions/' + id, {method: 'DELETE'});
-                if (currentSessionId === id) {
-                    currentSessionId = null;
-                    currentSessionProjectId = null;
-                    currentSessionProvider = null;
-                    currentSessionUpdatedAt = 0;
-                    currentNewestMessageId = 0;
-                    updateConversationHeaderTitle('新对话');
-                    resetInputHistoryFromMessages([], false);
-                    clearPromptSkills();
-                    updateContextUsage(null);
-                    showEmptyState();
-                }
-                await fetchSessions();
-            } catch (e) {
-                showError('删除失败');
-            }
+            return sessionController.deleteSession(id);
         }
 
         const sendMessageController = createSendMessageController({
@@ -1188,9 +1018,9 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             getState: function () {
                 var promptSelection = slashPickerController.getSelection();
                 return {
-                    currentSessionId: currentSessionId,
-                    currentSessionProvider: currentSessionProvider,
-                    isTyping: isTyping,
+                    currentSessionId: sessionController.getCurrentSessionId(),
+                    currentSessionProvider: sessionController.getCurrentSessionProvider(),
+                    isTyping: sessionController.getIsTyping(),
                     modelConfig: settingsController.getModelConfig(),
                     pendingAttachments: pendingAttachments,
                     promptProjects: promptSelection.projects,
@@ -1202,26 +1032,22 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 pendingAttachments = value;
             },
             setTyping: function (value) {
-                isTyping = value;
+                sessionController.setTyping(value);
             },
             setCancelling: function (value) {
-                isCancellingResponse = value;
+                sessionController.setCancelling(value);
             },
             setSendButtonDisabled: function (value) {
                 sendBtn.disabled = value;
             },
             setActiveStream: function (controller, sessionId) {
-                activeStreamAbortController = controller;
-                activeStreamSessionId = sessionId;
+                sessionController.setActiveStream(controller, sessionId);
             },
             clearActiveStreamForSession: function (sessionId) {
-                if (activeStreamSessionId === sessionId) {
-                    activeStreamAbortController = null;
-                    activeStreamSessionId = null;
-                }
+                sessionController.clearActiveStreamForSession(sessionId);
             },
             setCurrentSessionProvider: function (provider) {
-                currentSessionProvider = provider;
+                sessionController.setCurrentSessionProvider(provider);
             },
             appendMessage: appendMessage,
             clearPromptSkills: clearPromptSkills,
@@ -1382,7 +1208,8 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         function getActiveSlashProviderType() {
             var providerData = settingsController ? settingsController.getProviderData() : null;
             var modelConfig = settingsController ? settingsController.getModelConfig() : null;
-            return currentSessionProvider || (providerData && providerData.current) || (modelConfig && modelConfig.provider) || '';
+            var currentProvider = sessionController ? sessionController.getCurrentSessionProvider() : null;
+            return currentProvider || (providerData && providerData.current) || (modelConfig && modelConfig.provider) || '';
         }
 
         function getProviderQuery(providerType) {
