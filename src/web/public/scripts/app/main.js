@@ -1,3 +1,6 @@
+import { createAttachmentController } from './chat/attachments.js';
+import { bindChatInputEvents } from './chat/input-events.js';
+import { createInputHistoryController } from './chat/input-history.js';
 import { createMessageRenderer } from './chat/message-renderer.js';
 import { createSendMessageController } from './chat/send-message.js';
 import {
@@ -136,16 +139,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         let currentNewestMessageId = 0;
         let isCurrentSessionSyncInFlight = false;
         let isLoadingOlderMessages = false;
-        let inputHistoryItems = [];
-        let inputHistoryCursor = null;
-        let inputHistoryDraft = '';
-        let inputHistoryDraftSkills = [];
-        let inputHistoryDraftProjects = [];
-        let inputHistoryOldestFetchedMessageId = null;
-        let inputHistoryHasMore = false;
-        let inputHistoryFetchPromise = null;
-        let inputHistoryNavigationPromise = null;
-        let inputHistoryNavigationVersion = 0;
         let skillPickerOpen = false;
         const GITHUB_LATEST_RELEASE_URL = 'https://github.com/1935417243/AnyBot/releases/latest';
         let skillPickerQuery = '';
@@ -387,26 +380,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             }
         }
 
-        function getFileTypeClass(name) {
-            var ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
-            if (['.doc', '.docx', '.txt', '.rtf'].includes(ext)) return 'file-type-doc';
-            if (['.xls', '.xlsx', '.csv'].includes(ext)) return 'file-type-sheet';
-            if (ext === '.pdf') return 'file-type-pdf';
-            if (['.js', '.ts', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.html', '.css', '.json', '.xml', '.yaml', '.yml', '.sh', '.sql'].includes(ext)) return 'file-type-code';
-            return 'file-type-other';
-        }
-
-        function getFileExt(name) {
-            var ext = (name.match(/\.[^.]+$/) || [''])[0].replace('.', '').toUpperCase();
-            return ext.slice(0, 4) || 'FILE';
-        }
-
-        function formatSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        }
-
         function updateSendBtnState() {
             var isRunning = !!isTyping;
             sendBtn.classList.toggle('is-stop', isRunning);
@@ -429,99 +402,61 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
         }
 
-        function getOldestMessageId(messages) {
-            return (messages || []).reduce(function (oldest, message) {
-                var id = Number(message && message.id || 0);
-                if (!id) return oldest;
-                return oldest === null || id < oldest ? id : oldest;
-            }, null);
-        }
+        const attachmentController = createAttachmentController({
+            attachmentPreview: attachmentPreview,
+            imageExts: IMAGE_EXTS,
+            getPendingAttachments: function () {
+                return pendingAttachments;
+            },
+            showError: showError,
+            updateSendBtnState: updateSendBtnState,
+        });
+
+        const inputHistoryController = createInputHistoryController({
+            inputEl: inputEl,
+            pageSize: SESSION_MESSAGE_PAGE_SIZE,
+            applyDraft: applyChatInputDraft,
+            getCurrentSessionId: function () {
+                return currentSessionId;
+            },
+            getOldestRenderedMessageId: getOldestRenderedMessageId,
+            getPromptSelection: function () {
+                return {
+                    skills: promptSkills,
+                    projects: promptProjects,
+                };
+            },
+            isSelectionOnlyFallback: isSelectionOnlyFallback,
+            normalizeMessageProjects: normalizeMessageProjects,
+            normalizeMessageSkills: normalizeMessageSkills,
+            parseMessageMetadata: parseMessageMetadata,
+        });
 
         function resetInputHistoryNavigation() {
-            inputHistoryCursor = null;
-            inputHistoryDraft = '';
-            inputHistoryDraftSkills = [];
-            inputHistoryDraftProjects = [];
-            inputHistoryNavigationPromise = null;
-            inputHistoryNavigationVersion += 1;
-        }
-
-        function getHistoryVisibleContent(content, skills, projects) {
-            var value = String(content || '').trim();
-            return isSelectionOnlyFallback(value, skills, projects) ? '' : value;
-        }
-
-        function createInputHistoryItem(message) {
-            if (!message || message.role !== 'user') return null;
-            var meta = parseMessageMetadata(message.metadata);
-            var skills = normalizeMessageSkills(meta.skills);
-            var projects = normalizeMessageProjects(meta.projects);
-            var content = getHistoryVisibleContent(message.content, skills, projects);
-            if ((!content && skills.length === 0 && projects.length === 0) || (content === '[附件]' && skills.length === 0 && projects.length === 0)) return null;
-            return {
-                id: Number(message.id || 0) || null,
-                content: content,
-                skills: skills,
-                projects: projects,
-                contentTruncated: !!message.contentTruncated,
-            };
-        }
-
-        function mergeInputHistoryMessages(messages, placement) {
-            var seenIds = new Set(inputHistoryItems
-                .map(function (item) { return item.id; })
-                .filter(function (id) { return id !== null; }));
-            var nextItems = [];
-            (messages || []).forEach(function (message) {
-                var item = createInputHistoryItem(message);
-                if (!item) return;
-                if (item.id !== null && seenIds.has(item.id)) return;
-                if (item.id !== null) seenIds.add(item.id);
-                nextItems.push(item);
-            });
-            if (nextItems.length === 0) return 0;
-
-            if (placement === 'prepend') {
-                inputHistoryItems = nextItems.concat(inputHistoryItems);
-                if (inputHistoryCursor !== null) inputHistoryCursor += nextItems.length;
-            } else {
-                inputHistoryItems = inputHistoryItems.concat(nextItems);
-            }
-            return nextItems.length;
+            return inputHistoryController.resetNavigation();
         }
 
         function resetInputHistoryFromMessages(messages, hasMoreMessages) {
-            inputHistoryItems = [];
-            inputHistoryOldestFetchedMessageId = getOldestMessageId(messages);
-            inputHistoryHasMore = !!hasMoreMessages;
-            resetInputHistoryNavigation();
-            mergeInputHistoryMessages(messages, 'append');
+            return inputHistoryController.resetFromMessages(messages, hasMoreMessages);
         }
 
         function prependInputHistoryMessages(messages, hasMoreMessages) {
-            var addedCount = mergeInputHistoryMessages(messages, 'prepend');
-            var oldestId = getOldestMessageId(messages);
-            if (oldestId !== null) inputHistoryOldestFetchedMessageId = oldestId;
-            inputHistoryHasMore = !!hasMoreMessages;
-            return addedCount;
+            return inputHistoryController.prependMessages(messages, hasMoreMessages);
         }
 
         function rememberSentUserMessage(text, skills, projects) {
-            var content = String(text || '').trim();
-            var itemSkills = normalizeMessageSkills(skills);
-            var itemProjects = normalizeMessageProjects(projects);
-            if (!content && itemSkills.length === 0 && itemProjects.length === 0) return;
-            inputHistoryItems.push({
-                id: null,
-                content: content,
-                skills: itemSkills,
-                projects: itemProjects,
-                contentTruncated: false,
-            });
-            resetInputHistoryNavigation();
+            return inputHistoryController.rememberSentUserMessage(text, skills, projects);
         }
 
-        function setChatInputDraft(value, skills, projects) {
+        function shouldHandleInputHistoryKey(e, direction) {
+            return inputHistoryController.shouldHandleKey(e, direction);
+        }
+
+        function navigateInputHistory(direction) {
+            return inputHistoryController.navigate(direction);
+        }
+
+        function applyChatInputDraft(value, skills, projects) {
             inputEl.value = value;
             promptSkills = normalizeMessageSkills(skills);
             promptProjects = normalizeMessageProjects(projects);
@@ -535,126 +470,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 var end = inputEl.value.length;
                 inputEl.setSelectionRange(end, end);
             }
-        }
-
-        function isInputCaretOnFirstLine() {
-            if (typeof inputEl.selectionStart !== 'number' || typeof inputEl.selectionEnd !== 'number') return true;
-            if (inputEl.selectionStart !== inputEl.selectionEnd) return false;
-            return inputEl.value.slice(0, inputEl.selectionStart).indexOf('\n') === -1;
-        }
-
-        function isInputCaretOnLastLine() {
-            if (typeof inputEl.selectionStart !== 'number' || typeof inputEl.selectionEnd !== 'number') return true;
-            if (inputEl.selectionStart !== inputEl.selectionEnd) return false;
-            return inputEl.value.slice(inputEl.selectionEnd).indexOf('\n') === -1;
-        }
-
-        function shouldHandleInputHistoryKey(e, direction) {
-            if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return false;
-            if (direction < 0) return isInputCaretOnFirstLine();
-            return inputHistoryCursor !== null && isInputCaretOnLastLine();
-        }
-
-        async function fetchOlderInputHistoryPage() {
-            if (!currentSessionId || !inputHistoryHasMore) return 0;
-            if (inputHistoryFetchPromise) return inputHistoryFetchPromise;
-
-            inputHistoryFetchPromise = (async function () {
-                var addedTotal = 0;
-                while (currentSessionId && inputHistoryHasMore && addedTotal === 0) {
-                    var beforeId = inputHistoryOldestFetchedMessageId || getOldestRenderedMessageId();
-                    if (!beforeId) break;
-                    var requestSessionId = currentSessionId;
-                    var res = await fetch('/api/sessions/' + requestSessionId + '/messages?before=' + encodeURIComponent(beforeId) + '&limit=' + SESSION_MESSAGE_PAGE_SIZE);
-                    if (!res.ok) throw new Error('加载历史输入失败');
-                    var data = await res.json();
-                    if (currentSessionId !== requestSessionId) return addedTotal;
-                    if (!data.messages || data.messages.length === 0) {
-                        inputHistoryHasMore = false;
-                        break;
-                    }
-                    addedTotal += prependInputHistoryMessages(data.messages, data.hasMoreMessages);
-                }
-                return addedTotal;
-            })().finally(function () {
-                inputHistoryFetchPromise = null;
-            });
-
-            return inputHistoryFetchPromise;
-        }
-
-        async function getInputHistoryItemContent(item) {
-            if (!item || !item.contentTruncated || !item.id || !currentSessionId) {
-                return item ? item.content : '';
-            }
-            try {
-                var requestSessionId = currentSessionId;
-                var res = await fetch('/api/sessions/' + requestSessionId + '/messages/' + encodeURIComponent(item.id) + '/content');
-                if (!res.ok) return item.content;
-                var data = await res.json();
-                if (currentSessionId !== requestSessionId || typeof data.content !== 'string') return item.content;
-                item.content = getHistoryVisibleContent(data.content, item.skills, item.projects);
-                item.contentTruncated = false;
-            } catch (_) {}
-            return item.content;
-        }
-
-        async function applyInputHistoryIndex(index, navigationVersion) {
-            var item = inputHistoryItems[index];
-            if (!item) return false;
-            var content = await getInputHistoryItemContent(item);
-            if (navigationVersion !== inputHistoryNavigationVersion) return false;
-            inputHistoryCursor = index;
-            setChatInputDraft(content, item.skills, item.projects);
-            return true;
-        }
-
-        async function navigateInputHistory(direction) {
-            if (inputHistoryNavigationPromise) return;
-            var navigationVersion = inputHistoryNavigationVersion;
-            inputHistoryNavigationPromise = (async function () {
-                if (!currentSessionId) return;
-
-                if (direction < 0) {
-                    if (inputHistoryCursor === null) {
-                        inputHistoryDraft = inputEl.value;
-                        inputHistoryDraftSkills = promptSkills.slice();
-                        inputHistoryDraftProjects = promptProjects.slice();
-                    }
-                    if (inputHistoryItems.length === 0) await fetchOlderInputHistoryPage();
-
-                    var targetIndex = -1;
-                    if (inputHistoryCursor === null) {
-                        targetIndex = inputHistoryItems.length - 1;
-                    } else if (inputHistoryCursor > 0) {
-                        targetIndex = inputHistoryCursor - 1;
-                    } else {
-                        var previousIndex = inputHistoryCursor;
-                        var addedCount = await fetchOlderInputHistoryPage();
-                        targetIndex = addedCount > 0 ? previousIndex + addedCount - 1 : 0;
-                    }
-
-                    if (targetIndex >= 0) await applyInputHistoryIndex(targetIndex, navigationVersion);
-                    return;
-                }
-
-                if (inputHistoryCursor === null) return;
-                if (inputHistoryCursor < inputHistoryItems.length - 1) {
-                    await applyInputHistoryIndex(inputHistoryCursor + 1, navigationVersion);
-                    return;
-                }
-
-                if (navigationVersion !== inputHistoryNavigationVersion) return;
-                inputHistoryCursor = null;
-                setChatInputDraft(inputHistoryDraft, inputHistoryDraftSkills, inputHistoryDraftProjects);
-                inputHistoryDraft = '';
-                inputHistoryDraftSkills = [];
-                inputHistoryDraftProjects = [];
-            })().catch(function (e) {
-                console.warn('Failed to navigate input history:', e);
-            }).finally(function () {
-                inputHistoryNavigationPromise = null;
-            });
         }
 
         function getActiveSkillTrigger() {
@@ -1158,134 +973,40 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         }
 
         function renderAttachmentPreview() {
-            if (pendingAttachments.length === 0) {
-                attachmentPreview.style.display = 'none';
-                attachmentPreview.innerHTML = '';
-                return;
-            }
-            attachmentPreview.style.display = 'flex';
-            attachmentPreview.innerHTML = '';
-            pendingAttachments.forEach(function (att, idx) {
-                var item = document.createElement('div');
-                item.className = 'attachment-item' + (att.uploading ? ' uploading' : '');
-
-                if (att.isImage && att.localUrl) {
-                    var thumb = document.createElement('img');
-                    thumb.className = 'attachment-item-thumb';
-                    thumb.src = att.localUrl;
-                    thumb.alt = att.name;
-                    item.appendChild(thumb);
-                } else {
-                    var icon = document.createElement('div');
-                    icon.className = 'attachment-item-icon ' + getFileTypeClass(att.name);
-                    icon.textContent = getFileExt(att.name);
-                    item.appendChild(icon);
-                }
-
-                var info = document.createElement('div');
-                info.className = 'attachment-item-info';
-                info.innerHTML = '<div class="attachment-item-name">' + escapeHtml(att.name) + '</div>' +
-                    '<div class="attachment-item-size">' + formatSize(att.size) + '</div>';
-                item.appendChild(info);
-
-                if (!att.uploading) {
-                    var removeBtn = document.createElement('button');
-                    removeBtn.className = 'attachment-item-remove';
-                    removeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
-                    removeBtn.addEventListener('click', function () {
-                        pendingAttachments.splice(idx, 1);
-                        renderAttachmentPreview();
-                        updateSendBtnState();
-                    });
-                    item.appendChild(removeBtn);
-                }
-
-                attachmentPreview.appendChild(item);
-            });
-        }
-
-        async function uploadFile(file) {
-            var isImage = IMAGE_EXTS.some(function (ext) {
-                return file.name.toLowerCase().endsWith(ext);
-            });
-            var localUrl = isImage ? URL.createObjectURL(file) : null;
-            var tempAtt = { name: file.name, size: file.size, isImage: isImage, localUrl: localUrl, uploading: true, path: '' };
-            pendingAttachments.push(tempAtt);
-            renderAttachmentPreview();
-            updateSendBtnState();
-
-            try {
-                var formData = new FormData();
-                formData.append('file', file);
-                var res = await fetch('/api/upload', { method: 'POST', body: formData });
-                if (!res.ok) throw new Error('上传失败');
-                var data = await res.json();
-                tempAtt.path = data.path;
-                tempAtt.uploading = false;
-                renderAttachmentPreview();
-                updateSendBtnState();
-            } catch (e) {
-                var idx = pendingAttachments.indexOf(tempAtt);
-                if (idx !== -1) pendingAttachments.splice(idx, 1);
-                renderAttachmentPreview();
-                updateSendBtnState();
-                showError('文件上传失败: ' + (e.message || '未知错误'));
-            }
+            return attachmentController.renderPreview();
         }
 
         async function uploadFiles(files) {
-            for (var i = 0; i < files.length; i++) {
-                await uploadFile(files[i]);
-            }
+            return attachmentController.uploadFiles(files);
         }
 
-        if (inputWrapper) {
-            inputWrapper.addEventListener('click', function (e) {
-                if (e.target === inputEl) return;
-                if (e.target.closest && e.target.closest('button, input, textarea, [tabindex], .model-switcher')) return;
-                inputEl.focus();
-                var end = inputEl.value.length;
-                if (inputEl.setSelectionRange) inputEl.setSelectionRange(end, end);
-            });
-        }
-
-        inputEl.addEventListener('input', function () {
-            resetInputHistoryNavigation();
-            if (inputEl.value.length > 0) clearPromptSkillDeleteTarget();
-            resizeChatInput();
-            updateSendBtnState();
-            syncSkillPickerFromInput();
+        bindChatInputEvents({
+            attachBtn: attachBtn,
+            cancelCurrentResponse: cancelCurrentResponse,
+            canOpenSkillPickerFromSlash: canOpenSkillPickerFromSlash,
+            chatViewEl: document.getElementById('chat-view'),
+            clearPromptSkillDeleteTarget: clearPromptSkillDeleteTarget,
+            dropOverlay: dropOverlay,
+            fileInput: fileInput,
+            getIsTyping: function () {
+                return isTyping;
+            },
+            handlePromptSkillBackspace: handlePromptSkillBackspace,
+            handleSkillPickerKeydown: handleSkillPickerKeydown,
+            inputEl: inputEl,
+            inputWrapper: inputWrapper,
+            insertSkillSlashTrigger: insertSkillSlashTrigger,
+            navigateInputHistory: navigateInputHistory,
+            resetInputHistoryNavigation: resetInputHistoryNavigation,
+            resizeChatInput: resizeChatInput,
+            sendBtn: sendBtn,
+            sendMessage: sendMessage,
+            shouldHandleInputHistoryKey: shouldHandleInputHistoryKey,
+            syncSkillPickerFromInput: syncSkillPickerFromInput,
+            updateSendBtnState: updateSendBtnState,
+            uploadFiles: uploadFiles,
         });
 
-        inputEl.addEventListener('keydown', function (e) {
-            if (handleSkillPickerKeydown(e)) return;
-            if (handlePromptSkillBackspace(e)) return;
-            if (e.key === '/' && canOpenSkillPickerFromSlash(e)) {
-                e.preventDefault();
-                insertSkillSlashTrigger();
-                return;
-            }
-            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                var direction = e.key === 'ArrowUp' ? -1 : 1;
-                if (shouldHandleInputHistoryKey(e, direction)) {
-                    e.preventDefault();
-                    navigateInputHistory(direction);
-                    return;
-                }
-            }
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (!isTyping && !sendBtn.disabled) sendMessage();
-            }
-        });
-
-        sendBtn.addEventListener('click', function () {
-            if (isTyping) {
-                cancelCurrentResponse();
-                return;
-            }
-            sendMessage();
-        });
         newChatBtn.addEventListener('click', function () {
             createNewChat();
         });
@@ -1295,67 +1016,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         addHistoryChatBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             createNewChat(null, { force: true });
-        });
-
-        // 附件按钮 - 点击触发文件选择
-        attachBtn.addEventListener('click', function () {
-            fileInput.click();
-        });
-
-        fileInput.addEventListener('change', function () {
-            if (this.files && this.files.length > 0) {
-                uploadFiles(this.files);
-            }
-            this.value = ''; // 重置以便重新选择同一文件
-        });
-
-        // 粘贴图片
-        inputEl.addEventListener('paste', function (e) {
-            var items = e.clipboardData && e.clipboardData.items;
-            if (!items) return;
-            var files = [];
-            for (var i = 0; i < items.length; i++) {
-                if (items[i].kind === 'file') {
-                    var file = items[i].getAsFile();
-                    if (file) files.push(file);
-                }
-            }
-            if (files.length > 0) {
-                e.preventDefault();
-                uploadFiles(files);
-            }
-        });
-
-        // 拖拽文件
-        var dragCounter = 0;
-        var chatViewEl = document.getElementById('chat-view');
-
-        chatViewEl.addEventListener('dragenter', function (e) {
-            e.preventDefault();
-            dragCounter++;
-            dropOverlay.style.display = 'flex';
-        });
-
-        chatViewEl.addEventListener('dragleave', function (e) {
-            e.preventDefault();
-            dragCounter--;
-            if (dragCounter <= 0) {
-                dragCounter = 0;
-                dropOverlay.style.display = 'none';
-            }
-        });
-
-        chatViewEl.addEventListener('dragover', function (e) {
-            e.preventDefault();
-        });
-
-        chatViewEl.addEventListener('drop', function (e) {
-            e.preventDefault();
-            dragCounter = 0;
-            dropOverlay.style.display = 'none';
-            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                uploadFiles(e.dataTransfer.files);
-            }
         });
 
         messagesEl.addEventListener('click', function (e) {
