@@ -700,7 +700,7 @@ function getWebChatSelectionFallback(
     parts.push(`使用技能：${skills.map((skill) => skill.name).join("、")}`);
   }
   if (projects.length > 0) {
-    parts.push(`涉及项目：${projects.map((project) => project.name).join("、")}`);
+    parts.push(`额外项目：${projects.map((project) => project.name).join("、")}`);
   }
   return parts.join("\n");
 }
@@ -710,23 +710,33 @@ function prepareWebChatInput(
   attachments: ChatAttachment[] = [],
   skills: ChatPromptSkill[] = [],
   projects: ChatPromptProject[] = [],
+  options: { sessionProjectId?: string | null } = {},
 ) {
   let userText = (content || "").trim();
   const imagePaths: string[] = [];
   const filePaths: ChatAttachment[] = [];
   const skillInfo = normalizeWebChatSkills(skills);
-  const projectInfo = normalizeWebChatProjects(projects);
-
-  if (skillInfo.length > 0) {
-    const skillNames = skillInfo.map((skill) => skill.name).join("、");
-    const skillPrompt = `本轮请使用这些技能：${skillNames}`;
-    userText = userText ? `${skillPrompt}\n\n${userText}` : skillPrompt;
-  }
+  const sessionProjectId = options.sessionProjectId || "";
+  const projectInfo = normalizeWebChatProjects(projects)
+    .filter((project) => project.id !== sessionProjectId);
+  const promptParts: string[] = [];
 
   if (projectInfo.length > 0) {
     const projectList = projectInfo.map((project) => `- ${project.name}: ${project.path}`).join("\n");
-    const projectPrompt = `本轮涉及以下项目。处理文件时必须按项目名使用对应绝对路径：\n${projectList}`;
-    userText = userText ? `${projectPrompt}\n\n${userText}` : projectPrompt;
+    promptParts.push(`本轮额外选择项目。处理文件时必须按项目名使用对应绝对路径：\n\n${projectList}`);
+  }
+
+  if (skillInfo.length > 0) {
+    const skillList = skillInfo.map((skill) => `- ${skill.name}`).join("\n");
+    promptParts.push(`本轮可使用技能：\n${skillList}`);
+  }
+
+  if (userText) {
+    promptParts.push(`任务目标：\n${userText}`);
+  }
+
+  if (promptParts.length > 0) {
+    userText = promptParts.join("\n\n");
   }
 
   for (const att of attachments) {
@@ -1674,7 +1684,9 @@ export function chatRouter(): Router {
     const requestAttachments = Array.isArray(attachments) ? attachments : [];
     const requestSkills = Array.isArray(skills) ? skills : [];
     const requestProjects = Array.isArray(projects) ? projects : [];
-    const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects);
+    const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects, {
+      sessionProjectId: session.projectId,
+    });
     if (!input.userText && requestAttachments.length === 0) {
       res.status(400).json({ error: "消息不能为空" });
       return;
@@ -1758,7 +1770,9 @@ export function chatRouter(): Router {
     const requestAttachments = Array.isArray(attachments) ? attachments : [];
     const requestSkills = Array.isArray(skills) ? skills : [];
     const requestProjects = Array.isArray(projects) ? projects : [];
-    const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects);
+    const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects, {
+      sessionProjectId: session.projectId,
+    });
     if (!input.userText && requestAttachments.length === 0) {
       res.status(400).json({ error: "消息不能为空" });
       return;

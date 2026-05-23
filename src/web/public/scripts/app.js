@@ -730,6 +730,7 @@
             var groups = data && Array.isArray(data.groups) ? data.groups : [];
             var selectedSkillIds = new Set(promptSkills.map(function (skill) { return skill.id; }));
             var selectedProjectIds = new Set(promptProjects.map(function (project) { return project.id; }));
+            if (currentSessionProjectId) selectedProjectIds.add(currentSessionProjectId);
             var pickerItems = [];
 
             groups.forEach(function (group) {
@@ -1021,6 +1022,7 @@
 
         function addPromptProject(project) {
             if (!project || !project.id || !project.name) return;
+            if (currentSessionProjectId && project.id === currentSessionProjectId) return;
             var alreadySelected = promptProjects.some(function (item) {
                 return item.id === project.id;
             });
