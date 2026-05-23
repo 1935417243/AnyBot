@@ -6,6 +6,7 @@ import { createMessageListController } from './chat/message-list-controller.js';
 import { createMessageMetaController } from './chat/message-meta.js';
 import { createSendMessageController } from './chat/send-message.js';
 import { createSessionController } from './chat/session-controller.js';
+import { createSlashItemsStore } from './chat/slash-items-store.js';
 import { createSlashPickerController } from './chat/slash-picker.js';
 import { createChannelsPageController } from './channels/channels-page.js';
 import { createSidebarController } from './sidebar/sidebar-controller.js';
@@ -94,6 +95,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         const settingsUpdateDownloadBtn = document.getElementById('settings-update-download-btn');
         const settingsUpdateRestartBtn = document.getElementById('settings-update-restart-btn');
         let contextUsageController = null;
+        let slashItemsStore = null;
         let slashPickerController = null;
         let messageListController = null;
         let messageMetaController = null;
@@ -257,6 +259,18 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             updateSendBtnState: updateSendBtnState,
         });
 
+        slashItemsStore = createSlashItemsStore({
+            getCurrentSessionProvider: function () {
+                return sessionController ? sessionController.getCurrentSessionProvider() : null;
+            },
+            getModelConfig: function () {
+                return settingsController ? settingsController.getModelConfig() : null;
+            },
+            getProviderData: function () {
+                return settingsController ? settingsController.getProviderData() : null;
+            },
+        });
+
         slashPickerController = createSlashPickerController({
             inputEl: inputEl,
             selectedSkillsEl: selectedSkillsEl,
@@ -269,8 +283,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 return currentView;
             },
             getSlashItemsState: function () {
-                var providerType = getActiveSlashProviderType();
-                return slashItemsDataProvider === providerType ? slashItemsData : null;
+                return slashItemsStore ? slashItemsStore.getState() : null;
             },
             resetInputHistoryNavigation: resetInputHistoryNavigation,
             resizeChatInput: resizeChatInput,
@@ -801,11 +814,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             return CHANNEL_META[type] || {name: type, icon: type.charAt(0).toUpperCase(), iconClass: 'default'};
         }
 
-        var slashItemsData = null;
-        var slashItemsDataProvider = '';
-        var slashItemsDataFetchedAt = 0;
-        var slashItemsDataCache = {};
-        var SLASH_ITEMS_CACHE_TTL = 5 * 1000;
         var currentView = 'chat';
 
         channelsPageController = createChannelsPageController({
@@ -881,57 +889,19 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         });
 
         function getActiveSlashProviderType() {
-            var providerData = settingsController ? settingsController.getProviderData() : null;
-            var modelConfig = settingsController ? settingsController.getModelConfig() : null;
-            var currentProvider = sessionController ? sessionController.getCurrentSessionProvider() : null;
-            return currentProvider || (providerData && providerData.current) || (modelConfig && modelConfig.provider) || '';
+            return slashItemsStore ? slashItemsStore.getActiveProviderType() : '';
         }
 
         function getProviderQuery(providerType) {
-            return providerType ? '?provider=' + encodeURIComponent(providerType) : '';
-        }
-
-        function getSlashItemsCacheKey(providerType) {
-            return providerType || '__current__';
+            return slashItemsStore ? slashItemsStore.getProviderQuery(providerType) : (providerType ? '?provider=' + encodeURIComponent(providerType) : '');
         }
 
         function invalidateSlashItemsData(providerType) {
-            if (providerType) {
-                delete slashItemsDataCache[getSlashItemsCacheKey(providerType)];
-                if (slashItemsDataProvider !== providerType) return;
-            } else {
-                slashItemsDataCache = {};
-            }
-            slashItemsData = null;
-            slashItemsDataProvider = '';
-            slashItemsDataFetchedAt = 0;
+            if (slashItemsStore) slashItemsStore.invalidate(providerType);
         }
 
         async function fetchSlashItemsData(force) {
-            var providerType = getActiveSlashProviderType();
-            var cacheKey = getSlashItemsCacheKey(providerType);
-            var cached = slashItemsDataCache[cacheKey];
-            if (!force && cached && Date.now() - cached.fetchedAt < SLASH_ITEMS_CACHE_TTL) {
-                slashItemsData = cached.data;
-                slashItemsDataProvider = providerType;
-                slashItemsDataFetchedAt = cached.fetchedAt;
-                return;
-            }
-            try {
-                var res = await fetch('/api/slash/items' + getProviderQuery(providerType));
-                slashItemsData = await res.json();
-                slashItemsDataProvider = providerType;
-                slashItemsDataFetchedAt = Date.now();
-                slashItemsDataCache[cacheKey] = {
-                    data: slashItemsData,
-                    fetchedAt: slashItemsDataFetchedAt,
-                };
-            } catch (e) {
-                console.error('Failed to fetch slash items:', e);
-                slashItemsData = { groups: [] };
-                slashItemsDataProvider = providerType;
-                slashItemsDataFetchedAt = 0;
-            }
+            if (slashItemsStore) return slashItemsStore.fetchItems(force);
         }
 
         document.addEventListener('keydown', function (e) {
