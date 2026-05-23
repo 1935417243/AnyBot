@@ -1,4 +1,5 @@
 import { createAttachmentController } from './chat/attachments.js';
+import { createContextUsageController, formatTokenCount } from './chat/context-usage.js';
 import { bindChatInputEvents } from './chat/input-events.js';
 import { createInputHistoryController } from './chat/input-history.js';
 import { createMessageListController } from './chat/message-list-controller.js';
@@ -92,13 +93,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         const settingsUpdateCheckBtn = document.getElementById('settings-update-check-btn');
         const settingsUpdateDownloadBtn = document.getElementById('settings-update-download-btn');
         const settingsUpdateRestartBtn = document.getElementById('settings-update-restart-btn');
-        const contextUsageEl = document.getElementById('context-usage');
-        const contextUsageRingEl = document.getElementById('context-usage-ring');
-        const contextUsagePercentEl = document.getElementById('context-usage-percent');
-        const contextUsageTokensEl = document.getElementById('context-usage-tokens');
-        const contextUsageProviderEl = document.getElementById('context-usage-provider');
-
-        let latestContextUsage = null;
+        let contextUsageController = null;
         let slashPickerController = null;
         let messageListController = null;
         let messageMetaController = null;
@@ -138,6 +133,8 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         const SEND_BUTTON_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M7.5 2.5L12 7l-4.5 4.5" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         const STOP_BUTTON_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.4" fill="white"/></svg>';
 
+        contextUsageController = createContextUsageController();
+
         settingsController = createSettingsController({
             addProjectBtn: addProjectBtn,
             createNewChat: createNewChat,
@@ -153,7 +150,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 return currentView;
             },
             getLatestContextUsage: function () {
-                return latestContextUsage;
+                return contextUsageController ? contextUsageController.getLatestUsage() : null;
             },
             getSidebarController: function () {
                 return sidebarController;
@@ -533,53 +530,8 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             return messageListController ? messageListController.parseMessageMetadata(raw) : {};
         }
 
-        function formatTokenCount(value) {
-            var n = Number(value || 0);
-            if (!Number.isFinite(n) || n <= 0) return '0';
-            if (n >= 1000000) return (n / 1000000).toFixed(n >= 10000000 ? 0 : 1).replace(/\.0$/, '') + 'm';
-            if (n >= 1000) return Math.round(n / 1000) + 'k';
-            return String(Math.round(n));
-        }
-
-        function contextUsageColor(percent) {
-            if (percent >= 90) return '#ef4444';
-            if (percent >= 70) return '#f59e0b';
-            return '#9ca3af';
-        }
-
         function updateContextUsage(usage) {
-            latestContextUsage = usage || {
-                usedTokens: 0,
-                maxTokens: 0,
-                usedPercentage: 0,
-                remainingPercentage: 100,
-                source: '',
-            };
-            if (!contextUsageEl || !contextUsageRingEl || !latestContextUsage) return;
-
-            var usedPercent = Math.max(0, Math.min(100, Number(latestContextUsage.usedPercentage || 0)));
-            var remainingPercent = Math.max(0, Math.round((100 - usedPercent) * 10) / 10);
-            var usedTokens = Number(latestContextUsage.usedTokens || 0);
-            var maxTokens = Number(latestContextUsage.maxTokens || 0);
-            var color = contextUsageColor(usedPercent);
-            var degrees = usedPercent * 3.6;
-
-            contextUsageEl.classList.toggle('has-data', usedTokens > 0 && maxTokens > 0);
-            contextUsageRingEl.style.background =
-                'radial-gradient(circle at center, var(--input-bg) 48%, transparent 50%), ' +
-                'conic-gradient(' + color + ' ' + degrees + 'deg, var(--ring-track) ' + degrees + 'deg)';
-
-            if (contextUsagePercentEl) {
-                contextUsagePercentEl.textContent =
-                    Math.round(usedPercent) + '% 已用（剩余 ' + Math.round(remainingPercent) + '%）';
-            }
-            if (contextUsageTokensEl) {
-                contextUsageTokensEl.textContent =
-                    '已用 ' + formatTokenCount(usedTokens) + ' token，共 ' + formatTokenCount(maxTokens);
-            }
-            if (contextUsageProviderEl) {
-                contextUsageProviderEl.textContent = '';
-            }
+            if (contextUsageController) contextUsageController.updateUsage(usage);
         }
 
         function setupSidebarTooltips() {
