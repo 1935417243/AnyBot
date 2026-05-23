@@ -3,10 +3,8 @@ import { bindChatInputEvents } from './chat/input-events.js';
 import { createInputHistoryController } from './chat/input-history.js';
 import { createMessageRenderer } from './chat/message-renderer.js';
 import { createSendMessageController } from './chat/send-message.js';
+import { createSlashPickerController } from './chat/slash-picker.js';
 import {
-    getCommandIconHtml,
-    getProjectIconHtml,
-    getSkillIconHtml,
     isSelectionOnlyFallback,
     normalizeMessageProjects,
     normalizeMessageSkills,
@@ -139,20 +137,8 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         let currentNewestMessageId = 0;
         let isCurrentSessionSyncInFlight = false;
         let isLoadingOlderMessages = false;
-        let skillPickerOpen = false;
         const GITHUB_LATEST_RELEASE_URL = 'https://github.com/1935417243/AnyBot/releases/latest';
-        let skillPickerQuery = '';
-        let skillPickerTokenStart = null;
-        let skillPickerTokenEnd = null;
-        let skillPickerItems = [];
-        let skillPickerFilteredItems = [];
-        let skillPickerActiveIndex = 0;
-        let skillPickerVisualActive = false;
-        let isSkillPickerOpening = false;
-        let promptSkills = [];
-        let promptSkillDeleteIndex = null;
-        let promptProjects = [];
-        let promptProjectDeleteIndex = null;
+        let slashPickerController = null;
         let isProjectsCollapsed = localStorage.getItem('projectsCollapsed') === 'true';
         let isHistoryCollapsed = localStorage.getItem('historyCollapsed') === 'true';
         let expandedProjectIds = readStoredSet('expandedProjectIds');
@@ -382,6 +368,9 @@ window.AnyBotMarkdown = { render: renderMarkdown };
 
         function updateSendBtnState() {
             var isRunning = !!isTyping;
+            var promptSelection = slashPickerController
+                ? slashPickerController.getSelection()
+                : { skills: [], projects: [] };
             sendBtn.classList.toggle('is-stop', isRunning);
             sendBtn.innerHTML = isRunning ? STOP_BUTTON_ICON : SEND_BUTTON_ICON;
             sendBtn.title = isRunning ? (isCancellingResponse ? '正在中断' : '中断') : '发送';
@@ -391,8 +380,8 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 : (
                     inputEl.value.trim() === '' &&
                     pendingAttachments.length === 0 &&
-                    promptSkills.length === 0 &&
-                    promptProjects.length === 0
+                    promptSelection.skills.length === 0 &&
+                    promptSelection.projects.length === 0
                 );
         }
 
@@ -412,6 +401,27 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             updateSendBtnState: updateSendBtnState,
         });
 
+        slashPickerController = createSlashPickerController({
+            inputEl: inputEl,
+            selectedSkillsEl: selectedSkillsEl,
+            skillPickerEl: skillPickerEl,
+            fetchSlashItemsData: fetchSlashItemsData,
+            getCurrentSessionProjectId: function () {
+                return currentSessionProjectId;
+            },
+            getCurrentView: function () {
+                return currentView;
+            },
+            getSlashItemsState: function () {
+                var providerType = getActiveSlashProviderType();
+                return slashItemsDataProvider === providerType ? slashItemsData : null;
+            },
+            resetInputHistoryNavigation: resetInputHistoryNavigation,
+            resizeChatInput: resizeChatInput,
+            showError: showError,
+            updateSendBtnState: updateSendBtnState,
+        });
+
         const inputHistoryController = createInputHistoryController({
             inputEl: inputEl,
             pageSize: SESSION_MESSAGE_PAGE_SIZE,
@@ -421,10 +431,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             },
             getOldestRenderedMessageId: getOldestRenderedMessageId,
             getPromptSelection: function () {
-                return {
-                    skills: promptSkills,
-                    projects: promptProjects,
-                };
+                return slashPickerController.getSelection();
             },
             isSelectionOnlyFallback: isSelectionOnlyFallback,
             normalizeMessageProjects: normalizeMessageProjects,
@@ -458,518 +465,43 @@ window.AnyBotMarkdown = { render: renderMarkdown };
 
         function applyChatInputDraft(value, skills, projects) {
             inputEl.value = value;
-            promptSkills = normalizeMessageSkills(skills);
-            promptProjects = normalizeMessageProjects(projects);
-            promptSkillDeleteIndex = null;
-            promptProjectDeleteIndex = null;
-            renderPromptSkills();
-            resizeChatInput();
-            updateSendBtnState();
-            inputEl.focus();
-            if (inputEl.setSelectionRange) {
-                var end = inputEl.value.length;
-                inputEl.setSelectionRange(end, end);
-            }
-        }
-
-        function getActiveSkillTrigger() {
-            if (typeof inputEl.selectionStart !== 'number' || typeof inputEl.selectionEnd !== 'number') return null;
-            if (inputEl.selectionStart !== inputEl.selectionEnd) return null;
-            var caret = inputEl.selectionStart;
-            var before = inputEl.value.slice(0, caret);
-            var match = before.match(/(^|\s)\/([^\s/]*)$/);
-            if (!match) return null;
-            return {
-                start: before.length - match[2].length - 1,
-                end: caret,
-                query: match[2],
-            };
-        }
-
-        function isValidSkillTrigger(trigger) {
-            if (!trigger) return false;
-            return isNaturalLanguageSkillTriggerContext(inputEl.value.slice(0, trigger.start));
+            slashPickerController.setSelection(skills, projects);
         }
 
         function canOpenSkillPickerFromSlash(e) {
-            if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return false;
-            if (typeof currentView !== 'undefined' && currentView !== 'chat') return false;
-            if (typeof inputEl.selectionStart !== 'number' || inputEl.selectionStart !== inputEl.selectionEnd) return false;
-            var before = inputEl.value.slice(0, inputEl.selectionStart);
-            return isNaturalLanguageSkillTriggerContext(before);
-        }
-
-        function isNaturalLanguageSkillTriggerContext(before) {
-            if (before === '') return true;
-            if (!/\s$/.test(before)) return false;
-
-            var trimmed = before.trim();
-            if (!trimmed) return true;
-            if (/[`"'([{<>=+*|&;]$/.test(trimmed)) return false;
-            if (/(^|[\s/\\])[\w.-]+\/[\w./-]*$/.test(trimmed)) return false;
-            if (/^(cd|ls|cat|open|node|npm|pnpm|yarn|git|curl|grep|rg|python|python3|pip|uv|docker|kubectl|ssh|scp)\b/i.test(trimmed)) {
-                return false;
-            }
-
-            return /[\u4e00-\u9fff]/.test(trimmed) ||
-                /[.!?,，。！？；：)]$/.test(trimmed) ||
-                trimmed.split(/\s+/).length >= 2;
-        }
-
-        function getSlashPickerType(item) {
-            if (!item) return 'skill';
-            if (item.type === 'project') return 'project';
-            if (item.type === 'provider-command') return 'provider-command';
-            return 'skill';
-        }
-
-        function getSkillPickerEnabledItems() {
-            var providerType = getActiveSlashProviderType();
-            var data = slashItemsDataProvider === providerType ? slashItemsData : null;
-            var groups = data && Array.isArray(data.groups) ? data.groups : [];
-            var selectedSkillIds = new Set(promptSkills.map(function (skill) { return skill.id; }));
-            var selectedProjectIds = new Set(promptProjects.map(function (project) { return project.id; }));
-            if (currentSessionProjectId) selectedProjectIds.add(currentSessionProjectId);
-            var pickerItems = [];
-
-            groups.forEach(function (group) {
-                var groupItems = Array.isArray(group.items) ? group.items : [];
-                groupItems.forEach(function (item) {
-                    if (!item || !item.id || !item.name) return;
-                    var pickerType = getSlashPickerType(item);
-                    if (pickerType === 'skill' && (!item.enabled || selectedSkillIds.has(item.id))) return;
-                    if (pickerType === 'project' && (!item.path || selectedProjectIds.has(item.id))) return;
-                    pickerItems.push(Object.assign({}, item, {
-                        pickerType: pickerType,
-                        groupTitle: group.title || (pickerType === 'project' ? '项目' : '技能'),
-                    }));
-                });
-            });
-
-            return pickerItems;
-        }
-
-        function filterSkillPickerItems() {
-            var term = skillPickerQuery.toLowerCase().trim();
-            var filtered = skillPickerItems;
-            if (term) {
-                filtered = filtered.filter(function (item) {
-                    if (item.pickerType === 'project') return matchesPickerTerm([item.name, item.path], term);
-                    return matchesPickerTerm([item.name, item.description, item.source], term);
-                });
-            }
-            skillPickerFilteredItems = filtered;
-            if (skillPickerActiveIndex >= skillPickerFilteredItems.length) {
-                skillPickerActiveIndex = Math.max(0, skillPickerFilteredItems.length - 1);
-            }
-        }
-
-        function matchesPickerTerm(values, term) {
-            return values.some(function (value) {
-                var normalized = String(value || '').toLowerCase();
-                if (!normalized) return false;
-                if (normalized.startsWith(term)) return true;
-                return normalized
-                    .split(/[^a-z0-9\u4e00-\u9fff]+/)
-                    .filter(Boolean)
-                    .some(function (part) { return part.startsWith(term); });
-            });
+            return slashPickerController.canOpenFromSlash(e);
         }
 
         function closeSkillPicker(options) {
-            options = options || {};
-            if (!skillPickerEl) return;
-            if (options.removeTrigger && skillPickerTokenStart !== null && skillPickerTokenEnd !== null) {
-                var value = inputEl.value;
-                var nextValue = value.slice(0, skillPickerTokenStart) + value.slice(skillPickerTokenEnd);
-                inputEl.value = nextValue;
-                inputEl.setSelectionRange(skillPickerTokenStart, skillPickerTokenStart);
-                resizeChatInput();
-                updateSendBtnState();
-            }
-            skillPickerOpen = false;
-            skillPickerQuery = '';
-            skillPickerTokenStart = null;
-            skillPickerTokenEnd = null;
-            skillPickerFilteredItems = [];
-            skillPickerActiveIndex = 0;
-            skillPickerVisualActive = false;
-            skillPickerEl.hidden = true;
-            skillPickerEl.innerHTML = '';
+            return slashPickerController.close(options);
         }
 
         function syncSkillPickerFromInput() {
-            var trigger = getActiveSkillTrigger();
-            if (!isValidSkillTrigger(trigger)) {
-                if (skillPickerOpen) closeSkillPicker();
-                return;
-            }
-            if (!skillPickerOpen) {
-                openSkillPicker(trigger);
-                return;
-            }
-            updateSkillPickerFromTrigger(trigger);
-        }
-
-        function updateSkillPickerFromTrigger(trigger) {
-            if (!skillPickerOpen) return;
-            if (!isValidSkillTrigger(trigger)) {
-                closeSkillPicker();
-                return;
-            }
-            skillPickerTokenStart = trigger.start;
-            skillPickerTokenEnd = trigger.end;
-            skillPickerQuery = trigger.query;
-            skillPickerActiveIndex = 0;
-            skillPickerVisualActive = false;
-            filterSkillPickerItems();
-            renderSkillPicker();
-        }
-
-        function moveSkillPickerActive(delta) {
-            if (skillPickerFilteredItems.length === 0) return;
-            var count = skillPickerFilteredItems.length;
-            if (!skillPickerVisualActive) {
-                skillPickerActiveIndex = delta > 0 ? 0 : count - 1;
-            } else {
-                skillPickerActiveIndex = (skillPickerActiveIndex + delta + count) % count;
-            }
-            skillPickerVisualActive = true;
-            updateSkillPickerActiveItem(true);
-        }
-
-        function setSkillPickerActiveIndex(index) {
-            if (index < 0 || index >= skillPickerFilteredItems.length) return;
-            if (skillPickerActiveIndex === index && skillPickerVisualActive) return;
-            skillPickerActiveIndex = index;
-            skillPickerVisualActive = true;
-            updateSkillPickerActiveItem(false);
-        }
-
-        function updateSkillPickerActiveItem(scrollIntoView) {
-            if (!skillPickerEl) return;
-            var activeItem = null;
-            Array.prototype.forEach.call(skillPickerEl.querySelectorAll('.skill-picker-item'), function (item) {
-                var isActive = skillPickerVisualActive && Number(item.dataset.index) === skillPickerActiveIndex;
-                item.classList.toggle('active', isActive);
-                item.setAttribute('aria-selected', isActive ? 'true' : 'false');
-                if (isActive) activeItem = item;
-            });
-            if (scrollIntoView && activeItem) activeItem.scrollIntoView({ block: 'nearest' });
+            return slashPickerController.syncFromInput();
         }
 
         function renderPromptSkills() {
-            if (!selectedSkillsEl) return;
-            selectedSkillsEl.innerHTML = '';
-            selectedSkillsEl.hidden = promptSkills.length === 0 && promptProjects.length === 0;
-            promptSkills.forEach(function (skill, index) {
-                var chip = document.createElement('button');
-                chip.className = 'selected-skill-chip' + (index === promptSkillDeleteIndex ? ' pending-delete' : '');
-                chip.type = 'button';
-                chip.title = '移除技能 ' + skill.name;
-                chip.innerHTML =
-                    getSkillIconHtml('selected-skill-icon') +
-                    '<span class="selected-skill-name">' + escapeHtml(skill.name) + '</span>' +
-                    '<span class="selected-skill-remove" aria-hidden="true">×</span>';
-                chip.addEventListener('click', function () {
-                    promptSkillDeleteIndex = null;
-                    promptSkills.splice(index, 1);
-                    resetInputHistoryNavigation();
-                    renderPromptSkills();
-                    updateSendBtnState();
-                    inputEl.focus();
-                });
-                selectedSkillsEl.appendChild(chip);
-            });
-            promptProjects.forEach(function (project, index) {
-                var chip = document.createElement('button');
-                chip.className = 'selected-skill-chip selected-project-chip' + (index === promptProjectDeleteIndex ? ' pending-delete' : '');
-                chip.type = 'button';
-                chip.title = project.path ? ('移除项目 ' + project.name + ' · ' + project.path) : ('移除项目 ' + project.name);
-                chip.innerHTML =
-                    getProjectIconHtml('selected-skill-icon') +
-                    '<span class="selected-skill-name">' + escapeHtml(project.name) + '</span>' +
-                    '<span class="selected-skill-remove" aria-hidden="true">×</span>';
-                chip.addEventListener('click', function () {
-                    promptProjectDeleteIndex = null;
-                    promptProjects.splice(index, 1);
-                    resetInputHistoryNavigation();
-                    renderPromptSkills();
-                    updateSendBtnState();
-                    inputEl.focus();
-                });
-                selectedSkillsEl.appendChild(chip);
-            });
-        }
-
-        function addPromptSkill(skill) {
-            if (!skill || !skill.id || !skill.name) return;
-            var alreadySelected = promptSkills.some(function (item) {
-                return item.id === skill.id;
-            });
-            if (alreadySelected) return;
-            promptSkillDeleteIndex = null;
-            promptProjectDeleteIndex = null;
-            resetInputHistoryNavigation();
-            promptSkills.push({
-                id: skill.id,
-                name: skill.name,
-            });
-            renderPromptSkills();
-            updateSendBtnState();
-        }
-
-        function addPromptProject(project) {
-            if (!project || !project.id || !project.name) return;
-            if (currentSessionProjectId && project.id === currentSessionProjectId) return;
-            var alreadySelected = promptProjects.some(function (item) {
-                return item.id === project.id;
-            });
-            if (alreadySelected) return;
-            promptSkillDeleteIndex = null;
-            promptProjectDeleteIndex = null;
-            resetInputHistoryNavigation();
-            promptProjects.push({
-                id: project.id,
-                name: project.name,
-                path: project.path || '',
-            });
-            renderPromptSkills();
-            updateSendBtnState();
+            return slashPickerController.renderPromptSelections();
         }
 
         function clearPromptSkills() {
-            promptSkills = [];
-            promptProjects = [];
-            promptSkillDeleteIndex = null;
-            promptProjectDeleteIndex = null;
-            renderPromptSkills();
-            updateSendBtnState();
+            return slashPickerController.clearPromptSelections();
         }
 
         function clearPromptSkillDeleteTarget() {
-            if (promptSkillDeleteIndex === null && promptProjectDeleteIndex === null) return;
-            promptSkillDeleteIndex = null;
-            promptProjectDeleteIndex = null;
-            renderPromptSkills();
+            return slashPickerController.clearDeleteTarget();
         }
 
         function handlePromptSkillBackspace(e) {
-            if (e.key !== 'Backspace') {
-                if (e.key.length === 1 || e.key === 'Enter' || e.key === 'Escape') {
-                    clearPromptSkillDeleteTarget();
-                }
-                return false;
-            }
-            if (skillPickerOpen) return false;
-            if (promptSkills.length === 0 && promptProjects.length === 0) return false;
-            if (typeof inputEl.selectionStart !== 'number' || inputEl.selectionStart !== inputEl.selectionEnd) return false;
-            if (inputEl.selectionStart !== 0 || inputEl.value.length > 0) {
-                clearPromptSkillDeleteTarget();
-                return false;
-            }
-
-            e.preventDefault();
-            if (promptProjects.length > 0) {
-                var lastProjectIndex = promptProjects.length - 1;
-                if (promptProjectDeleteIndex === lastProjectIndex) {
-                    promptProjects.splice(lastProjectIndex, 1);
-                    promptProjectDeleteIndex = null;
-                    resetInputHistoryNavigation();
-                    renderPromptSkills();
-                    updateSendBtnState();
-                    return true;
-                }
-                promptSkillDeleteIndex = null;
-                promptProjectDeleteIndex = lastProjectIndex;
-                resetInputHistoryNavigation();
-                renderPromptSkills();
-                return true;
-            }
-
-            var lastIndex = promptSkills.length - 1;
-            if (promptSkillDeleteIndex === lastIndex) {
-                promptSkills.splice(lastIndex, 1);
-                promptSkillDeleteIndex = null;
-                resetInputHistoryNavigation();
-                renderPromptSkills();
-                updateSendBtnState();
-                return true;
-            }
-
-            promptProjectDeleteIndex = null;
-            promptSkillDeleteIndex = lastIndex;
-            resetInputHistoryNavigation();
-            renderPromptSkills();
-            return true;
-        }
-
-        function commitSkillPickerSkill(skill) {
-            if (!skill || skillPickerTokenStart === null || skillPickerTokenEnd === null) return;
-            var value = inputEl.value;
-            var nextValue = value.slice(0, skillPickerTokenStart) + value.slice(skillPickerTokenEnd);
-            inputEl.value = nextValue;
-            inputEl.setSelectionRange(skillPickerTokenStart, skillPickerTokenStart);
-            resizeChatInput();
-            if (skill.pickerType === 'project') {
-                addPromptProject(skill);
-            } else if (skill.pickerType === 'provider-command') {
-                showError('该命令暂未接入执行逻辑');
-            } else {
-                addPromptSkill(skill);
-            }
-            closeSkillPicker();
-            inputEl.focus();
-        }
-
-        function renderSkillPicker() {
-            if (!skillPickerEl || !skillPickerOpen) return;
-            filterSkillPickerItems();
-
-            skillPickerEl.hidden = false;
-            skillPickerEl.innerHTML = '';
-
-            var list = document.createElement('div');
-            list.className = 'skill-picker-list';
-            list.setAttribute('role', 'listbox');
-            list.setAttribute('aria-label', '快捷项列表');
-
-            if (skillPickerFilteredItems.length === 0) {
-                var empty = document.createElement('div');
-                empty.className = 'skill-picker-empty';
-                empty.textContent = skillPickerItems.length === 0 ? '暂无可用技能、命令或项目' : '没有匹配的快捷项';
-                list.appendChild(empty);
-            } else {
-                var indexedItems = skillPickerFilteredItems.map(function (skill, index) {
-                    return { skill: skill, index: index };
-                });
-                var groups = [];
-                indexedItems.forEach(function (entry) {
-                    var title = entry.skill.groupTitle || (entry.skill.pickerType === 'project' ? '项目' : '技能');
-                    var group = groups.find(function (item) { return item.title === title; });
-                    if (!group) {
-                        group = { title: title, items: [] };
-                        groups.push(group);
-                    }
-                    group.items.push(entry);
-                });
-                groups.forEach(function (group) {
-                    if (group.items.length === 0) return;
-                    var label = document.createElement('div');
-                    label.className = 'skill-picker-group-label';
-                    label.setAttribute('role', 'presentation');
-                    label.textContent = group.title;
-                    list.appendChild(label);
-
-                    group.items.forEach(function (entry) {
-                        var skill = entry.skill;
-                        var index = entry.index;
-                        var item = document.createElement('button');
-                        var isActive = skillPickerVisualActive && index === skillPickerActiveIndex;
-                        item.className = 'skill-picker-item' +
-                            (isActive ? ' active' : '');
-                        item.type = 'button';
-                        item.dataset.index = String(index);
-                        item.setAttribute('role', 'option');
-                        item.setAttribute('aria-selected', isActive ? 'true' : 'false');
-                        var iconHtml = skill.pickerType === 'project'
-                            ? getProjectIconHtml('skill-picker-icon project')
-                            : (skill.pickerType === 'provider-command'
-                                ? getCommandIconHtml('skill-picker-icon')
-                                : getSkillIconHtml('skill-picker-icon'));
-                        var detailText = skill.pickerType === 'project'
-                            ? (skill.path || skill.description || '')
-                            : (skill.description || '');
-                        item.title = detailText ? (skill.name + ' · ' + detailText) : skill.name;
-                        item.innerHTML =
-                            iconHtml +
-                            '<span class="skill-picker-copy">' +
-                            '<span class="skill-picker-name">' + escapeHtml(skill.name) + '</span>' +
-                            '<span class="skill-picker-desc">' + escapeHtml(detailText) + '</span>' +
-                            '</span>';
-                        item.addEventListener('mousemove', function () {
-                            setSkillPickerActiveIndex(index);
-                        });
-                        item.addEventListener('mousedown', function (e) {
-                            e.preventDefault();
-                        });
-                        item.addEventListener('click', function () {
-                            commitSkillPickerSkill(skill);
-                        });
-                        list.appendChild(item);
-                    });
-                });
-            }
-
-            skillPickerEl.appendChild(list);
-
-            updateSkillPickerActiveItem(true);
-        }
-
-        async function openSkillPicker(initialTrigger) {
-            if (!skillPickerEl) return;
-            if (isSkillPickerOpening) return;
-            var startingTrigger = initialTrigger || getActiveSkillTrigger();
-            if (!isValidSkillTrigger(startingTrigger)) return;
-            isSkillPickerOpening = true;
-            try {
-                await fetchSlashItemsData();
-            } finally {
-                isSkillPickerOpening = false;
-            }
-            var trigger = getActiveSkillTrigger();
-            if (!isValidSkillTrigger(trigger)) return;
-            skillPickerItems = getSkillPickerEnabledItems();
-            skillPickerOpen = true;
-            skillPickerTokenStart = trigger.start;
-            skillPickerTokenEnd = trigger.end;
-            skillPickerQuery = trigger.query;
-            skillPickerActiveIndex = 0;
-            skillPickerVisualActive = false;
-            renderSkillPicker();
+            return slashPickerController.handlePromptBackspace(e);
         }
 
         function insertSkillSlashTrigger() {
-            var caret = inputEl.selectionStart;
-            var value = inputEl.value;
-            inputEl.value = value.slice(0, caret) + '/' + value.slice(inputEl.selectionEnd);
-            inputEl.setSelectionRange(caret + 1, caret + 1);
-            resizeChatInput();
-            updateSendBtnState();
-            syncSkillPickerFromInput();
+            return slashPickerController.insertSlashTrigger();
         }
 
         function handleSkillPickerKeydown(e) {
-            if (!skillPickerOpen) return false;
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                moveSkillPickerActive(1);
-                return true;
-            }
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                moveSkillPickerActive(-1);
-                return true;
-            }
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                var activeSkill = skillPickerFilteredItems[skillPickerActiveIndex];
-                if (activeSkill) commitSkillPickerSkill(activeSkill);
-                return true;
-            }
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                var tabSkill = skillPickerFilteredItems[skillPickerActiveIndex];
-                if (tabSkill) commitSkillPickerSkill(tabSkill);
-                return true;
-            }
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                closeSkillPicker({ removeTrigger: true });
-                inputEl.focus();
-                return true;
-            }
-            return false;
+            return slashPickerController.handleKeydown(e);
         }
 
         function renderAttachmentPreview() {
@@ -2302,14 +1834,15 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             inputEl: inputEl,
             messagesEl: messagesEl,
             getState: function () {
+                var promptSelection = slashPickerController.getSelection();
                 return {
                     currentSessionId: currentSessionId,
                     currentSessionProvider: currentSessionProvider,
                     isTyping: isTyping,
                     modelConfig: modelConfig,
                     pendingAttachments: pendingAttachments,
-                    promptProjects: promptProjects,
-                    promptSkills: promptSkills,
+                    promptProjects: promptSelection.projects,
+                    promptSkills: promptSelection.skills,
                     providerData: providerData,
                 };
             },
@@ -4012,7 +3545,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         }
 
         document.addEventListener('click', function (e) {
-            if (skillPickerOpen && skillPickerEl && e.target !== inputEl && !skillPickerEl.contains(e.target)) {
+            if (slashPickerController.isOpen() && skillPickerEl && e.target !== inputEl && !skillPickerEl.contains(e.target)) {
                 closeSkillPicker();
             }
             if (!modelSwitcher.contains(e.target)) {
@@ -4038,7 +3571,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
 
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') {
-                if (skillPickerOpen) {
+                if (slashPickerController.isOpen()) {
                     closeSkillPicker({ removeTrigger: document.activeElement === inputEl });
                     if (document.activeElement === inputEl) inputEl.focus();
                     return;
