@@ -3077,8 +3077,8 @@
             transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
         }
 
-        .skill-picker-item:hover,
-        .skill-picker-item.active {
+        .skill-picker-item.active,
+        .skill-picker-item:focus-visible {
             background: var(--sidebar-hover);
             border-color: var(--border);
             outline: none;

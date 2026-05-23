@@ -153,6 +153,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         let skillPickerItems = [];
         let skillPickerFilteredItems = [];
         let skillPickerActiveIndex = 0;
+        let skillPickerVisualActive = false;
         let isSkillPickerOpening = false;
         let promptSkills = [];
         let promptSkillDeleteIndex = null;
@@ -776,6 +777,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             skillPickerTokenEnd = null;
             skillPickerFilteredItems = [];
             skillPickerActiveIndex = 0;
+            skillPickerVisualActive = false;
             skillPickerEl.hidden = true;
             skillPickerEl.innerHTML = '';
         }
@@ -803,6 +805,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             skillPickerTokenEnd = trigger.end;
             skillPickerQuery = trigger.query;
             skillPickerActiveIndex = 0;
+            skillPickerVisualActive = false;
             filterSkillPickerItems();
             renderSkillPicker();
         }
@@ -810,20 +813,33 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         function moveSkillPickerActive(delta) {
             if (skillPickerFilteredItems.length === 0) return;
             var count = skillPickerFilteredItems.length;
-            skillPickerActiveIndex = (skillPickerActiveIndex + delta + count) % count;
-            renderSkillPicker();
+            if (!skillPickerVisualActive) {
+                skillPickerActiveIndex = delta > 0 ? 0 : count - 1;
+            } else {
+                skillPickerActiveIndex = (skillPickerActiveIndex + delta + count) % count;
+            }
+            skillPickerVisualActive = true;
+            updateSkillPickerActiveItem(true);
         }
 
         function setSkillPickerActiveIndex(index) {
             if (index < 0 || index >= skillPickerFilteredItems.length) return;
-            if (skillPickerActiveIndex === index) return;
+            if (skillPickerActiveIndex === index && skillPickerVisualActive) return;
             skillPickerActiveIndex = index;
+            skillPickerVisualActive = true;
+            updateSkillPickerActiveItem(false);
+        }
+
+        function updateSkillPickerActiveItem(scrollIntoView) {
             if (!skillPickerEl) return;
+            var activeItem = null;
             Array.prototype.forEach.call(skillPickerEl.querySelectorAll('.skill-picker-item'), function (item) {
-                var isActive = Number(item.dataset.index) === skillPickerActiveIndex;
+                var isActive = skillPickerVisualActive && Number(item.dataset.index) === skillPickerActiveIndex;
                 item.classList.toggle('active', isActive);
                 item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                if (isActive) activeItem = item;
             });
+            if (scrollIntoView && activeItem) activeItem.scrollIntoView({ block: 'nearest' });
         }
 
         function renderPromptSkills() {
@@ -842,6 +858,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 chip.addEventListener('click', function () {
                     promptSkillDeleteIndex = null;
                     promptSkills.splice(index, 1);
+                    resetInputHistoryNavigation();
                     renderPromptSkills();
                     updateSendBtnState();
                     inputEl.focus();
@@ -860,6 +877,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 chip.addEventListener('click', function () {
                     promptProjectDeleteIndex = null;
                     promptProjects.splice(index, 1);
+                    resetInputHistoryNavigation();
                     renderPromptSkills();
                     updateSendBtnState();
                     inputEl.focus();
@@ -876,6 +894,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             if (alreadySelected) return;
             promptSkillDeleteIndex = null;
             promptProjectDeleteIndex = null;
+            resetInputHistoryNavigation();
             promptSkills.push({
                 id: skill.id,
                 name: skill.name,
@@ -893,6 +912,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             if (alreadySelected) return;
             promptSkillDeleteIndex = null;
             promptProjectDeleteIndex = null;
+            resetInputHistoryNavigation();
             promptProjects.push({
                 id: project.id,
                 name: project.name,
@@ -939,12 +959,14 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 if (promptProjectDeleteIndex === lastProjectIndex) {
                     promptProjects.splice(lastProjectIndex, 1);
                     promptProjectDeleteIndex = null;
+                    resetInputHistoryNavigation();
                     renderPromptSkills();
                     updateSendBtnState();
                     return true;
                 }
                 promptSkillDeleteIndex = null;
                 promptProjectDeleteIndex = lastProjectIndex;
+                resetInputHistoryNavigation();
                 renderPromptSkills();
                 return true;
             }
@@ -953,6 +975,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             if (promptSkillDeleteIndex === lastIndex) {
                 promptSkills.splice(lastIndex, 1);
                 promptSkillDeleteIndex = null;
+                resetInputHistoryNavigation();
                 renderPromptSkills();
                 updateSendBtnState();
                 return true;
@@ -960,6 +983,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
 
             promptProjectDeleteIndex = null;
             promptSkillDeleteIndex = lastIndex;
+            resetInputHistoryNavigation();
             renderPromptSkills();
             return true;
         }
@@ -1025,12 +1049,13 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                         var skill = entry.skill;
                         var index = entry.index;
                         var item = document.createElement('button');
+                        var isActive = skillPickerVisualActive && index === skillPickerActiveIndex;
                         item.className = 'skill-picker-item' +
-                            (index === skillPickerActiveIndex ? ' active' : '');
+                            (isActive ? ' active' : '');
                         item.type = 'button';
                         item.dataset.index = String(index);
                         item.setAttribute('role', 'option');
-                        item.setAttribute('aria-selected', index === skillPickerActiveIndex ? 'true' : 'false');
+                        item.setAttribute('aria-selected', isActive ? 'true' : 'false');
                         var iconHtml = skill.pickerType === 'project'
                             ? getProjectIconHtml('skill-picker-icon project')
                             : (skill.pickerType === 'provider-command'
@@ -1046,7 +1071,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                             '<span class="skill-picker-name">' + escapeHtml(skill.name) + '</span>' +
                             '<span class="skill-picker-desc">' + escapeHtml(detailText) + '</span>' +
                             '</span>';
-                        item.addEventListener('mouseenter', function () {
+                        item.addEventListener('mousemove', function () {
                             setSkillPickerActiveIndex(index);
                         });
                         item.addEventListener('mousedown', function (e) {
@@ -1062,8 +1087,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
 
             skillPickerEl.appendChild(list);
 
-            var activeItem = list.querySelector('.skill-picker-item.active');
-            if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
+            updateSkillPickerActiveItem(true);
         }
 
         async function openSkillPicker(initialTrigger) {
@@ -1085,6 +1109,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             skillPickerTokenEnd = trigger.end;
             skillPickerQuery = trigger.query;
             skillPickerActiveIndex = 0;
+            skillPickerVisualActive = false;
             renderSkillPicker();
         }
 
