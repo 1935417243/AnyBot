@@ -694,13 +694,15 @@ function normalizeWebChatProjects(projects: ChatPromptProject[] = []): Array<{ i
 function getWebChatSelectionFallback(
   skills: Array<{ id?: string; name: string }>,
   projects: Array<{ id: string; name: string; path: string }>,
+  options: { hasSessionProject?: boolean } = {},
 ): string {
   const parts: string[] = [];
   if (skills.length > 0) {
     parts.push(`使用技能：${skills.map((skill) => skill.name).join("、")}`);
   }
   if (projects.length > 0) {
-    parts.push(`额外项目：${projects.map((project) => project.name).join("、")}`);
+    const projectLabel = options.hasSessionProject ? "额外项目" : "选择项目";
+    parts.push(`${projectLabel}：${projects.map((project) => project.name).join("、")}`);
   }
   return parts.join("\n");
 }
@@ -723,12 +725,13 @@ function prepareWebChatInput(
 
   if (projectInfo.length > 0) {
     const projectList = projectInfo.map((project) => `- ${project.name}: ${project.path}`).join("\n");
-    promptParts.push(`本轮额外选择项目。处理文件时必须按项目名使用对应绝对路径：\n\n${projectList}`);
+    const projectTitle = sessionProjectId ? "本轮额外选择项目" : "本轮选择项目";
+    promptParts.push(`${projectTitle}。处理文件时必须按项目名使用对应绝对路径：\n\n${projectList}`);
   }
 
   if (skillInfo.length > 0) {
     const skillList = skillInfo.map((skill) => `- ${skill.name}`).join("\n");
-    promptParts.push(`本轮可使用技能：\n${skillList}`);
+    promptParts.push(`用户本轮选择的技能：\n${skillList}`);
   }
 
   if (userText) {
@@ -762,7 +765,9 @@ function prepareWebChatInput(
     ...(skillInfo.length > 0 ? { skills: skillInfo } : {}),
     ...(projectInfo.length > 0 ? { projects: projectInfo } : {}),
   };
-  const selectionFallback = getWebChatSelectionFallback(skillInfo, projectInfo);
+  const selectionFallback = getWebChatSelectionFallback(skillInfo, projectInfo, {
+    hasSessionProject: !!sessionProjectId,
+  });
   const storedFallback = selectionFallback
     ? selectionFallback
     : "[附件]";
