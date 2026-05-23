@@ -4,6 +4,7 @@ import { createInputHistoryController } from './chat/input-history.js';
 import { createMessageRenderer } from './chat/message-renderer.js';
 import { createSendMessageController } from './chat/send-message.js';
 import { createSlashPickerController } from './chat/slash-picker.js';
+import { createSidebarController } from './sidebar/sidebar-controller.js';
 import {
     isSelectionOnlyFallback,
     normalizeMessageProjects,
@@ -32,8 +33,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         const historyList = document.getElementById('history-list');
         const addHistoryChatBtn = document.getElementById('add-history-chat-btn');
         const newChatBtn = document.getElementById('new-chat-btn');
-        var sidebarTooltipEl = null;
-        var sidebarTooltipTarget = null;
 
         const modelSwitcher = document.getElementById('model-switcher');
         const modelBadge = document.getElementById('model-badge');
@@ -111,11 +110,8 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         let currentConversationTitle = '新对话';
         let currentSessionProjectId = null;
         let currentSessionProvider = null;
-        let activeProjectId = null;
         let isTyping = false;
         let isCancellingResponse = false;
-        let sessions = [];
-        let projects = [];
         let modelConfig = null;
         let providerData = null;
         let sandboxConfig = null;
@@ -135,15 +131,10 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         let currentSessionHasMoreMessages = false;
         let currentSessionUpdatedAt = 0;
         let currentNewestMessageId = 0;
-        let isCurrentSessionSyncInFlight = false;
         let isLoadingOlderMessages = false;
         const GITHUB_LATEST_RELEASE_URL = 'https://github.com/1935417243/AnyBot/releases/latest';
         let slashPickerController = null;
-        let isProjectsCollapsed = localStorage.getItem('projectsCollapsed') === 'true';
-        let isHistoryCollapsed = localStorage.getItem('historyCollapsed') === 'true';
-        let expandedProjectIds = readStoredSet('expandedProjectIds');
-        let expandedProjectSessionIds = new Set();
-        let isHistorySessionsExpanded = false;
+        let sidebarController = null;
         const SESSION_MESSAGE_PAGE_SIZE = 40;
         const HISTORY_SESSION_PREVIEW_LIMIT = 4;
         const PROJECT_SESSION_PREVIEW_LIMIT = 4;
@@ -169,12 +160,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         const CHAT_INPUT_PLACEHOLDER_INTERVAL_MS = 10000;
         const systemThemeQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
         let currentThemeSetting = readStoredTheme();
-        let sidebarRefreshTimer = null;
-        let currentSessionRefreshTimer = null;
-        let realtimeEvents = null;
-        let realtimeReconnectTimer = null;
-        let realtimeRefreshTimer = null;
-        let isSidebarRefreshInFlight = false;
         let chatInputPlaceholderIndex = 0;
         let chatInputPlaceholderTimer = null;
 
@@ -538,6 +523,61 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             updateSendBtnState: updateSendBtnState,
             uploadFiles: uploadFiles,
         });
+
+        sidebarController = createSidebarController({
+            addProjectBtn: addProjectBtn,
+            createNewChat: createNewChat,
+            currentSessionRefreshIntervalMs: CURRENT_SESSION_REFRESH_INTERVAL_MS,
+            deleteSession: deleteSession,
+            getActiveStreamSessionId: function () {
+                return activeStreamSessionId;
+            },
+            getChannelMeta: getChannelMeta,
+            getCurrentNewestMessageId: function () {
+                return currentNewestMessageId;
+            },
+            getCurrentSessionId: function () {
+                return currentSessionId;
+            },
+            getCurrentSessionProjectId: function () {
+                return currentSessionProjectId;
+            },
+            getCurrentSessionUpdatedAt: function () {
+                return currentSessionUpdatedAt;
+            },
+            getCurrentView: function () {
+                return currentView;
+            },
+            getIsLoadingOlderMessages: function () {
+                return isLoadingOlderMessages;
+            },
+            getIsTyping: function () {
+                return isTyping;
+            },
+            getNewestMessageId: getNewestMessageId,
+            historyList: historyList,
+            historySessionPreviewLimit: HISTORY_SESSION_PREVIEW_LIMIT,
+            historyToggle: historyToggle,
+            invalidateSlashItemsData: invalidateSlashItemsData,
+            loadSession: loadSession,
+            projectList: projectList,
+            projectSessionPreviewLimit: PROJECT_SESSION_PREVIEW_LIMIT,
+            projectToggle: projectToggle,
+            realtimeReconnectMs: REALTIME_RECONNECT_MS,
+            realtimeRefreshDebounceMs: REALTIME_REFRESH_DEBOUNCE_MS,
+            setCurrentNewestMessageId: function (value) {
+                currentNewestMessageId = value;
+            },
+            setCurrentSessionUpdatedAt: function (value) {
+                currentSessionUpdatedAt = value;
+            },
+            showChatView: showChatView,
+            showError: showError,
+            sidebar: sidebar,
+            sidebarRefreshIntervalMs: SIDEBAR_REFRESH_INTERVAL_MS,
+            updateConversationHeaderTitle: updateConversationHeaderTitle,
+        });
+        sidebarController.bindRealtimeLifecycle();
 
         newChatBtn.addEventListener('click', function () {
             createNewChat();
@@ -931,106 +971,8 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             }
         }
 
-        function getSessionSortTime(s) {
-            return Number(s.updatedAt || s.createdAt || 0);
-        }
-
-        function sortSessionsByUpdatedAt(list) {
-            return list.slice().sort(function (a, b) {
-                var timeDiff = getSessionSortTime(b) - getSessionSortTime(a);
-                if (timeDiff !== 0) return timeDiff;
-                var createdDiff = Number(b.createdAt || 0) - Number(a.createdAt || 0);
-                if (createdDiff !== 0) return createdDiff;
-                return String(b.id || '').localeCompare(String(a.id || ''));
-            });
-        }
-
-        function readStoredSet(key) {
-            try {
-                return new Set(JSON.parse(localStorage.getItem(key) || '[]'));
-            } catch (_) {
-                return new Set();
-            }
-        }
-
-        function saveStoredSet(key, value) {
-            localStorage.setItem(key, JSON.stringify(Array.from(value)));
-        }
-
-        function ensureSidebarTooltip() {
-            if (sidebarTooltipEl) return sidebarTooltipEl;
-            sidebarTooltipEl = document.createElement('div');
-            sidebarTooltipEl.className = 'sidebar-floating-tooltip';
-            sidebarTooltipEl.setAttribute('role', 'tooltip');
-            document.body.appendChild(sidebarTooltipEl);
-            return sidebarTooltipEl;
-        }
-
-        function updateSidebarTooltipPosition() {
-            if (!sidebarTooltipEl || !sidebarTooltipTarget) return;
-            var targetRect = sidebarTooltipTarget.getBoundingClientRect();
-            var tooltipRect = sidebarTooltipEl.getBoundingClientRect();
-            var gap = 8;
-            var left = targetRect.right + gap;
-            var maxLeft = window.innerWidth - tooltipRect.width - gap;
-            var top = targetRect.top + (targetRect.height / 2);
-            var minTop = (tooltipRect.height / 2) + gap;
-            var maxTop = window.innerHeight - (tooltipRect.height / 2) - gap;
-
-            sidebarTooltipEl.style.left = Math.max(gap, Math.min(left, maxLeft)) + 'px';
-            sidebarTooltipEl.style.top = Math.max(minTop, Math.min(top, maxTop)) + 'px';
-        }
-
-        function showSidebarTooltip(target) {
-            var text = target.getAttribute('data-tooltip');
-            if (!text) return;
-            sidebarTooltipTarget = target;
-            var tooltip = ensureSidebarTooltip();
-            tooltip.textContent = text;
-            updateSidebarTooltipPosition();
-        }
-
-        function hideSidebarTooltip(target) {
-            if (target && sidebarTooltipTarget !== target) return;
-            sidebarTooltipTarget = null;
-            if (sidebarTooltipEl) {
-                sidebarTooltipEl.remove();
-                sidebarTooltipEl = null;
-            }
-        }
-
-        function getSidebarTooltipTarget(target) {
-            if (!(target instanceof Element)) return null;
-            var tooltipTarget = target.closest('[data-tooltip]');
-            if (!tooltipTarget || !sidebar.contains(tooltipTarget)) return null;
-            return tooltipTarget;
-        }
-
         function setupSidebarTooltips() {
-            sidebar.addEventListener('mouseover', function (e) {
-                var target = getSidebarTooltipTarget(e.target);
-                if (!target) return;
-                if (e.relatedTarget instanceof Node && target.contains(e.relatedTarget)) return;
-                showSidebarTooltip(target);
-            });
-            sidebar.addEventListener('mouseout', function (e) {
-                var target = getSidebarTooltipTarget(e.target);
-                if (!target) return;
-                if (e.relatedTarget instanceof Node && target.contains(e.relatedTarget)) return;
-                hideSidebarTooltip(target);
-            });
-            sidebar.addEventListener('focusin', function (e) {
-                var target = getSidebarTooltipTarget(e.target);
-                if (!target) return;
-                showSidebarTooltip(target);
-            });
-            sidebar.addEventListener('focusout', function (e) {
-                var target = getSidebarTooltipTarget(e.target);
-                if (!target) return;
-                hideSidebarTooltip(target);
-            });
-            window.addEventListener('resize', updateSidebarTooltipPosition);
-            document.addEventListener('scroll', updateSidebarTooltipPosition, true);
+            sidebarController.setupTooltips();
         }
 
         function updateChatInputPlaceholder() {
@@ -1046,549 +988,81 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             }, CHAT_INPUT_PLACEHOLDER_INTERVAL_MS);
         }
 
-        function folderIcon(open) {
-            return open
-                ? '<svg class="project-icon" viewBox="0 0 16 16" fill="none"><path d="M1.8 5.5h12.4l-1.1 6.3c-.1.7-.7 1.2-1.5 1.2H4.1c-.7 0-1.3-.5-1.5-1.2L1.8 5.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M2.4 5.5V3.6c0-.6.5-1.1 1.1-1.1h3l1.4 1.6h4.3c.6 0 1.1.5 1.1 1.1v.3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>'
-                : '<svg class="project-icon" viewBox="0 0 16 16" fill="none"><path d="M2.4 12.7V3.6c0-.6.5-1.1 1.1-1.1h3l1.4 1.6h4.6c.6 0 1.1.5 1.1 1.1v7.5H2.4Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
-        }
-
-        function isSameLocalDate(a, b) {
-            return a.getFullYear() === b.getFullYear()
-                && a.getMonth() === b.getMonth()
-                && a.getDate() === b.getDate();
-        }
-
-        function formatRelativeAge(ts) {
-            var value = Number(ts || Date.now());
-            if (!Number.isFinite(value) || value <= 0) value = Date.now();
-
-            var now = new Date();
-            var date = new Date(value);
-            if (Number.isNaN(date.getTime())) date = now;
-
-            var minute = 60000;
-            var hour = 60 * minute;
-            var day = 24 * hour;
-            var diff = Math.max(0, now.getTime() - date.getTime());
-
-            if (diff < minute) return '刚刚';
-            if (diff < hour) return Math.floor(diff / minute) + '分';
-            if (diff < day) return Math.floor(diff / hour) + '时';
-            if (isSameLocalDate(date, now)) return '今天';
-
-            var days = Math.floor(diff / day);
-            if (days < 7) return Math.max(1, days) + '天';
-            if (days < 28) return Math.floor(days / 7) + '周';
-            if (days < 365) return Math.min(11, Math.max(1, Math.floor(days / 30))) + '月前';
-            return '历史';
-        }
-
         function updateProjectsCollapsedState() {
-            sidebar.classList.toggle('projects-collapsed', isProjectsCollapsed);
-            projectToggle.setAttribute('aria-expanded', String(!isProjectsCollapsed));
-            projectToggle.title = isProjectsCollapsed ? '展开项目列表' : '折叠项目列表';
+            sidebarController.updateProjectsCollapsedState();
         }
 
         function toggleProjects() {
-            isProjectsCollapsed = !isProjectsCollapsed;
-            localStorage.setItem('projectsCollapsed', String(isProjectsCollapsed));
-            updateProjectsCollapsedState();
+            sidebarController.toggleProjects();
         }
 
         function updateHistoryCollapsedState() {
-            sidebar.classList.toggle('history-collapsed', isHistoryCollapsed);
-            historyToggle.setAttribute('aria-expanded', String(!isHistoryCollapsed));
-            historyToggle.title = isHistoryCollapsed ? '展开对话列表' : '折叠对话列表';
+            sidebarController.updateHistoryCollapsedState();
         }
 
         function toggleHistory() {
-            isHistoryCollapsed = !isHistoryCollapsed;
-            localStorage.setItem('historyCollapsed', String(isHistoryCollapsed));
-            updateHistoryCollapsedState();
-        }
-
-        function createSourceBadge(s) {
-            var effectiveSource = (s.source && s.source !== 'web') ? s.source : 'web';
-            var meta = CHANNEL_META[effectiveSource];
-            var badge = document.createElement('span');
-            badge.className = 'history-item-source ' + (meta ? meta.iconClass : 'default');
-            badge.textContent = meta ? meta.badge : effectiveSource;
-            return badge;
-        }
-
-        function createHistoryItem(s) {
-            var item = document.createElement('div');
-            item.className = 'history-item' + (currentView === 'chat' && s.id === currentSessionId ? ' active' : '');
-            item.dataset.id = s.id;
-
-            var badge = createSourceBadge(s);
-            item.appendChild(badge);
-
-            var text = document.createElement('span');
-            text.className = 'history-item-text';
-            text.textContent = s.title;
-
-            var age = document.createElement('span');
-            age.className = 'history-item-age';
-            age.textContent = formatRelativeAge(s.updatedAt || s.createdAt);
-
-            var del = document.createElement('button');
-            del.className = 'history-item-delete';
-            del.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
-            del.addEventListener('click', function (e) {
-                e.stopPropagation();
-                deleteSession(s.id);
-            });
-
-            item.appendChild(text);
-            item.appendChild(age);
-            item.appendChild(del);
-
-            item.addEventListener('click', function () {
-                loadSession(s.id, { force: true });
-            });
-
-            return item;
+            sidebarController.toggleHistory();
         }
 
         function renderHistory() {
-            historyList.innerHTML = '';
-            var globalSessions = sessions.filter(function (s) { return !s.projectId; });
-            var sortedGlobalSessions = sortSessionsByUpdatedAt(globalSessions);
-            var visibleSessions = isHistorySessionsExpanded
-                ? sortedGlobalSessions
-                : sortedGlobalSessions.slice(0, HISTORY_SESSION_PREVIEW_LIMIT);
-            visibleSessions.forEach(function (s) {
-                historyList.appendChild(createHistoryItem(s));
-            });
-
-            if (sortedGlobalSessions.length > HISTORY_SESSION_PREVIEW_LIMIT) {
-                var moreBtn = document.createElement('button');
-                moreBtn.className = 'history-sessions-more';
-                moreBtn.type = 'button';
-                moreBtn.setAttribute('aria-expanded', String(isHistorySessionsExpanded));
-                moreBtn.textContent = isHistorySessionsExpanded
-                    ? '收起'
-                    : '查看更多 ' + (sortedGlobalSessions.length - HISTORY_SESSION_PREVIEW_LIMIT) + ' 条';
-                moreBtn.addEventListener('click', function () {
-                    isHistorySessionsExpanded = !isHistorySessionsExpanded;
-                    renderHistory();
-                });
-                historyList.appendChild(moreBtn);
-            }
+            sidebarController.renderHistory();
         }
 
         function selectProject(projectId) {
-            activeProjectId = projectId;
-            expandedProjectIds.add(projectId);
-            saveStoredSet('expandedProjectIds', expandedProjectIds);
-            if (currentView !== 'chat') showChatView();
-            renderProjects();
-        }
-
-        function renderProjectSessions(projectId) {
-            var list = document.createElement('div');
-            list.className = 'project-session-list';
-            var projectSessions = sortSessionsByUpdatedAt(
-                sessions.filter(function (s) { return s.projectId === projectId; })
-            );
-            if (projectSessions.length === 0) {
-                var empty = document.createElement('div');
-                empty.className = 'project-empty';
-                empty.textContent = '暂无对话';
-                list.appendChild(empty);
-                return list;
-            }
-
-            var isShowingAll = expandedProjectSessionIds.has(projectId);
-            var visibleSessions = isShowingAll
-                ? projectSessions
-                : projectSessions.slice(0, PROJECT_SESSION_PREVIEW_LIMIT);
-
-            visibleSessions.forEach(function (s) {
-                var btn = document.createElement('div');
-                btn.className = 'project-session-item' + (currentView === 'chat' && s.id === currentSessionId ? ' active' : '');
-                btn.setAttribute('role', 'button');
-                btn.tabIndex = 0;
-                btn.dataset.id = s.id;
-                btn.innerHTML =
-                    '<span class="project-session-source"></span>' +
-                    '<span class="project-session-title"></span>' +
-                    '<span class="project-session-age"></span>' +
-                    '<button class="project-session-delete" type="button" title="删除对话" aria-label="删除对话">' +
-                    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>' +
-                    '</button>';
-                btn.replaceChild(createSourceBadge(s), btn.querySelector('.project-session-source'));
-                btn.querySelector('.project-session-title').textContent = s.title;
-                btn.querySelector('.project-session-age').textContent = formatRelativeAge(s.updatedAt || s.createdAt);
-                btn.querySelector('.project-session-delete').addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    deleteSession(s.id);
-                });
-                btn.addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    loadSession(s.id, { force: true });
-                });
-                btn.addEventListener('keydown', function (e) {
-                    if (e.target !== btn) return;
-                    if (e.key !== 'Enter' && e.key !== ' ') return;
-                    e.preventDefault();
-                    loadSession(s.id, { force: true });
-                });
-                list.appendChild(btn);
-            });
-
-            if (projectSessions.length > PROJECT_SESSION_PREVIEW_LIMIT) {
-                var moreBtn = document.createElement('button');
-                moreBtn.className = 'project-sessions-more';
-                moreBtn.type = 'button';
-                moreBtn.setAttribute('aria-expanded', String(isShowingAll));
-                moreBtn.textContent = isShowingAll
-                    ? '收起'
-                    : '查看更多 ' + (projectSessions.length - PROJECT_SESSION_PREVIEW_LIMIT) + ' 条';
-                moreBtn.addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    if (isShowingAll) {
-                        expandedProjectSessionIds.delete(projectId);
-                    } else {
-                        expandedProjectSessionIds.add(projectId);
-                    }
-                    renderProjects();
-                });
-                list.appendChild(moreBtn);
-            }
-
-            return list;
+            sidebarController.selectProject(projectId);
         }
 
         function renderProjects() {
-            projectList.innerHTML = '';
-            projects.forEach(function (project) {
-                var isExpanded = expandedProjectIds.has(project.id);
-                var row = document.createElement('div');
-                row.className = 'project-item' + (activeProjectId === project.id ? ' active' : '');
-                row.setAttribute('role', 'button');
-                row.tabIndex = 0;
-                row.dataset.id = project.id;
-                row.setAttribute('aria-expanded', String(isExpanded));
-                row.innerHTML =
-                    folderIcon(isExpanded) +
-                    '<span class="project-name"></span>' +
-                    '<button class="project-create-chat" type="button" data-tooltip="新对话" aria-label="在当前项目新建对话">' +
-                    '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">' +
-                    '<path d="M6.5 1.5v10M1.5 6.5h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
-                    '</svg>' +
-                    '</button>';
-                row.querySelector('.project-name').textContent = project.name;
-                row.addEventListener('click', function () {
-                    if (activeProjectId === project.id) {
-                        if (isExpanded) {
-                            expandedProjectIds.delete(project.id);
-                        } else {
-                            expandedProjectIds.add(project.id);
-                        }
-                        saveStoredSet('expandedProjectIds', expandedProjectIds);
-                        renderProjects();
-                        return;
-                    }
-                    selectProject(project.id);
-                });
-                row.addEventListener('keydown', function (e) {
-                    if (e.target !== row) return;
-                    if (e.key !== 'Enter' && e.key !== ' ') return;
-                    e.preventDefault();
-                    row.click();
-                });
-                row.querySelector('.project-create-chat').addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    createNewChat(project.id, { force: true });
-                });
-                projectList.appendChild(row);
-
-                if (!isExpanded) return;
-
-                var details = document.createElement('div');
-                details.className = 'project-details';
-                details.appendChild(renderProjectSessions(project.id));
-
-                projectList.appendChild(details);
-            });
+            sidebarController.renderProjects();
         }
 
         function updateSidebarSelection() {
-            var isChat = currentView === 'chat';
-            historyList.querySelectorAll('.history-item').forEach(function (item) {
-                item.classList.toggle('active', isChat && item.dataset.id === currentSessionId);
-            });
-            projectList.querySelectorAll('.project-item').forEach(function (item) {
-                item.classList.toggle('active', isChat && item.dataset.id === activeProjectId);
-            });
-            projectList.querySelectorAll('.project-session-item').forEach(function (item) {
-                item.classList.toggle('active', isChat && item.dataset.id === currentSessionId);
-            });
+            sidebarController.updateSelection();
         }
 
         function revealSessionContainer(projectId) {
-            if (projectId) {
-                isProjectsCollapsed = false;
-                localStorage.setItem('projectsCollapsed', 'false');
-                expandedProjectIds.add(projectId);
-                saveStoredSet('expandedProjectIds', expandedProjectIds);
-                updateProjectsCollapsedState();
-            } else {
-                isHistoryCollapsed = false;
-                localStorage.setItem('historyCollapsed', 'false');
-                updateHistoryCollapsedState();
-            }
+            sidebarController.revealSessionContainer(projectId);
         }
 
         function revealActiveSessionInSidebar() {
-            if (!currentSessionId) return;
-            var container = currentSessionProjectId ? projectList : historyList;
-            var items = container.querySelectorAll('[data-id]');
-            for (var i = 0; i < items.length; i++) {
-                if (items[i].dataset.id === currentSessionId) {
-                    items[i].scrollIntoView({ block: 'nearest' });
-                    return;
-                }
-            }
+            sidebarController.revealActiveSession();
         }
 
         function findSessionSummary(id) {
-            return sessions.find(function (s) { return s.id === id; }) || null;
+            return sidebarController.findSessionSummary(id);
         }
 
         async function syncCurrentSessionFromSummary() {
-            if (!currentSessionId || currentView !== 'chat') return;
-            if (isTyping || isLoadingOlderMessages || activeStreamSessionId === currentSessionId) return;
-            if (isCurrentSessionSyncInFlight) return;
-
-            var summary = findSessionSummary(currentSessionId);
-            if (!summary) return;
-
-            var summaryUpdatedAt = Number(summary.updatedAt || 0);
-            if (!summaryUpdatedAt) return;
-            if (!currentSessionUpdatedAt) {
-                currentSessionUpdatedAt = summaryUpdatedAt;
-                return;
-            }
-            if (summaryUpdatedAt <= currentSessionUpdatedAt) return;
-
-            isCurrentSessionSyncInFlight = true;
-            try {
-                await loadSession(currentSessionId, { force: true, silent: true });
-            } finally {
-                isCurrentSessionSyncInFlight = false;
-            }
+            return sidebarController.syncCurrentSessionFromSummary();
         }
 
         async function pollCurrentSessionMessages() {
-            if (!currentSessionId || currentView !== 'chat') return;
-            if (document.hidden) return;
-            if (isTyping || isLoadingOlderMessages || activeStreamSessionId === currentSessionId) return;
-            var sessionId = currentSessionId;
-
-            if (isCurrentSessionSyncInFlight) return;
-            try {
-                var res = await fetch('/api/sessions/' + sessionId + '?limit=1');
-                if (!res.ok) return;
-                var data = await res.json();
-                if (currentSessionId !== sessionId || currentView !== 'chat') return;
-
-                var incomingNewestId = getNewestMessageId(data.messages);
-                var incomingUpdatedAt = Number(data.updatedAt || findSessionSummary(sessionId)?.updatedAt || 0);
-                var hasUnsubscribedStream = !!data.activeStream && activeStreamSessionId !== sessionId;
-                var hasNewMessage = incomingNewestId > currentNewestMessageId;
-                var hasNewerTimestamp = incomingUpdatedAt && currentSessionUpdatedAt && incomingUpdatedAt > currentSessionUpdatedAt;
-
-                if (hasUnsubscribedStream || hasNewMessage || hasNewerTimestamp) {
-                    if (isCurrentSessionSyncInFlight) return;
-                    isCurrentSessionSyncInFlight = true;
-                    try {
-                        await loadSession(sessionId, { force: true, silent: true });
-                    } finally {
-                        isCurrentSessionSyncInFlight = false;
-                    }
-                    return;
-                }
-
-                if (incomingUpdatedAt) currentSessionUpdatedAt = Math.max(currentSessionUpdatedAt || 0, incomingUpdatedAt);
-                if (incomingNewestId) currentNewestMessageId = Math.max(currentNewestMessageId || 0, incomingNewestId);
-            } catch (e) {
-                console.warn('Failed to sync current session messages:', e);
-            }
+            return sidebarController.pollCurrentSessionMessages();
         }
 
         async function fetchSessions() {
-            try {
-                var res = await fetch('/api/sessions');
-                sessions = sortSessionsByUpdatedAt(await res.json());
-                var currentSummary = currentSessionId ? findSessionSummary(currentSessionId) : null;
-                if (currentSummary) updateConversationHeaderTitle(currentSummary.title);
-                renderHistory();
-                renderProjects();
-                await syncCurrentSessionFromSummary();
-            } catch (e) {
-                console.error('Failed to fetch sessions:', e);
-            }
+            return sidebarController.fetchSessions();
         }
 
         async function fetchProjects() {
-            try {
-                var res = await fetch('/api/projects');
-                projects = await res.json();
-                invalidateSlashItemsData();
-                renderProjects();
-            } catch (e) {
-                console.error('Failed to fetch projects:', e);
-            }
+            return sidebarController.fetchProjects();
         }
 
         async function refreshSidebarDirectory() {
-            if (isSidebarRefreshInFlight) return;
-            isSidebarRefreshInFlight = true;
-            try {
-                await Promise.all([fetchProjects(), fetchSessions()]);
-                updateSidebarSelection();
-            } finally {
-                isSidebarRefreshInFlight = false;
-            }
-        }
-
-        function scheduleRealtimeRefresh() {
-            if (document.hidden) return;
-            clearTimeout(realtimeRefreshTimer);
-            realtimeRefreshTimer = setTimeout(function () {
-                refreshSidebarDirectory();
-            }, REALTIME_REFRESH_DEBOUNCE_MS);
-        }
-
-        function startSidebarAutoRefresh() {
-            if (sidebarRefreshTimer) clearInterval(sidebarRefreshTimer);
-            sidebarRefreshTimer = setInterval(function () {
-                if (document.hidden) return;
-                refreshSidebarDirectory();
-            }, SIDEBAR_REFRESH_INTERVAL_MS);
-        }
-
-        function startCurrentSessionAutoRefresh() {
-            if (currentSessionRefreshTimer) clearInterval(currentSessionRefreshTimer);
-            currentSessionRefreshTimer = setInterval(function () {
-                pollCurrentSessionMessages();
-            }, CURRENT_SESSION_REFRESH_INTERVAL_MS);
-        }
-
-        function stopSidebarAutoRefresh() {
-            if (sidebarRefreshTimer) {
-                clearInterval(sidebarRefreshTimer);
-                sidebarRefreshTimer = null;
-            }
-        }
-
-        function stopCurrentSessionAutoRefresh() {
-            if (currentSessionRefreshTimer) {
-                clearInterval(currentSessionRefreshTimer);
-                currentSessionRefreshTimer = null;
-            }
-        }
-
-        function startPollingFallback() {
-            startSidebarAutoRefresh();
-            startCurrentSessionAutoRefresh();
-        }
-
-        function stopPollingFallback() {
-            stopSidebarAutoRefresh();
-            stopCurrentSessionAutoRefresh();
-        }
-
-        function parseRealtimeEvent(event) {
-            try {
-                return JSON.parse(event.data || '{}');
-            } catch (_) {
-                return null;
-            }
-        }
-
-        function handleRealtimeChange(event) {
-            var payload = parseRealtimeEvent(event);
-            if (!payload) return;
-            scheduleRealtimeRefresh();
-        }
-
-        function closeRealtimeEvents() {
-            if (realtimeEvents) {
-                realtimeEvents.close();
-                realtimeEvents = null;
-            }
-        }
-
-        function scheduleRealtimeReconnect() {
-            if (realtimeReconnectTimer) return;
-            realtimeReconnectTimer = setTimeout(function () {
-                realtimeReconnectTimer = null;
-                startRealtimeEvents();
-            }, REALTIME_RECONNECT_MS);
+            return sidebarController.refreshDirectory();
         }
 
         function startRealtimeEvents() {
-            if (!window.EventSource) {
-                startPollingFallback();
-                return;
-            }
-            if (realtimeEvents) return;
-
-            var source = new EventSource('/api/events');
-            realtimeEvents = source;
-
-            source.addEventListener('ready', function () {
-                stopPollingFallback();
-            });
-            source.addEventListener('sessions_changed', handleRealtimeChange);
-            source.addEventListener('projects_changed', handleRealtimeChange);
-            source.addEventListener('history_cleared', handleRealtimeChange);
-            source.onerror = function () {
-                closeRealtimeEvents();
-                startPollingFallback();
-                scheduleRealtimeReconnect();
-            };
+            sidebarController.startRealtimeEvents();
         }
 
-        document.addEventListener('visibilitychange', function () {
-            if (document.hidden) return;
-            refreshSidebarDirectory();
-            pollCurrentSessionMessages();
-        });
-
-        window.addEventListener('beforeunload', function () {
-            closeRealtimeEvents();
-            if (realtimeReconnectTimer) clearTimeout(realtimeReconnectTimer);
-            if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
-            stopPollingFallback();
-        });
-
         async function addProject() {
-            try {
-                addProjectBtn.disabled = true;
-                var res = await fetch('/api/projects/pick', { method: 'POST' });
-                var data = await res.json();
-                if (!res.ok) throw new Error(data.error || '添加项目失败');
-                if (data.canceled) return;
-                activeProjectId = data.id;
-                expandedProjectIds.add(data.id);
-                saveStoredSet('expandedProjectIds', expandedProjectIds);
-                await Promise.all([fetchProjects(), fetchSessions()]);
-                selectProject(data.id);
-            } catch (e) {
-                showError(e.message || '添加项目失败');
-            } finally {
-                addProjectBtn.disabled = false;
-            }
+            return sidebarController.addProject();
         }
 
         async function createNewChat(projectId, options) {
             options = options || {};
-            var targetProjectId = arguments.length > 0 ? projectId : activeProjectId;
+            var targetProjectId = arguments.length > 0 ? projectId : sidebarController.getActiveProjectId();
             if (!targetProjectId) targetProjectId = null;
             if (currentView !== 'chat') {
                 showChatView();
@@ -1601,7 +1075,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 (!currentProviderType || currentSessionProvider === currentProviderType) &&
                 !document.querySelector('#messages .message-row');
             if (canReuseEmptySession) {
-                activeProjectId = targetProjectId;
+                sidebarController.setActiveProjectId(targetProjectId);
                 delete sessionModelSelections[currentSessionId];
                 var reusableSummary = findSessionSummary(currentSessionId);
                 updateConversationHeaderTitle(reusableSummary ? reusableSummary.title : '新对话');
@@ -1628,7 +1102,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 updateConversationHeaderTitle(data.title);
                 currentSessionUpdatedAt = Number(data.updatedAt || Date.now());
                 currentNewestMessageId = 0;
-                activeProjectId = currentSessionProjectId;
+                sidebarController.setActiveProjectId(currentSessionProjectId);
                 revealSessionContainer(currentSessionProjectId);
                 showChatView();
                 updateContextUsage(null);
@@ -1764,17 +1238,12 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 currentSessionProvider = data.provider || null;
                 updateConversationHeaderTitle(data.title);
                 currentSessionUpdatedAt = Number(data.updatedAt || findSessionSummary(id)?.updatedAt || currentSessionUpdatedAt || 0);
-                activeProjectId = data.projectId || null;
+                sidebarController.setActiveProjectId(data.projectId || null);
                 currentSessionHasMoreMessages = !!data.hasMoreMessages;
                 isLoadingOlderMessages = false;
                 resetInputHistoryFromMessages(data.messages || [], currentSessionHasMoreMessages);
                 updateContextUsage(null);
-                var didExpandProject = false;
-                if (activeProjectId && !expandedProjectIds.has(activeProjectId)) {
-                    expandedProjectIds.add(activeProjectId);
-                    saveStoredSet('expandedProjectIds', expandedProjectIds);
-                    didExpandProject = true;
-                }
+                var didExpandProject = sidebarController.expandProject(data.projectId || null);
 
                 if (!wasChatView) showChatView();
 
@@ -3463,9 +2932,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         if (settingsProjectsEntryBtn) {
             settingsProjectsEntryBtn.addEventListener('click', function () {
                 closeSettingsPanel();
-                isProjectsCollapsed = false;
-                localStorage.setItem('projectsCollapsed', 'false');
-                updateProjectsCollapsedState();
+                sidebarController.setProjectsCollapsed(false);
                 if (addProjectBtn) addProjectBtn.focus();
             });
         }
@@ -4461,8 +3928,9 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             updateProjectsCollapsedState();
             updateHistoryCollapsedState();
             await Promise.all([fetchProjects(), fetchSessions(), fetchModelConfig(), fetchProviders(), fetchSandboxConfig(), fetchAppSettings(), fetchProxyConfig()]);
-            if (sessions.length > 0) {
-                await loadSession(sessions[0].id);
+            var initialSessions = sidebarController.getSessions();
+            if (initialSessions.length > 0) {
+                await loadSession(initialSessions[0].id);
             } else {
                 await createNewChat();
             }
