@@ -1,4 +1,5 @@
 import { createMessageRenderer } from './chat/message-renderer.js';
+import { createSendMessageController } from './chat/send-message.js';
 import {
     getCommandIconHtml,
     getProjectIconHtml,
@@ -2637,147 +2638,63 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             }
         }
 
-        async function sendMessage() {
-            var text = inputEl.value.trim();
-            var messageSkills = promptSkills.slice();
-            var messageProjects = promptProjects.slice();
-            // 收集已上传完成的附件
-            var readyAttachments = pendingAttachments.filter(function (a) { return !a.uploading && a.path; });
-            if ((!text && readyAttachments.length === 0 && messageSkills.length === 0 && messageProjects.length === 0) || isTyping || !currentSessionId) return;
-            var requestSessionId = currentSessionId;
-
-            // 收集附件信息用于显示（包含 path 以便渲染图片）
-            var attachmentInfos = readyAttachments.map(function (a) { return { name: a.name, path: a.path }; });
-            var displayText = text || (readyAttachments.length > 0 ? '[附件]' : '');
-
-            inputEl.value = '';
-            clearPromptSkills();
-            resizeChatInput();
-            sendBtn.disabled = true;
-            isTyping = true;
-            isCancellingResponse = false;
-            updateSendBtnState();
-
-            // 清空附件预览
-            pendingAttachments = [];
-            renderAttachmentPreview();
-
-            appendMessage('user', displayText, attachmentInfos, null, {
-                createdAt: Date.now(),
-                skills: messageSkills,
-                projects: messageProjects,
-            });
-            rememberSentUserMessage(text, messageSkills, messageProjects);
-            showTyping();
-
-            // 构建请求体
-            var body = { content: text };
-            if (messageSkills.length > 0) {
-                body.skills = messageSkills.map(function (skill) {
-                    return { id: skill.id, name: skill.name };
-                });
-            }
-            if (messageProjects.length > 0) {
-                body.projects = messageProjects.map(function (project) {
-                    return { id: project.id, name: project.name, path: project.path };
-                });
-            }
-            if (modelConfig && modelConfig.currentModel) {
-                body.modelId = modelConfig.currentModel;
-            }
-            if (readyAttachments.length > 0) {
-                body.attachments = readyAttachments.map(function (a) {
-                    return { path: a.path, name: a.name };
-                });
-            }
-
-            var agentView = null;
-            try {
-                if (window.ClaudeAgentLoop && window.ClaudeAgentLoop.canStream(currentSessionProvider || (providerData && providerData.current))) {
-                    removeTyping();
-                    agentView = window.ClaudeAgentLoop.createMessage({
-                        messagesEl: messagesEl,
-                        scrollBottom: scrollBottom,
-                    });
-                    var streamController = new AbortController();
-                    activeStreamAbortController = streamController;
-                    activeStreamSessionId = requestSessionId;
-                    var streamResult = await window.ClaudeAgentLoop.stream({
-                        sessionId: requestSessionId,
-                        body: body,
-                        view: agentView,
-                        signal: streamController.signal,
-                        onContextUsage: updateContextUsage,
-                    });
-                    if (activeStreamSessionId === requestSessionId) {
-                        activeStreamAbortController = null;
-                        activeStreamSessionId = null;
-                    }
-                    if (!streamResult.fallback) {
-                        if (streamResult.result && streamResult.result.provider) {
-                            currentSessionProvider = streamResult.result.provider;
-                        }
-                        if (streamResult.result && streamResult.result.title) {
-                            updateConversationHeaderTitle(streamResult.result.title);
-                        }
-                        await fetchSessions();
-                        isTyping = false;
-                        isCancellingResponse = false;
-                        updateSendBtnState();
-                        return;
-                    }
-                    if (agentView && agentView.row) agentView.row.remove();
-                    agentView = null;
-                    showTyping();
-                }
-
-                var res = await fetch('/api/sessions/' + requestSessionId + '/messages', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(body),
-                });
-
-                removeTyping();
-
-                if (!res.ok) {
-                    var err = await res.json().catch(function () {
-                        return {};
-                    });
-                    showError(err.error || '发送失败，请重试');
-                    isTyping = false;
-                    isCancellingResponse = false;
-                    return;
-                }
-
-                var data = await res.json();
-                if (data.provider) currentSessionProvider = data.provider;
-                if (data.title) updateConversationHeaderTitle(data.title);
-                if (data.contextUsage) updateContextUsage(data.contextUsage);
-                appendMessage('ai', data.content, null, data.changeReview, { createdAt: Date.now() });
-
-                await fetchSessions();
-            } catch (e) {
-                removeTyping();
-                if (activeStreamSessionId === requestSessionId) {
+        const sendMessageController = createSendMessageController({
+            inputEl: inputEl,
+            messagesEl: messagesEl,
+            getState: function () {
+                return {
+                    currentSessionId: currentSessionId,
+                    currentSessionProvider: currentSessionProvider,
+                    isTyping: isTyping,
+                    modelConfig: modelConfig,
+                    pendingAttachments: pendingAttachments,
+                    promptProjects: promptProjects,
+                    promptSkills: promptSkills,
+                    providerData: providerData,
+                };
+            },
+            setPendingAttachments: function (value) {
+                pendingAttachments = value;
+            },
+            setTyping: function (value) {
+                isTyping = value;
+            },
+            setCancelling: function (value) {
+                isCancellingResponse = value;
+            },
+            setSendButtonDisabled: function (value) {
+                sendBtn.disabled = value;
+            },
+            setActiveStream: function (controller, sessionId) {
+                activeStreamAbortController = controller;
+                activeStreamSessionId = sessionId;
+            },
+            clearActiveStreamForSession: function (sessionId) {
+                if (activeStreamSessionId === sessionId) {
                     activeStreamAbortController = null;
                     activeStreamSessionId = null;
                 }
-                if (e.name === 'AbortError') {
-                    // 切换会话时只断开本页订阅，不取消后台任务。
-                } else if (agentView) {
-                    agentView.handleEvent({
-                        type: 'error',
-                        error: e.message || '网络错误，请检查连接',
-                    });
-                    showError(e.message || '网络错误，请检查连接');
-                } else {
-                    showError(e.message || '网络错误，请检查连接');
-                }
-            }
+            },
+            setCurrentSessionProvider: function (provider) {
+                currentSessionProvider = provider;
+            },
+            appendMessage: appendMessage,
+            clearPromptSkills: clearPromptSkills,
+            fetchSessions: fetchSessions,
+            rememberSentUserMessage: rememberSentUserMessage,
+            removeTyping: removeTyping,
+            renderAttachmentPreview: renderAttachmentPreview,
+            resizeChatInput: resizeChatInput,
+            scrollBottom: scrollBottom,
+            showError: showError,
+            showTyping: showTyping,
+            updateContextUsage: updateContextUsage,
+            updateConversationHeaderTitle: updateConversationHeaderTitle,
+            updateSendBtnState: updateSendBtnState,
+        });
 
-            isTyping = false;
-            isCancellingResponse = false;
-            updateSendBtnState();
+        async function sendMessage() {
+            return sendMessageController.sendMessage();
         }
 
         function updateModelBadgeLabel() {
