@@ -2,12 +2,15 @@ import { createAttachmentController } from './chat/attachments.js';
 import { createContextUsageController, formatTokenCount } from './chat/context-usage.js';
 import { bindChatInputEvents } from './chat/input-events.js';
 import { createInputHistoryController } from './chat/input-history.js';
+import { createChatInputUiController } from './chat/input-ui.js';
 import { createMessageListController } from './chat/message-list-controller.js';
 import { createMessageMetaController } from './chat/message-meta.js';
 import { createSendMessageController } from './chat/send-message.js';
 import { createSessionController } from './chat/session-controller.js';
 import { createSlashItemsStore } from './chat/slash-items-store.js';
 import { createSlashPickerController } from './chat/slash-picker.js';
+import { createViewRouter } from './app/view-router.js';
+import { getChannelMeta } from './channels/channel-meta.js';
 import { createChannelsPageController } from './channels/channels-page.js';
 import { createSidebarController } from './sidebar/sidebar-controller.js';
 import { createSettingsController } from './settings/settings-controller.js';
@@ -20,6 +23,7 @@ import { renderMarkdown, configureMarkdown } from './markdown.js';
 import { createSkillsPageController } from './skills/skills-page.js';
 import { copyCode } from './ui/code-copy.js';
 import { openImageModal } from './ui/image-modal.js';
+import { createToastController } from './ui/toast.js';
 
 configureMarkdown();
 window.AnyBotMarkdown = { render: renderMarkdown };
@@ -97,13 +101,17 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         let contextUsageController = null;
         let slashItemsStore = null;
         let slashPickerController = null;
+        let inputUiController = null;
         let messageListController = null;
         let messageMetaController = null;
         let sessionController = null;
+        let sendMessageController = null;
         let sidebarController = null;
         let settingsController = null;
         let channelsPageController = null;
         let skillsPageController = null;
+        let viewRouter = null;
+        const toastController = createToastController();
         const SESSION_MESSAGE_PAGE_SIZE = 40;
         const HISTORY_SESSION_PREVIEW_LIMIT = 4;
         const PROJECT_SESSION_PREVIEW_LIMIT = 4;
@@ -112,15 +120,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         const CURRENT_SESSION_REFRESH_INTERVAL_MS = 2000;
         const REALTIME_REFRESH_DEBOUNCE_MS = 150;
         const REALTIME_RECONNECT_MS = 3000;
-        const CHAT_INPUT_PLACEHOLDERS = [
-            '发送消息... 输入 / 使用技能或项目',
-            '按 ↑ / ↓ 切换历史消息',
-            '可粘贴图片或拖拽文件',
-            'Enter 发送，Shift+Enter 换行',
-        ];
-        const CHAT_INPUT_PLACEHOLDER_INTERVAL_MS = 10000;
-        let chatInputPlaceholderIndex = 0;
-        let chatInputPlaceholderTimer = null;
 
         // 附件相关
         const fileInput = document.getElementById('file-input');
@@ -132,16 +131,37 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         let pendingAttachments = []; // { path, name, size, isImage, localUrl? }
 
         const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif', '.heic', '.heif', '.avif'];
-        const SEND_BUTTON_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M7.5 2.5L12 7l-4.5 4.5" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        const STOP_BUTTON_ICON = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.4" fill="white"/></svg>';
 
         contextUsageController = createContextUsageController();
 
+        inputUiController = createChatInputUiController({
+            inputEl: inputEl,
+            sendBtn: sendBtn,
+            getIsTyping: function () {
+                return sessionController ? sessionController.getIsTyping() : false;
+            },
+            getIsCancellingResponse: function () {
+                return sessionController ? sessionController.getIsCancellingResponse() : false;
+            },
+            getPendingAttachments: function () {
+                return pendingAttachments;
+            },
+            getPromptSelection: function () {
+                return slashPickerController
+                    ? slashPickerController.getSelection()
+                    : { skills: [], projects: [] };
+            },
+        });
+
         settingsController = createSettingsController({
             addProjectBtn: addProjectBtn,
-            createNewChat: createNewChat,
+            createNewChat: function (projectId, chatOptions) {
+                return sessionController.createNewChat(projectId, chatOptions);
+            },
             currentModelNameEl: currentModelNameEl,
-            fetchSessions: fetchSessions,
+            fetchSessions: function () {
+                return sidebarController.fetchSessions();
+            },
             getCurrentSessionId: function () {
                 return sessionController ? sessionController.getCurrentSessionId() : null;
             },
@@ -149,7 +169,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 return sessionController ? sessionController.getCurrentSessionProvider() : null;
             },
             getCurrentView: function () {
-                return currentView;
+                return getCurrentView();
             },
             getLatestContextUsage: function () {
                 return contextUsageController ? contextUsageController.getLatestUsage() : null;
@@ -214,39 +234,16 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             settingsWorkdirPickBtn: settingsWorkdirPickBtn,
             showChatView: showChatView,
             showError: showError,
-            showSettingsView: function () {
-                hideAllViews();
-                currentView = 'settings';
-                settingsView.style.display = 'flex';
-                settingsBtn.classList.add('active');
-            },
+            showSettingsView: showSettingsView,
             updateContextUsage: updateContextUsage,
         });
 
         function updateSendBtnState() {
-            var isRunning = !!(sessionController && sessionController.getIsTyping());
-            var isCancelling = !!(sessionController && sessionController.getIsCancellingResponse());
-            var promptSelection = slashPickerController
-                ? slashPickerController.getSelection()
-                : { skills: [], projects: [] };
-            sendBtn.classList.toggle('is-stop', isRunning);
-            sendBtn.innerHTML = isRunning ? STOP_BUTTON_ICON : SEND_BUTTON_ICON;
-            sendBtn.title = isRunning ? (isCancelling ? '正在中断' : '中断') : '发送';
-            sendBtn.setAttribute('aria-label', sendBtn.title);
-            sendBtn.disabled = isRunning
-                ? isCancelling
-                : (
-                    inputEl.value.trim() === '' &&
-                    pendingAttachments.length === 0 &&
-                    promptSelection.skills.length === 0 &&
-                    promptSelection.projects.length === 0
-                );
+            if (inputUiController) inputUiController.updateSendBtnState();
         }
 
         function resizeChatInput() {
-            inputEl.style.height = 'auto';
-            inputEl.style.overflowY = inputEl.scrollHeight > 160 ? 'auto' : 'hidden';
-            inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+            if (inputUiController) inputUiController.resizeChatInput();
         }
 
         const attachmentController = createAttachmentController({
@@ -275,17 +272,21 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             inputEl: inputEl,
             selectedSkillsEl: selectedSkillsEl,
             skillPickerEl: skillPickerEl,
-            fetchSlashItemsData: fetchSlashItemsData,
+            fetchSlashItemsData: function (force) {
+                if (slashItemsStore) return slashItemsStore.fetchItems(force);
+            },
             getCurrentSessionProjectId: function () {
                 return sessionController ? sessionController.getCurrentSessionProjectId() : null;
             },
             getCurrentView: function () {
-                return currentView;
+                return getCurrentView();
             },
             getSlashItemsState: function () {
                 return slashItemsStore ? slashItemsStore.getState() : null;
             },
-            resetInputHistoryNavigation: resetInputHistoryNavigation,
+            resetInputHistoryNavigation: function () {
+                return inputHistoryController.resetNavigation();
+            },
             resizeChatInput: resizeChatInput,
             showError: showError,
             updateSendBtnState: updateSendBtnState,
@@ -298,121 +299,89 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             getCurrentSessionId: function () {
                 return sessionController ? sessionController.getCurrentSessionId() : null;
             },
-            getOldestRenderedMessageId: getOldestRenderedMessageId,
+            getOldestRenderedMessageId: function () {
+                return messageListController ? messageListController.getOldestRenderedMessageId() : null;
+            },
             getPromptSelection: function () {
                 return slashPickerController.getSelection();
             },
             isSelectionOnlyFallback: isSelectionOnlyFallback,
             normalizeMessageProjects: normalizeMessageProjects,
             normalizeMessageSkills: normalizeMessageSkills,
-            parseMessageMetadata: parseMessageMetadata,
+            parseMessageMetadata: function (raw) {
+                return messageListController ? messageListController.parseMessageMetadata(raw) : {};
+            },
         });
-
-        function resetInputHistoryNavigation() {
-            return inputHistoryController.resetNavigation();
-        }
-
-        function resetInputHistoryFromMessages(messages, hasMoreMessages) {
-            return inputHistoryController.resetFromMessages(messages, hasMoreMessages);
-        }
-
-        function prependInputHistoryMessages(messages, hasMoreMessages) {
-            return inputHistoryController.prependMessages(messages, hasMoreMessages);
-        }
-
-        function rememberSentUserMessage(text, skills, projects) {
-            return inputHistoryController.rememberSentUserMessage(text, skills, projects);
-        }
-
-        function shouldHandleInputHistoryKey(e, direction) {
-            return inputHistoryController.shouldHandleKey(e, direction);
-        }
-
-        function navigateInputHistory(direction) {
-            return inputHistoryController.navigate(direction);
-        }
 
         function applyChatInputDraft(value, skills, projects) {
             inputEl.value = value;
             slashPickerController.setSelection(skills, projects);
         }
 
-        function canOpenSkillPickerFromSlash(e) {
-            return slashPickerController.canOpenFromSlash(e);
-        }
-
         function closeSkillPicker(options) {
             return slashPickerController.close(options);
         }
 
-        function syncSkillPickerFromInput() {
-            return slashPickerController.syncFromInput();
-        }
-
-        function renderPromptSkills() {
-            return slashPickerController.renderPromptSelections();
-        }
-
-        function clearPromptSkills() {
-            return slashPickerController.clearPromptSelections();
-        }
-
-        function clearPromptSkillDeleteTarget() {
-            return slashPickerController.clearDeleteTarget();
-        }
-
-        function handlePromptSkillBackspace(e) {
-            return slashPickerController.handlePromptBackspace(e);
-        }
-
-        function insertSkillSlashTrigger() {
-            return slashPickerController.insertSlashTrigger();
-        }
-
-        function handleSkillPickerKeydown(e) {
-            return slashPickerController.handleKeydown(e);
-        }
-
-        function renderAttachmentPreview() {
-            return attachmentController.renderPreview();
-        }
-
-        async function uploadFiles(files) {
-            return attachmentController.uploadFiles(files);
-        }
-
         bindChatInputEvents({
             attachBtn: attachBtn,
-            cancelCurrentResponse: cancelCurrentResponse,
-            canOpenSkillPickerFromSlash: canOpenSkillPickerFromSlash,
+            cancelCurrentResponse: function () {
+                return sessionController.cancelCurrentResponse();
+            },
+            canOpenSkillPickerFromSlash: function (e) {
+                return slashPickerController.canOpenFromSlash(e);
+            },
             chatViewEl: document.getElementById('chat-view'),
-            clearPromptSkillDeleteTarget: clearPromptSkillDeleteTarget,
+            clearPromptSkillDeleteTarget: function () {
+                return slashPickerController.clearDeleteTarget();
+            },
             dropOverlay: dropOverlay,
             fileInput: fileInput,
             getIsTyping: function () {
                 return sessionController ? sessionController.getIsTyping() : false;
             },
-            handlePromptSkillBackspace: handlePromptSkillBackspace,
-            handleSkillPickerKeydown: handleSkillPickerKeydown,
+            handlePromptSkillBackspace: function (e) {
+                return slashPickerController.handlePromptBackspace(e);
+            },
+            handleSkillPickerKeydown: function (e) {
+                return slashPickerController.handleKeydown(e);
+            },
             inputEl: inputEl,
             inputWrapper: inputWrapper,
-            insertSkillSlashTrigger: insertSkillSlashTrigger,
-            navigateInputHistory: navigateInputHistory,
-            resetInputHistoryNavigation: resetInputHistoryNavigation,
+            insertSkillSlashTrigger: function () {
+                return slashPickerController.insertSlashTrigger();
+            },
+            navigateInputHistory: function (direction) {
+                return inputHistoryController.navigate(direction);
+            },
+            resetInputHistoryNavigation: function () {
+                return inputHistoryController.resetNavigation();
+            },
             resizeChatInput: resizeChatInput,
             sendBtn: sendBtn,
-            sendMessage: sendMessage,
-            shouldHandleInputHistoryKey: shouldHandleInputHistoryKey,
-            syncSkillPickerFromInput: syncSkillPickerFromInput,
+            sendMessage: function () {
+                return sendMessageController.sendMessage();
+            },
+            shouldHandleInputHistoryKey: function (e, direction) {
+                return inputHistoryController.shouldHandleKey(e, direction);
+            },
+            syncSkillPickerFromInput: function () {
+                return slashPickerController.syncFromInput();
+            },
             updateSendBtnState: updateSendBtnState,
-            uploadFiles: uploadFiles,
+            uploadFiles: function (files) {
+                return attachmentController.uploadFiles(files);
+            },
         });
 
         sidebarController = createSidebarController({
             addProjectBtn: addProjectBtn,
-            createNewChat: createNewChat,
+            createNewChat: function (projectId, options) {
+                return sessionController.createNewChat(projectId, options);
+            },
             currentSessionRefreshIntervalMs: CURRENT_SESSION_REFRESH_INTERVAL_MS,
-            deleteSession: deleteSession,
+            deleteSession: function (id) {
+                return sessionController.deleteSession(id);
+            },
             getActiveStreamSessionId: function () {
                 return sessionController ? sessionController.getActiveStreamSessionId() : null;
             },
@@ -430,7 +399,7 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 return sessionController ? sessionController.getCurrentSessionUpdatedAt() : 0;
             },
             getCurrentView: function () {
-                return currentView;
+                return getCurrentView();
             },
             getIsLoadingOlderMessages: function () {
                 return messageListController ? messageListController.getIsLoadingOlderMessages() : false;
@@ -438,12 +407,18 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             getIsTyping: function () {
                 return sessionController ? sessionController.getIsTyping() : false;
             },
-            getNewestMessageId: getNewestMessageId,
+            getNewestMessageId: function (messages) {
+                return messageListController ? messageListController.getNewestMessageId(messages) : 0;
+            },
             historyList: historyList,
             historySessionPreviewLimit: HISTORY_SESSION_PREVIEW_LIMIT,
             historyToggle: historyToggle,
-            invalidateSlashItemsData: invalidateSlashItemsData,
-            loadSession: loadSession,
+            invalidateSlashItemsData: function (providerType) {
+                if (slashItemsStore) slashItemsStore.invalidate(providerType);
+            },
+            loadSession: function (id, options) {
+                return sessionController.loadSession(id, options);
+            },
             projectList: projectList,
             projectSessionPreviewLimit: PROJECT_SESSION_PREVIEW_LIMIT,
             projectToggle: projectToggle,
@@ -459,19 +434,27 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             showError: showError,
             sidebar: sidebar,
             sidebarRefreshIntervalMs: SIDEBAR_REFRESH_INTERVAL_MS,
-            updateConversationHeaderTitle: updateConversationHeaderTitle,
+            updateConversationHeaderTitle: function (title) {
+                return messageListController.updateConversationHeaderTitle(title);
+            },
         });
         sidebarController.bindRealtimeLifecycle();
 
         newChatBtn.addEventListener('click', function () {
-            createNewChat();
+            sessionController.createNewChat();
         });
-        projectToggle.addEventListener('click', toggleProjects);
-        addProjectBtn.addEventListener('click', addProject);
-        historyToggle.addEventListener('click', toggleHistory);
+        projectToggle.addEventListener('click', function () {
+            sidebarController.toggleProjects();
+        });
+        addProjectBtn.addEventListener('click', function () {
+            return sidebarController.addProject();
+        });
+        historyToggle.addEventListener('click', function () {
+            sidebarController.toggleHistory();
+        });
         addHistoryChatBtn.addEventListener('click', function (e) {
             e.stopPropagation();
-            createNewChat(null, { force: true });
+            sessionController.createNewChat(null, { force: true });
         });
 
         messageMetaController = createMessageMetaController({
@@ -489,7 +472,9 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             largeMessagePreviewChars: LARGE_MESSAGE_PREVIEW_CHARS,
             messagesEl: messagesEl,
             openImageModal: openImageModal,
-            prependInputHistoryMessages: prependInputHistoryMessages,
+            prependInputHistoryMessages: function (messages, hasMoreMessages) {
+                return inputHistoryController.prependMessages(messages, hasMoreMessages);
+            },
             renderMarkdown: renderMarkdown,
             formatTokenCount: formatTokenCount,
             sessionMessagePageSize: SESSION_MESSAGE_PAGE_SIZE,
@@ -497,177 +482,66 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             updateContextUsage: updateContextUsage,
         });
 
-        function scrollBottom() {
-            return messageListController.scrollBottom();
-        }
-
-        function updateConversationHeaderTitle(title) {
-            return messageListController.updateConversationHeaderTitle(title);
-        }
-
-        function showEmptyState() {
-            return messageListController.showEmptyState();
-        }
-
-        function appendMessage(role, text, attachments, changeReview, opts) {
-            return messageListController.appendMessage(role, text, attachments, changeReview, opts);
-        }
-
-        function getOldestRenderedMessageId() {
-            return messageListController ? messageListController.getOldestRenderedMessageId() : null;
-        }
-
-        function getNewestMessageId(messages) {
-            return messageListController ? messageListController.getNewestMessageId(messages) : 0;
-        }
-
-        function showTyping() {
-            return messageListController.showTyping();
-        }
-
-        function removeTyping() {
-            return messageListController.removeTyping();
-        }
-
         function showError(msg) {
-            var toast = document.createElement('div');
-            toast.className = 'error-toast';
-            toast.textContent = msg;
-            document.body.appendChild(toast);
-            setTimeout(function () {
-                toast.remove();
-            }, 4000);
-        }
-
-        function parseMessageMetadata(raw) {
-            return messageListController ? messageListController.parseMessageMetadata(raw) : {};
+            toastController.showError(msg);
         }
 
         function updateContextUsage(usage) {
             if (contextUsageController) contextUsageController.updateUsage(usage);
         }
 
-        function setupSidebarTooltips() {
-            sidebarController.setupTooltips();
-        }
-
-        function updateChatInputPlaceholder() {
-            inputEl.placeholder = CHAT_INPUT_PLACEHOLDERS[chatInputPlaceholderIndex];
-        }
-
-        function startChatInputPlaceholderRotation() {
-            if (chatInputPlaceholderTimer) return;
-            updateChatInputPlaceholder();
-            chatInputPlaceholderTimer = setInterval(function () {
-                chatInputPlaceholderIndex = (chatInputPlaceholderIndex + 1) % CHAT_INPUT_PLACEHOLDERS.length;
-                updateChatInputPlaceholder();
-            }, CHAT_INPUT_PLACEHOLDER_INTERVAL_MS);
-        }
-
-        function updateProjectsCollapsedState() {
-            sidebarController.updateProjectsCollapsedState();
-        }
-
-        function toggleProjects() {
-            sidebarController.toggleProjects();
-        }
-
-        function updateHistoryCollapsedState() {
-            sidebarController.updateHistoryCollapsedState();
-        }
-
-        function toggleHistory() {
-            sidebarController.toggleHistory();
-        }
-
-        function renderHistory() {
-            sidebarController.renderHistory();
-        }
-
-        function selectProject(projectId) {
-            sidebarController.selectProject(projectId);
-        }
-
-        function renderProjects() {
-            sidebarController.renderProjects();
-        }
-
-        function updateSidebarSelection() {
-            sidebarController.updateSelection();
-        }
-
-        function revealSessionContainer(projectId) {
-            sidebarController.revealSessionContainer(projectId);
-        }
-
-        function revealActiveSessionInSidebar() {
-            sidebarController.revealActiveSession();
-        }
-
-        function findSessionSummary(id) {
-            return sidebarController.findSessionSummary(id);
-        }
-
-        async function syncCurrentSessionFromSummary() {
-            return sidebarController.syncCurrentSessionFromSummary();
-        }
-
-        async function pollCurrentSessionMessages() {
-            return sidebarController.pollCurrentSessionMessages();
-        }
-
-        async function fetchSessions() {
-            return sidebarController.fetchSessions();
-        }
-
-        async function fetchProjects() {
-            return sidebarController.fetchProjects();
-        }
-
-        async function refreshSidebarDirectory() {
-            return sidebarController.refreshDirectory();
-        }
-
-        function startRealtimeEvents() {
-            sidebarController.startRealtimeEvents();
-        }
-
-        async function addProject() {
-            return sidebarController.addProject();
-        }
-
         sessionController = createSessionController({
-            clearPromptSkills: clearPromptSkills,
+            clearPromptSkills: function () {
+                return slashPickerController.clearPromptSelections();
+            },
             clearSessionModelSelection: function (sessionId) {
                 settingsController.clearSessionModelSelection(sessionId);
             },
             expandProject: function (projectId) {
                 return sidebarController.expandProject(projectId);
             },
-            fetchModelConfig: fetchModelConfig,
-            fetchSessions: fetchSessions,
-            findSessionSummary: findSessionSummary,
+            fetchModelConfig: function (providerType) {
+                return settingsController.fetchModelConfig(providerType);
+            },
+            fetchSessions: function () {
+                return sidebarController.fetchSessions();
+            },
+            findSessionSummary: function (id) {
+                return sidebarController.findSessionSummary(id);
+            },
             getActiveProjectId: function () {
                 return sidebarController.getActiveProjectId();
             },
             getCurrentView: function () {
-                return currentView;
+                return getCurrentView();
             },
             getProviderData: function () {
                 return settingsController.getProviderData();
             },
             inputEl: inputEl,
             messagesEl: messagesEl,
-            renderHistory: renderHistory,
-            renderProjects: renderProjects,
+            renderHistory: function () {
+                sidebarController.renderHistory();
+            },
+            renderProjects: function () {
+                sidebarController.renderProjects();
+            },
             renderSessionMessages: function (messages, hasMoreMessages) {
                 return messageListController.renderSessionMessages(messages, hasMoreMessages);
             },
-            resetInputHistoryFromMessages: resetInputHistoryFromMessages,
+            resetInputHistoryFromMessages: function (messages, hasMoreMessages) {
+                return inputHistoryController.resetFromMessages(messages, hasMoreMessages);
+            },
             resizeChatInput: resizeChatInput,
-            revealActiveSessionInSidebar: revealActiveSessionInSidebar,
-            revealSessionContainer: revealSessionContainer,
-            scrollBottom: scrollBottom,
+            revealActiveSessionInSidebar: function () {
+                sidebarController.revealActiveSession();
+            },
+            revealSessionContainer: function (projectId) {
+                sidebarController.revealSessionContainer(projectId);
+            },
+            scrollBottom: function () {
+                return messageListController.scrollBottom();
+            },
             sessionMessagePageSize: SESSION_MESSAGE_PAGE_SIZE,
             setActiveProjectId: function (projectId) {
                 sidebarController.setActiveProjectId(projectId);
@@ -676,31 +550,21 @@ window.AnyBotMarkdown = { render: renderMarkdown };
                 sendBtn.disabled = value;
             },
             showChatView: showChatView,
-            showEmptyState: showEmptyState,
+            showEmptyState: function () {
+                return messageListController.showEmptyState();
+            },
             showError: showError,
             updateContextUsage: updateContextUsage,
-            updateConversationHeaderTitle: updateConversationHeaderTitle,
+            updateConversationHeaderTitle: function (title) {
+                return messageListController.updateConversationHeaderTitle(title);
+            },
             updateSendBtnState: updateSendBtnState,
-            updateSidebarSelection: updateSidebarSelection,
+            updateSidebarSelection: function () {
+                sidebarController.updateSelection();
+            },
         });
 
-        async function createNewChat(projectId, options) {
-            return sessionController.createNewChat(projectId, options);
-        }
-
-        async function cancelCurrentResponse() {
-            return sessionController.cancelCurrentResponse();
-        }
-
-        async function loadSession(id, options) {
-            return sessionController.loadSession(id, options);
-        }
-
-        async function deleteSession(id) {
-            return sessionController.deleteSession(id);
-        }
-
-        const sendMessageController = createSendMessageController({
+        sendMessageController = createSendMessageController({
             inputEl: inputEl,
             messagesEl: messagesEl,
             getState: function () {
@@ -737,44 +601,38 @@ window.AnyBotMarkdown = { render: renderMarkdown };
             setCurrentSessionProvider: function (provider) {
                 sessionController.setCurrentSessionProvider(provider);
             },
-            appendMessage: appendMessage,
-            clearPromptSkills: clearPromptSkills,
-            fetchSessions: fetchSessions,
-            rememberSentUserMessage: rememberSentUserMessage,
-            removeTyping: removeTyping,
-            renderAttachmentPreview: renderAttachmentPreview,
+            appendMessage: function (role, text, attachments, changeReview, opts) {
+                return messageListController.appendMessage(role, text, attachments, changeReview, opts);
+            },
+            clearPromptSkills: function () {
+                return slashPickerController.clearPromptSelections();
+            },
+            fetchSessions: function () {
+                return sidebarController.fetchSessions();
+            },
+            rememberSentUserMessage: function (text, skills, projects) {
+                return inputHistoryController.rememberSentUserMessage(text, skills, projects);
+            },
+            removeTyping: function () {
+                return messageListController.removeTyping();
+            },
+            renderAttachmentPreview: function () {
+                return attachmentController.renderPreview();
+            },
             resizeChatInput: resizeChatInput,
-            scrollBottom: scrollBottom,
+            scrollBottom: function () {
+                return messageListController.scrollBottom();
+            },
             showError: showError,
-            showTyping: showTyping,
+            showTyping: function () {
+                return messageListController.showTyping();
+            },
             updateContextUsage: updateContextUsage,
-            updateConversationHeaderTitle: updateConversationHeaderTitle,
+            updateConversationHeaderTitle: function (title) {
+                return messageListController.updateConversationHeaderTitle(title);
+            },
             updateSendBtnState: updateSendBtnState,
         });
-
-        async function sendMessage() {
-            return sendMessageController.sendMessage();
-        }
-
-        function fetchModelConfig(providerType) {
-            return settingsController.fetchModelConfig(providerType);
-        }
-
-        function fetchProviders() {
-            return settingsController.fetchProviders();
-        }
-
-        function fetchSandboxConfig() {
-            return settingsController.fetchSandboxConfig();
-        }
-
-        function fetchAppSettings() {
-            return settingsController.fetchAppSettings();
-        }
-
-        function fetchProxyConfig() {
-            return settingsController.fetchProxyConfig();
-        }
 
         document.addEventListener('click', function (e) {
             if (slashPickerController.isOpen() && skillPickerEl && e.target !== inputEl && !skillPickerEl.contains(e.target)) {
@@ -800,22 +658,6 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         const channelsBtn = document.getElementById('channels-btn');
         const skillsBtn = document.getElementById('skills-btn');
 
-        const CHANNEL_META = {
-            web: {name: '本地', icon: '本', iconClass: 'web', badge: '本地'},
-            feishu: {name: '飞书', icon: '飞', iconClass: 'feishu', badge: '飞书'},
-            qqbot: {name: 'QQ', icon: 'Q', iconClass: 'qq', badge: 'QQ'},
-            weixin: {name: '微信', icon: '微', iconClass: 'weixin', badge: '微信'},
-            dingtalk: {name: '钉钉', icon: '钉', iconClass: 'dingtalk', badge: '钉钉'},
-            telegram: {name: 'Telegram', icon: 'T', iconClass: 'telegram', badge: 'TG'},
-            discord: {name: 'Discord', icon: 'D', iconClass: 'discord', badge: 'DC'},
-        };
-
-        function getChannelMeta(type) {
-            return CHANNEL_META[type] || {name: type, icon: type.charAt(0).toUpperCase(), iconClass: 'default'};
-        }
-
-        var currentView = 'chat';
-
         channelsPageController = createChannelsPageController({
             channelView: channelView,
             getChannelMeta: getChannelMeta,
@@ -823,108 +665,93 @@ window.AnyBotMarkdown = { render: renderMarkdown };
         });
 
         skillsPageController = createSkillsPageController({
-            getActiveSlashProviderType: getActiveSlashProviderType,
-            getProviderQuery: getProviderQuery,
-            invalidateSlashItemsData: invalidateSlashItemsData,
+            getActiveSlashProviderType: function () {
+                return slashItemsStore ? slashItemsStore.getActiveProviderType() : '';
+            },
+            getProviderQuery: function (providerType) {
+                return slashItemsStore ? slashItemsStore.getProviderQuery(providerType) : (providerType ? '?provider=' + encodeURIComponent(providerType) : '');
+            },
+            invalidateSlashItemsData: function (providerType) {
+                if (slashItemsStore) slashItemsStore.invalidate(providerType);
+            },
             showChatView: showChatView,
             showError: showError,
             skillsView: skillsView,
         });
 
-        function hideAllViews() {
-            closeSkillPicker();
-            chatView.style.display = 'none';
-            channelView.style.display = 'none';
-            skillsView.style.display = 'none';
-            settingsView.style.display = 'none';
-            newChatBtn.classList.remove('active');
-            channelsBtn.classList.remove('active');
-            skillsBtn.classList.remove('active');
-            settingsBtn.classList.remove('active');
+        viewRouter = createViewRouter({
+            channelsBtn: channelsBtn,
+            channelView: channelView,
+            chatView: chatView,
+            closeSkillPicker: closeSkillPicker,
+            fetchChannels: function () {
+                return channelsPageController.fetchChannels();
+            },
+            fetchSkills: function () {
+                return skillsPageController.fetchSkills();
+            },
+            handleChannelsEscape: function () {
+                return channelsPageController.handleEscape();
+            },
+            handleSkillsKeydown: function (e) {
+                return skillsPageController.handleKeydown(e);
+            },
+            hasChannelsData: function () {
+                return channelsPageController.hasChannelsData();
+            },
+            newChatBtn: newChatBtn,
+            renderChannelsPage: function () {
+                return channelsPageController.render();
+            },
+            renderHistory: function () {
+                sidebarController.renderHistory();
+            },
+            renderProjects: function () {
+                sidebarController.renderProjects();
+            },
+            renderSkillsPage: function () {
+                return skillsPageController.render();
+            },
+            settingsBtn: settingsBtn,
+            settingsView: settingsView,
+            skillsBtn: skillsBtn,
+            skillsView: skillsView,
+        });
+        viewRouter.bindNavigation();
+
+        function getCurrentView() {
+            return viewRouter ? viewRouter.getCurrentView() : 'chat';
         }
 
         function showChatView() {
-            hideAllViews();
-            currentView = 'chat';
-            chatView.style.display = 'flex';
-            newChatBtn.classList.add('active');
-            renderHistory();
-            renderProjects();
+            if (viewRouter) viewRouter.showChatView();
         }
 
-        function showChannelsPage() {
-            hideAllViews();
-            currentView = 'channels';
-            channelView.style.display = 'flex';
-            channelsBtn.classList.add('active');
-            renderHistory();
-            channelsPageController.render();
+        function showSettingsView() {
+            if (viewRouter) viewRouter.showSettingsView();
         }
-
-        function showSkillsPage() {
-            hideAllViews();
-            currentView = 'skills';
-            skillsView.style.display = 'flex';
-            skillsBtn.classList.add('active');
-            renderHistory();
-            skillsPageController.render();
-        }
-
-        channelsBtn.addEventListener('click', function () {
-            if (currentView === 'channels') return;
-            if (!channelsPageController.hasChannelsData()) {
-                channelsPageController.fetchChannels().then(function () {
-                    showChannelsPage();
-                });
-            } else {
-                showChannelsPage();
-            }
-        });
-
-        skillsBtn.addEventListener('click', function () {
-            if (currentView === 'skills') return;
-            skillsPageController.fetchSkills().then(function () {
-                showSkillsPage();
-            });
-        });
-
-        function getActiveSlashProviderType() {
-            return slashItemsStore ? slashItemsStore.getActiveProviderType() : '';
-        }
-
-        function getProviderQuery(providerType) {
-            return slashItemsStore ? slashItemsStore.getProviderQuery(providerType) : (providerType ? '?provider=' + encodeURIComponent(providerType) : '');
-        }
-
-        function invalidateSlashItemsData(providerType) {
-            if (slashItemsStore) slashItemsStore.invalidate(providerType);
-        }
-
-        async function fetchSlashItemsData(force) {
-            if (slashItemsStore) return slashItemsStore.fetchItems(force);
-        }
-
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && channelsPageController.handleEscape()) {
-                return;
-            }
-            if (currentView !== 'skills') return;
-            skillsPageController.handleKeydown(e);
-        });
 
         async function init() {
-            setupSidebarTooltips();
-            startChatInputPlaceholderRotation();
-            updateProjectsCollapsedState();
-            updateHistoryCollapsedState();
-            await Promise.all([fetchProjects(), fetchSessions(), fetchModelConfig(), fetchProviders(), fetchSandboxConfig(), fetchAppSettings(), fetchProxyConfig()]);
+            sidebarController.setupTooltips();
+            if (inputUiController) inputUiController.startPlaceholderRotation();
+            sidebarController.updateProjectsCollapsedState();
+            sidebarController.updateHistoryCollapsedState();
+            await Promise.all([
+                sidebarController.fetchProjects(),
+                sidebarController.fetchSessions(),
+                settingsController.fetchModelConfig(),
+                settingsController.fetchProviders(),
+                settingsController.fetchSandboxConfig(),
+                settingsController.fetchAppSettings(),
+                settingsController.fetchProxyConfig(),
+            ]);
             var initialSessions = sidebarController.getSessions();
             if (initialSessions.length > 0) {
-                await loadSession(initialSessions[0].id);
+                await sessionController.loadSession(initialSessions[0].id);
             } else {
-                await createNewChat();
+                await sessionController.createNewChat();
             }
-            startRealtimeEvents();
+            sidebarController.startRealtimeEvents();
             inputEl.focus();
         }
 
