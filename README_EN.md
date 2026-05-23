@@ -478,45 +478,76 @@ curl -X POST http://localhost:19981/api/send \
 ```
 AnyBot/
 ├── src/
-│   ├── index.ts            # Main entry, session state management
-│   ├── shared.ts           # Shared utilities (prompt building, ID generation, config reading)
-│   ├── providers/           # Provider abstraction layer
-│   │   ├── types.ts        # IProvider interface definition
-│   │   ├── index.ts        # ProviderManager (factory + registry)
-│   │   ├── codex.ts        # Codex CLI Provider implementation
-│   │   └── claude-code.ts  # Claude Code Provider implementation
-│   ├── lark.ts             # Feishu API (messages, files, images)
-│   ├── logger.ts           # Structured logging
-│   ├── message.ts          # Message parsing (input/output)
-│   ├── proxy.ts            # Global proxy application and env injection
-│   ├── prompt.ts           # System prompt builder
-│   ├── types.ts            # Type definitions
-│   ├── channels/           # Channel management
-│   │   ├── index.ts        # ChannelManager
-│   │   ├── commands.ts     # Unified chat command handler (/help, /provider, /model, etc.)
-│   │   ├── feishu.ts       # Feishu channel implementation
-│   │   ├── qqbot.ts        # QQ Bot channel implementation
-│   │   ├── telegram.ts     # Telegram channel implementation
-│   │   ├── weixin.ts       # Weixin channel implementation
-│   │   ├── config.ts       # channels.json read/write
-│   │   └── types.ts        # Channel interface definitions (incl. sendToOwner)
-│   ├── web/                # Web layer
-│   │   ├── server.ts       # Express server
-│   │   ├── api.ts          # REST API (incl. file upload, proactive messaging)
-│   │   ├── db.ts           # SQLite persistence
-│   │   ├── model-config.ts # Provider + model configuration
-│   │   ├── proxy-config.ts # proxy.json read/write
-│   │   ├── skills.ts       # Skill management
-│   │   └── public/         # Frontend static files
-│   └── agent/              # Agent template files
+│   ├── index.ts                    # Process entry: starts Providers, Web server, and channels
+│   ├── chat-runner.ts              # Chat orchestration: Provider calls, stream events, change review, persistence
+│   ├── app-settings.ts             # App settings storage and environment compatibility layer
+│   ├── sandbox-config.ts           # Provider sandbox / permission mode configuration
+│   ├── prompt.ts                   # Shared system prompt construction
+│   ├── shared.ts                   # Shared runtime config, IDs, and path helpers
+│   ├── logger.ts                   # Structured logging
+│   ├── lark.ts                     # Feishu API (messages, files, images)
+│   ├── message.ts                  # Message parsing (input/output)
+│   ├── proxy.ts                    # Proxy compatibility logic
+│   ├── types.ts                    # Common type definitions
+│   ├── utils/                      # Common utilities
+│   ├── providers/                  # Provider abstraction layer
+│   │   ├── types.ts                # IProvider interface definition
+│   │   ├── index.ts                # ProviderManager (factory + registry)
+│   │   ├── codex.ts                # Codex CLI Provider implementation
+│   │   ├── claude-code.ts          # Claude Code Provider implementation
+│   │   └── claude-code-agent-events.ts # Claude Code Agent event conversion
+│   ├── channels/                   # Weixin, Telegram, Feishu, QQ, and other channel integrations
+│   │   ├── index.ts                # ChannelManager
+│   │   ├── commands.ts             # Channel chat commands (/help, /provider, /model, etc.)
+│   │   ├── config.ts               # channels.json read/write
+│   │   ├── feishu.ts               # Feishu channel implementation
+│   │   ├── qqbot.ts                # QQ Bot channel implementation
+│   │   ├── telegram.ts             # Telegram channel implementation
+│   │   ├── weixin.ts               # Weixin channel implementation
+│   │   └── types.ts                # Channel interface definitions (incl. sendToOwner)
+│   ├── web/                        # Express API, SQLite storage, and Web UI static resources
+│   │   ├── server.ts               # Static file server and /api mounting
+│   │   ├── api.ts                  # Lightweight API composition entry
+│   │   ├── db.ts                   # SQLite sessions, messages, and project storage
+│   │   ├── model-config.ts         # Provider + model configuration
+│   │   ├── proxy-config.ts         # proxy.json read/write
+│   │   ├── skills.ts               # Provider-isolated skill scanning and state management
+│   │   ├── slash-items.ts          # Web UI slash picker data source
+│   │   ├── agent-stream.ts         # Agent stream event shaping
+│   │   ├── change-review.ts        # Change review snapshots and state
+│   │   ├── events.ts               # Web event broadcasting
+│   │   ├── routes/                 # Domain routes for request/response, validation, and status codes
+│   │   │   ├── sessions.ts         # Session list, creation, details, and deletion
+│   │   │   ├── messages.ts         # Web chat send, streaming response, and cancellation
+│   │   │   ├── send.ts             # Proactive channel messaging
+│   │   │   ├── providers.ts        # Provider list and switching
+│   │   │   ├── settings.ts         # Model and app settings
+│   │   │   ├── channels.ts         # Channel configuration
+│   │   │   ├── skills.ts           # Skills and slash items
+│   │   │   ├── projects.ts         # Project list and directory tree
+│   │   │   ├── files.ts            # File upload and access
+│   │   │   ├── proxy.ts            # Proxy configuration API
+│   │   │   ├── data.ts             # Local data import/export
+│   │   │   ├── events.ts           # SSE / event API
+│   │   │   ├── change-reviews.ts   # Change review API
+│   │   │   └── desktop-update.ts   # Desktop update checks
+│   │   ├── services/               # Reusable route business logic and pure helpers
+│   │   └── public/                 # No-build browser HTML / CSS / ES modules
+│   │       ├── index.html
+│   │       ├── styles/
+│   │       └── scripts/
+│   │           └── app/            # app, chat, sidebar, settings, channels, skills, ui, utils layers
+│   └── agent/                      # Agent prompt templates
 │       └── md_files/
-│           ├── AGENTS.md   # Agent behavior rules
-│           ├── BOOTSTRAP.md # First-run bootstrap
-│           ├── MEMORY.md   # Long-term memory template
-│           └── PROFILE.md  # Agent identity & user profile
-├── scripts/                # Cross-platform helper scripts
-│   ├── bot.mjs             # daemon control script
-│   └── claude-deepseek-wrapper.sh
+│           ├── AGENTS.md           # Agent behavior rules
+│           ├── BOOTSTRAP.md        # First-run bootstrap
+│           ├── MEMORY.md           # Long-term memory template
+│           └── PROFILE.md          # Agent identity & user profile
+├── electron/                       # Electron desktop entry and after-pack handling
+├── scripts/                        # Build, release asset copy, and daemon helper scripts
+├── installer/windows/              # Windows installer configuration
+├── build/icons/                    # Desktop app icons
+├── assets/                         # README screenshots and showcase assets
 └── package.json
 ```
 

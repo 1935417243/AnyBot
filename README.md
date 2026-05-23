@@ -505,45 +505,76 @@ curl -X POST http://localhost:19981/api/send \
 ```
 AnyBot/
 ├── src/
-│   ├── index.ts            # 主入口，会话状态管理
-│   ├── shared.ts           # 公共工具（prompt 构建、ID 生成、配置读取）
-│   ├── providers/           # Provider 抽象层
-│   │   ├── types.ts        # IProvider 接口定义
-│   │   ├── index.ts        # ProviderManager（工厂 + 注册）
-│   │   ├── codex.ts        # Codex CLI Provider 实现
-│   │   └── claude-code.ts  # Claude Code Provider 实现
-│   ├── lark.ts             # 飞书 API（消息、文件、图片）
-│   ├── logger.ts           # 结构化日志
-│   ├── message.ts          # 消息解析（输入输出）
-│   ├── proxy.ts            # 全局代理应用与环境变量注入
-│   ├── prompt.ts           # 系统提示词构建
-│   ├── types.ts            # 类型定义
-│   ├── channels/           # 频道管理
-│   │   ├── index.ts        # ChannelManager
-│   │   ├── commands.ts     # 统一聊天命令处理（/help, /provider, /model 等）
-│   │   ├── feishu.ts       # 飞书频道实现
-│   │   ├── qqbot.ts        # QQ 机器人频道实现
-│   │   ├── telegram.ts     # Telegram 频道实现
-│   │   ├── weixin.ts       # 微信频道实现
-│   │   ├── config.ts       # channels.json 读写
-│   │   └── types.ts        # 频道接口定义（含 sendToOwner 主动推送）
-│   ├── web/                # Web 层
-│   │   ├── server.ts       # Express 服务
-│   │   ├── api.ts          # REST API（含文件上传、主动推送）
-│   │   ├── db.ts           # SQLite 持久化
-│   │   ├── model-config.ts # Provider + 模型配置
-│   │   ├── proxy-config.ts # proxy.json 读写
-│   │   ├── skills.ts       # 技能管理
-│   │   └── public/         # 前端静态文件
-│   └── agent/              # Agent 模板文件
+│   ├── index.ts                    # 进程入口：启动 Provider、Web 服务和频道
+│   ├── chat-runner.ts              # 会话编排：Provider 调用、流式事件、变更审核和消息落库
+│   ├── app-settings.ts             # 应用设置读写与环境变量兼容入口
+│   ├── sandbox-config.ts           # Provider sandbox / 权限模式配置
+│   ├── prompt.ts                   # 共享系统提示词构建
+│   ├── shared.ts                   # 共享运行配置、ID 和路径辅助
+│   ├── logger.ts                   # 结构化日志
+│   ├── lark.ts                     # 飞书 API（消息、文件、图片）
+│   ├── message.ts                  # 消息解析（输入输出）
+│   ├── proxy.ts                    # 代理相关兼容逻辑
+│   ├── types.ts                    # 通用类型定义
+│   ├── utils/                      # 通用工具
+│   ├── providers/                  # Provider 抽象层
+│   │   ├── types.ts                # IProvider 接口定义
+│   │   ├── index.ts                # ProviderManager（工厂 + 注册）
+│   │   ├── codex.ts                # Codex CLI Provider 实现
+│   │   ├── claude-code.ts          # Claude Code Provider 实现
+│   │   └── claude-code-agent-events.ts # Claude Code Agent 事件转换
+│   ├── channels/                   # 微信、Telegram、飞书、QQ 等频道集成
+│   │   ├── index.ts                # ChannelManager
+│   │   ├── commands.ts             # 频道聊天命令（/help, /provider, /model 等）
+│   │   ├── config.ts               # channels.json 读写
+│   │   ├── feishu.ts               # 飞书频道实现
+│   │   ├── qqbot.ts                # QQ 机器人频道实现
+│   │   ├── telegram.ts             # Telegram 频道实现
+│   │   ├── weixin.ts               # 微信频道实现
+│   │   └── types.ts                # 频道接口定义（含 sendToOwner 主动推送）
+│   ├── web/                        # Express API、SQLite 存储和 Web UI 静态资源
+│   │   ├── server.ts               # 静态资源服务和 /api 挂载
+│   │   ├── api.ts                  # 轻量 API 组合入口
+│   │   ├── db.ts                   # SQLite 会话、消息和项目存储
+│   │   ├── model-config.ts         # Provider + 模型配置
+│   │   ├── proxy-config.ts         # proxy.json 读写
+│   │   ├── skills.ts               # Provider 隔离的技能扫描与状态管理
+│   │   ├── slash-items.ts          # Web UI slash picker 数据源
+│   │   ├── agent-stream.ts         # Agent 流式事件整理
+│   │   ├── change-review.ts        # 变更审核快照与状态
+│   │   ├── events.ts               # Web 事件广播
+│   │   ├── routes/                 # 领域路由，负责请求/响应、校验和状态码
+│   │   │   ├── sessions.ts         # 会话列表、创建、详情和删除
+│   │   │   ├── messages.ts         # Web 对话发送、流式响应和取消
+│   │   │   ├── send.ts             # 频道主动推送
+│   │   │   ├── providers.ts        # Provider 列表与切换
+│   │   │   ├── settings.ts         # 模型和应用设置
+│   │   │   ├── channels.ts         # 频道配置
+│   │   │   ├── skills.ts           # 技能与 slash items
+│   │   │   ├── projects.ts         # 项目列表与目录树
+│   │   │   ├── files.ts            # 文件上传与访问
+│   │   │   ├── proxy.ts            # 代理配置接口
+│   │   │   ├── data.ts             # 本地数据导入/导出
+│   │   │   ├── events.ts           # SSE / 事件接口
+│   │   │   ├── change-reviews.ts   # 变更审核接口
+│   │   │   └── desktop-update.ts   # 桌面更新检查
+│   │   ├── services/               # 路由复用的业务逻辑和纯辅助函数
+│   │   └── public/                 # 无构建流程的浏览器端 HTML / CSS / ES modules
+│   │       ├── index.html
+│   │       ├── styles/
+│   │       └── scripts/
+│   │           └── app/            # app、chat、sidebar、settings、channels、skills、ui、utils 分层
+│   └── agent/                      # Agent 提示词模板
 │       └── md_files/
-│           ├── AGENTS.md   # Agent 行为规则
-│           ├── BOOTSTRAP.md # 首次启动引导
-│           ├── MEMORY.md   # 长期记忆模板
-│           └── PROFILE.md  # Agent 身份与用户档案
-├── scripts/                # 跨平台辅助脚本
-│   ├── bot.mjs             # daemon 控制脚本
-│   └── claude-deepseek-wrapper.sh
+│           ├── AGENTS.md           # Agent 行为规则
+│           ├── BOOTSTRAP.md        # 首次启动引导
+│           ├── MEMORY.md           # 长期记忆模板
+│           └── PROFILE.md          # Agent 身份与用户档案
+├── electron/                       # Electron 桌面入口与打包后处理
+├── scripts/                        # 构建、发布资源复制和 daemon 辅助脚本
+├── installer/windows/              # Windows 安装器配置
+├── build/icons/                    # 桌面应用图标
+├── assets/                         # README 截图和展示素材
 └── package.json
 ```
 
