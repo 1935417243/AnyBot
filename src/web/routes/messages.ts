@@ -3,11 +3,18 @@ import type { Request, Response } from "express";
 import { logger } from "../../logger.js";
 import {
   ChatTurnValidationError,
+  compactChatSession,
   prepareChatTurn,
   runChatTurn,
   runPreparedChatTurn,
   type PreparedChatTurn,
 } from "../../chat-runner.js";
+import {
+  clearActiveRun,
+  createActiveRun,
+  getActiveRunController,
+  hasActiveRun,
+} from "../active-runs.js";
 import {
   attachAgentStreamClient,
   createActiveAgentStream,
@@ -24,8 +31,6 @@ import {
   type ChatPromptProject,
   type ChatPromptSkill,
 } from "../services/web-chat-input.js";
-
-const activeRunControllers = new Map<string, AbortController>();
 
 export function createMessagesRouter(): Router {
   const router = Router();
@@ -52,7 +57,7 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    const controller = activeRunControllers.get(id);
+    const controller = getActiveRunController(id);
     if (!controller) {
       res.status(409).json({ error: "当前会话没有正在处理的 Claude/Codex 请求" });
       return;
@@ -63,6 +68,67 @@ export function createMessagesRouter(): Router {
     res.json({ ok: true });
   });
 
+  router.post("/sessions/:id/compact", async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const session = db.getSessionMetadata(id);
+    if (!session) {
+      res.status(404).json({ error: "会话不存在" });
+      return;
+    }
+
+    if (hasActiveAgentStream(id) || hasActiveRun(id)) {
+      res.status(423).json({ error: "当前会话正在处理中，请稍后再压缩上下文" });
+      return;
+    }
+
+    let sessionWorkdir: string;
+    try {
+      sessionWorkdir = getSessionWorkdir(session);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "项目目录不可用" });
+      return;
+    }
+
+    const { modelId } = req.body as { modelId?: string };
+    const activeRun = createActiveRun(id, "compact");
+
+    try {
+      const result = await compactChatSession({
+        session,
+        modelId,
+        workdir: sessionWorkdir,
+        signal: activeRun.controller.signal,
+        logPrefix: "web.chat.compact",
+      });
+
+      res.json({
+        role: "assistant",
+        content: result.content,
+        title: result.title,
+        messageId: result.messageId,
+        createdAt: result.createdAt,
+        provider: result.provider,
+        contextUsage: result.contextUsage,
+      });
+    } catch (error) {
+      if (error instanceof ChatTurnValidationError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+
+      if (activeRun.controller.signal.aborted) {
+        res.status(499).json({ error: "压缩已停止", canceled: true });
+        return;
+      }
+
+      const errorMessage =
+        error instanceof Error ? error.message : "压缩上下文失败，请稍后再试。";
+      res.status(500).json({ error: errorMessage });
+    } finally {
+      clearActiveRun(id, activeRun.controller);
+    }
+  });
+
   router.post("/sessions/:id/messages/stream", async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const session = db.getSessionMetadata(id);
@@ -71,7 +137,7 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    if (hasActiveAgentStream(id)) {
+    if (hasActiveAgentStream(id) || hasActiveRun(id)) {
       res.status(423).json({ error: "当前会话正在处理中，请稍后再发送新消息" });
       return;
     }
@@ -125,8 +191,7 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    const runAbortController = new AbortController();
-    activeRunControllers.set(id, runAbortController);
+    const activeRun = createActiveRun(id, "message");
     const active = createActiveAgentStream(id);
     attachAgentStreamClient(id, res);
 
@@ -135,7 +200,7 @@ export function createMessagesRouter(): Router {
     void (async () => {
       try {
         await runPreparedChatTurn(prepared, {
-          signal: runAbortController.signal,
+          signal: activeRun.controller.signal,
           stream: { emit },
           logPrefix: "web.chat.stream",
           logFields: { fileCount: input.fileCount, skillCount: input.skillCount, projectCount: input.projectCount },
@@ -143,7 +208,7 @@ export function createMessagesRouter(): Router {
       } catch {
         // runPreparedChatTurn 已记录日志并推送 error 事件，这里只负责收尾。
       } finally {
-        activeRunControllers.delete(id);
+        clearActiveRun(id, activeRun.controller);
         finishAgentStream(id, active);
       }
     })();
@@ -157,7 +222,7 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    if (hasActiveAgentStream(id)) {
+    if (hasActiveAgentStream(id) || hasActiveRun(id)) {
       res.status(423).json({ error: "当前会话正在处理中，请稍后再发送新消息" });
       return;
     }

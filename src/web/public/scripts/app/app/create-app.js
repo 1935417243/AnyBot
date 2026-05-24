@@ -286,11 +286,18 @@ export function createAnyBotApp(dom, deps) {
         getCurrentView: function () {
             return getCurrentView();
         },
+        getLatestContextUsage: function () {
+            return contextUsageController ? contextUsageController.getLatestUsage() : null;
+        },
         getSlashItemsState: function () {
             return slashItemsStore ? slashItemsStore.getState() : null;
         },
         resetInputHistoryNavigation: function () {
             return inputHistoryController.resetNavigation();
+        },
+        runProviderCommand: function (commandText, item) {
+            if (!sendMessageController) return false;
+            return sendMessageController.sendProviderCommand(commandText, item);
         },
         resizeChatInput: resizeChatInput,
         showError: showError,
@@ -534,6 +541,9 @@ export function createAnyBotApp(dom, deps) {
         renderSessionMessages: function (messages, hasMoreMessages) {
             return messageListController.renderSessionMessages(messages, hasMoreMessages);
         },
+        appendContextCompactProgress: function (opts) {
+            return messageListController.appendContextCompactProgress(opts);
+        },
         resetInputHistoryFromMessages: function (messages, hasMoreMessages) {
             return inputHistoryController.resetFromMessages(messages, hasMoreMessages);
         },
@@ -606,8 +616,26 @@ export function createAnyBotApp(dom, deps) {
         setCurrentSessionProvider: function (provider) {
             sessionController.setCurrentSessionProvider(provider);
         },
+        startCompactProgress: function (sessionId, startedAt) {
+            sessionController.startActiveCompact(sessionId, startedAt);
+        },
+        finishCompactProgress: function (sessionId, result) {
+            return sessionController.finishActiveCompact(sessionId, result);
+        },
+        cancelCompactProgress: function (sessionId, label) {
+            return sessionController.cancelActiveCompact(sessionId, label);
+        },
+        failCompactProgress: function (sessionId, label) {
+            return sessionController.failActiveCompact(sessionId, label);
+        },
         appendMessage: function (role, text, attachments, changeReview, opts) {
             return messageListController.appendMessage(role, text, attachments, changeReview, opts);
+        },
+        appendContextCompactDivider: function (text, opts) {
+            return messageListController.appendContextCompactDivider(text, opts);
+        },
+        appendContextCompactProgress: function (opts) {
+            return messageListController.appendContextCompactProgress(opts);
         },
         clearPromptSkills: function () {
             return slashPickerController.clearPromptSelections();

@@ -126,8 +126,8 @@ export function createSlashPickerController(config) {
         var nextFiltered = pickerItems;
         if (term) {
             nextFiltered = nextFiltered.filter(function (item) {
-                if (item.pickerType === 'project') return matchesTerm([item.name, item.path], term);
-                return matchesTerm([item.name, item.description, item.source], term);
+                if (item.pickerType === 'provider-command') return matchesTerm([item.name, item.command, item.id], term);
+                return matchesTerm([item.name], term);
             });
         }
         filteredItems = nextFiltered;
@@ -146,6 +146,33 @@ export function createSlashPickerController(config) {
                 .filter(Boolean)
                 .some(function (part) { return part.startsWith(term); });
         });
+    }
+
+    function getProviderCommandText(item) {
+        var command = String(item && item.command || '').trim();
+        if (command) return command;
+        var id = String(item && item.id || '').trim();
+        if (id) return id.charAt(0) === '/' ? id : '/' + id;
+        var name = String(item && item.name || '').trim();
+        return name.charAt(0) === '/' ? name : '';
+    }
+
+    function formatUsagePercent(value) {
+        var n = Number(value || 0);
+        if (!Number.isFinite(n) || n <= 0) return '';
+        return String(Math.round(n));
+    }
+
+    function getPickerItemDetailText(item) {
+        if (!item) return '';
+        if (item.pickerType === 'project') return item.path || item.description || '';
+        if (item.pickerType === 'provider-command' && item.id === 'compact') {
+            var usage = config.getLatestContextUsage ? config.getLatestContextUsage() : null;
+            var percent = formatUsagePercent(usage && usage.usedPercentage);
+            var base = item.description || '压缩此对话的上下文';
+            return percent ? base + '（已使用 ' + percent + '%）' : base;
+        }
+        return item.description || '';
     }
 
     function close(options) {
@@ -376,15 +403,32 @@ export function createSlashPickerController(config) {
     function commitItem(item) {
         if (!item || pickerTokenStart === null || pickerTokenEnd === null) return;
         var value = config.inputEl.value;
-        var nextValue = value.slice(0, pickerTokenStart) + value.slice(pickerTokenEnd);
-        config.inputEl.value = nextValue;
-        config.inputEl.setSelectionRange(pickerTokenStart, pickerTokenStart);
-        config.resizeChatInput();
         if (item.pickerType === 'project') {
+            var nextValue = value.slice(0, pickerTokenStart) + value.slice(pickerTokenEnd);
+            config.inputEl.value = nextValue;
+            config.inputEl.setSelectionRange(pickerTokenStart, pickerTokenStart);
+            config.resizeChatInput();
             addPromptProject(item);
         } else if (item.pickerType === 'provider-command') {
-            config.showError('该命令暂未接入执行逻辑');
+            var commandText = getProviderCommandText(item);
+            if (!commandText) return;
+            if (config.runProviderCommand && config.runProviderCommand(commandText, item)) {
+                close({ removeTrigger: true });
+                config.inputEl.focus();
+                return;
+            }
+            var replacement = commandText + ' ';
+            var commandValue = value.slice(0, pickerTokenStart) + replacement + value.slice(pickerTokenEnd);
+            var cursor = pickerTokenStart + replacement.length;
+            config.inputEl.value = commandValue;
+            config.inputEl.setSelectionRange(cursor, cursor);
+            config.resizeChatInput();
+            config.updateSendBtnState();
         } else {
+            var nextSkillValue = value.slice(0, pickerTokenStart) + value.slice(pickerTokenEnd);
+            config.inputEl.value = nextSkillValue;
+            config.inputEl.setSelectionRange(pickerTokenStart, pickerTokenStart);
+            config.resizeChatInput();
             addPromptSkill(item);
         }
         close();
@@ -459,9 +503,7 @@ export function createSlashPickerController(config) {
             : (item.pickerType === 'provider-command'
                 ? getCommandIconHtml('skill-picker-icon')
                 : getSkillIconHtml('skill-picker-icon'));
-        var detailText = item.pickerType === 'project'
-            ? (item.path || item.description || '')
-            : (item.description || '');
+        var detailText = getPickerItemDetailText(item);
         node.title = detailText ? (item.name + ' · ' + detailText) : item.name;
         node.innerHTML =
             iconHtml +

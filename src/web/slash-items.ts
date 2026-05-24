@@ -12,6 +12,7 @@ export interface WebSlashItem {
   source: string;
   provider?: string;
   path?: string;
+  command?: string;
   enabled?: boolean;
 }
 
@@ -66,6 +67,7 @@ function listProviderCommandSlashItems(providerType: string): WebSlashItem[] {
       description: command.description || "",
       source: getProviderDisplayName(providerType),
       provider: providerType,
+      command: command.command || (command.name.startsWith("/") ? command.name : `/${command.id}`),
       enabled: true,
     }));
   } catch {
@@ -94,21 +96,21 @@ export function listWebSlashItems(providerType?: string): WebSlashItemsPayload {
   const projects = listProjectSlashItems();
   const groups: WebSlashGroup[] = [];
 
-  if (providerSkills.length > 0) {
-    groups.push({
-      type: "provider-skill",
-      title: `${providerName} 技能`,
-      provider,
-      items: providerSkills,
-    });
-  }
-
   if (providerCommands.length > 0) {
     groups.push({
       type: "provider-command",
       title: `${providerName} 命令`,
       provider,
       items: providerCommands,
+    });
+  }
+
+  if (providerSkills.length > 0) {
+    groups.push({
+      type: "provider-skill",
+      title: `${providerName} 技能`,
+      provider,
+      items: providerSkills,
     });
   }
 

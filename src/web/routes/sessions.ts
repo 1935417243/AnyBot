@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { getProvider } from "../../providers/index.js";
 import { generateId } from "../../shared.js";
+import { getActiveRunInfo } from "../active-runs.js";
 import { getActiveAgentStreamInfo } from "../agent-stream.js";
 import * as db from "../db.js";
 import { emitSessionsChanged } from "../events.js";
@@ -64,6 +65,7 @@ export function createSessionsRouter(): Router {
       updatedAt: session.updatedAt,
       messages: await prepareMessagesForClient(page.messages),
       hasMoreMessages: page.hasMore,
+      activeRun: getActiveRunInfo(session.id),
       activeStream: getActiveAgentStreamInfo(session.id),
     });
   });

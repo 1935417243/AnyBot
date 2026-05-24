@@ -3,6 +3,11 @@ export function createSendMessageController(config) {
         var outgoing = collectOutgoingMessage();
         if (!outgoing) return;
 
+        if (isCompactCommand(outgoing.text)) {
+            await compactContext(outgoing);
+            return;
+        }
+
         beginOutgoingMessage(outgoing);
 
         var body = buildMessageRequestBody(outgoing, config.getState().modelConfig);
@@ -87,9 +92,98 @@ export function createSendMessageController(config) {
         config.updateSendBtnState();
     }
 
-    function collectOutgoingMessage() {
+    function sendProviderCommand(commandText) {
+        if (!isCompactCommand(commandText)) return false;
+        var outgoing = collectOutgoingMessage({ text: '/compact' });
+        if (!outgoing) return true;
+        compactContext(outgoing);
+        return true;
+    }
+
+    async function compactContext(outgoing) {
+        if (outgoing.attachments.length > 0 || outgoing.skills.length > 0 || outgoing.projects.length > 0) {
+            config.showError('压缩上下文时不能同时附加文件、技能或项目');
+            return;
+        }
+
+        var startedAt = Date.now();
+        if (config.startCompactProgress) config.startCompactProgress(outgoing.sessionId, startedAt);
+
+        config.inputEl.value = '';
+        config.clearPromptSkills();
+        config.resizeChatInput();
+        config.setSendButtonDisabled(true);
+        config.setTyping(true);
+        config.setCancelling(false);
+        config.updateSendBtnState();
+
+        var body = {};
+        var modelConfig = config.getState().modelConfig;
+        if (modelConfig && modelConfig.currentModel) {
+            body.modelId = modelConfig.currentModel;
+        }
+
+        try {
+            var res = await fetch('/api/sessions/' + outgoing.sessionId + '/compact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+                var err = await res.json().catch(function () {
+                    return {};
+                });
+                var isCurrentErrorSession = config.getState().currentSessionId === outgoing.sessionId;
+                if (err.canceled) {
+                    if (config.cancelCompactProgress) {
+                        config.cancelCompactProgress(outgoing.sessionId, err.error || '压缩已停止');
+                    }
+                    return;
+                }
+                if (isCurrentErrorSession) {
+                    if (config.failCompactProgress) {
+                        config.failCompactProgress(outgoing.sessionId, err.error || '压缩失败');
+                    }
+                    config.showError(err.error || '压缩上下文失败，请重试');
+                }
+                return;
+            }
+
+            var data = await res.json();
+            var isCurrentSession = config.getState().currentSessionId === outgoing.sessionId;
+            if (data.provider && isCurrentSession) config.setCurrentSessionProvider(data.provider);
+            if (data.title && isCurrentSession) config.updateConversationHeaderTitle(data.title);
+            if (data.contextUsage && isCurrentSession) config.updateContextUsage(data.contextUsage);
+            if (config.finishCompactProgress) {
+                config.finishCompactProgress(outgoing.sessionId, data);
+            }
+            await config.fetchSessions();
+        } catch (e) {
+            if (config.getState().currentSessionId === outgoing.sessionId) {
+                if (config.failCompactProgress) config.failCompactProgress(outgoing.sessionId, '压缩失败');
+                config.showError(e.message || '压缩上下文失败，请检查连接');
+            }
+        } finally {
+            if (config.getState().currentSessionId === outgoing.sessionId && !config.finishCompactProgress) {
+                config.setTyping(false);
+                config.setCancelling(false);
+                config.updateSendBtnState();
+            }
+        }
+    }
+
+    function isCompactCommand(text) {
+        var value = String(text || '').trim().toLowerCase();
+        return value === '/compact';
+    }
+
+    function collectOutgoingMessage(options) {
+        options = options || {};
         var state = config.getState();
-        var text = config.inputEl.value.trim();
+        var text = Object.prototype.hasOwnProperty.call(options, 'text')
+            ? String(options.text || '').trim()
+            : config.inputEl.value.trim();
         var messageSkills = state.promptSkills.slice();
         var messageProjects = state.promptProjects.slice();
         var readyAttachments = state.pendingAttachments.filter(function (attachment) {
@@ -180,6 +274,7 @@ export function createSendMessageController(config) {
     }
 
     return {
+        sendProviderCommand: sendProviderCommand,
         sendMessage: sendMessage,
     };
 }

@@ -15,6 +15,8 @@ export interface RunOptions {
   sessionId?: string;
   /** Optional UUID used by providers that can explicitly create a fresh session. */
   newSessionId?: string;
+  /** Send the prompt directly to the provider without AnyBot prompt prelude. */
+  rawProviderCommand?: boolean;
   sandbox?: SandboxMode;
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -42,6 +44,7 @@ export interface ProviderSlashCommand {
   id: string;
   name: string;
   description: string;
+  command?: string;
 }
 
 export interface ProviderCapabilities {

@@ -103,6 +103,16 @@ export function createMessageListController(config) {
         return messageRenderer.appendMessage(role, text, attachments, changeReview, opts);
     }
 
+    function appendContextCompactDivider(text, opts) {
+        var row = messageRenderer.appendContextCompactDivider(text, opts);
+        if (row && opts && opts.messageId) row.dataset.messageId = String(opts.messageId);
+        return row;
+    }
+
+    function appendContextCompactProgress(opts) {
+        return messageRenderer.appendContextCompactProgress(opts);
+    }
+
     function getOldestRenderedMessageId() {
         var first = messagesEl.querySelector('.message-row[data-message-id]');
         return first ? Number(first.dataset.messageId || 0) : null;
@@ -149,7 +159,13 @@ export function createMessageListController(config) {
         if (meta.attachments && meta.attachments.length > 0) {
             attInfo = meta.attachments;
         }
-        if (m.role === 'assistant' && meta.claudeAgentLoop && window.ClaudeAgentLoop && window.ClaudeAgentLoop.renderPersistedMessage) {
+        if (m.role === 'assistant' && meta.contextCompact) {
+            row = appendContextCompactDivider(m.content, {
+                messageId: m.id,
+                createdAt: m.createdAt,
+            });
+            if (meta.contextCompact.contextUsage) config.updateContextUsage(meta.contextCompact.contextUsage);
+        } else if (m.role === 'assistant' && meta.claudeAgentLoop && window.ClaudeAgentLoop && window.ClaudeAgentLoop.renderPersistedMessage) {
             clearEmpty();
             var view = window.ClaudeAgentLoop.renderPersistedMessage({
                 messagesEl: messagesEl,
@@ -279,6 +295,8 @@ export function createMessageListController(config) {
     bindMessageListEvents();
 
     return {
+        appendContextCompactDivider: appendContextCompactDivider,
+        appendContextCompactProgress: appendContextCompactProgress,
         appendMessage: appendMessage,
         clearEmpty: clearEmpty,
         getIsLoadingOlderMessages: function () {

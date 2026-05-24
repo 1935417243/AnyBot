@@ -497,10 +497,11 @@ export function createSidebarController(options) {
             var incomingNewestId = options.getNewestMessageId(data.messages);
             var incomingUpdatedAt = Number(data.updatedAt || findSessionSummary(sessionId)?.updatedAt || 0);
             var hasUnsubscribedStream = !!data.activeStream && options.getActiveStreamSessionId() !== sessionId;
+            var hasActiveCompactRun = !!data.activeRun && data.activeRun.kind === "compact";
             var hasNewMessage = incomingNewestId > options.getCurrentNewestMessageId();
             var hasNewerTimestamp = incomingUpdatedAt && options.getCurrentSessionUpdatedAt() && incomingUpdatedAt > options.getCurrentSessionUpdatedAt();
 
-            if (hasUnsubscribedStream || hasNewMessage || hasNewerTimestamp) {
+            if (hasUnsubscribedStream || hasActiveCompactRun || hasNewMessage || hasNewerTimestamp) {
                 if (isCurrentSessionSyncInFlight) return;
                 isCurrentSessionSyncInFlight = true;
                 try {

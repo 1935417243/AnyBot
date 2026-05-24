@@ -6,6 +6,9 @@ export function createSessionController(config) {
     var isCancellingResponse = false;
     var activeStreamSessionId = null;
     var activeStreamAbortController = null;
+    var activeCompactSessionId = null;
+    var activeCompactView = null;
+    var activeCompactPollTimer = null;
     var currentSessionUpdatedAt = 0;
     var currentNewestMessageId = 0;
 
@@ -78,13 +81,14 @@ export function createSessionController(config) {
             activeStreamAbortController = null;
         }
         activeStreamSessionId = null;
+        clearActiveCompact();
         isTyping = false;
         isCancellingResponse = false;
         config.updateSendBtnState();
     }
 
     async function cancelCurrentResponse() {
-        var targetSessionId = activeStreamSessionId || currentSessionId;
+        var targetSessionId = activeStreamSessionId || activeCompactSessionId || currentSessionId;
         if (!targetSessionId || isCancellingResponse) return;
 
         isCancellingResponse = true;
@@ -98,6 +102,10 @@ export function createSessionController(config) {
                     return {};
                 });
                 throw new Error(err.error || '中断失败');
+            }
+            if (activeCompactSessionId === targetSessionId) {
+                cancelActiveCompact(targetSessionId, '压缩已停止');
+                return;
             }
         } catch (e) {
             isCancellingResponse = false;
@@ -163,9 +171,125 @@ export function createSessionController(config) {
         }
     }
 
+    function clearActiveCompact(options) {
+        options = options || {};
+        if (activeCompactPollTimer) {
+            clearTimeout(activeCompactPollTimer);
+            activeCompactPollTimer = null;
+        }
+        if (!options.keepView && activeCompactView && activeCompactView.remove) {
+            activeCompactView.remove();
+        }
+        activeCompactSessionId = null;
+        activeCompactView = null;
+    }
+
+    function beginActiveCompact(sessionId, activeRun, options) {
+        options = options || {};
+        clearActiveCompact();
+        activeCompactSessionId = sessionId;
+        isTyping = true;
+        isCancellingResponse = false;
+        config.updateSendBtnState();
+
+        if (currentSessionId === sessionId && config.getCurrentView() === 'chat' && config.appendContextCompactProgress) {
+            activeCompactView = config.appendContextCompactProgress({
+                label: '正在压缩上下文',
+                startedAt: activeRun && activeRun.startedAt,
+            });
+        }
+        if (options.poll) scheduleActiveCompactPoll(sessionId);
+    }
+
+    function startActiveCompact(sessionId, startedAt) {
+        beginActiveCompact(sessionId, { startedAt: startedAt || Date.now() });
+    }
+
+    function resumeActiveCompact(sessionId, activeRun) {
+        beginActiveCompact(sessionId, activeRun, { poll: true });
+    }
+
+    function finishActiveCompact(sessionId, result) {
+        if (activeCompactSessionId !== sessionId) return false;
+        var isCurrent = currentSessionId === sessionId && config.getCurrentView() === 'chat';
+        var label = result && result.content || '上下文已压缩';
+
+        if (isCurrent && activeCompactView && activeCompactView.row && activeCompactView.row.isConnected) {
+            activeCompactView.complete(label, {
+                messageId: result && result.messageId,
+            });
+        } else if (isCurrent && config.appendContextCompactProgress) {
+            var completed = config.appendContextCompactProgress({
+                label: '正在压缩上下文',
+                startedAt: Date.now(),
+            });
+            completed.complete(label, {
+                messageId: result && result.messageId,
+            });
+        }
+
+        clearActiveCompact({ keepView: true });
+        isTyping = false;
+        isCancellingResponse = false;
+        config.updateSendBtnState();
+        return isCurrent;
+    }
+
+    function cancelActiveCompact(sessionId, label) {
+        if (activeCompactSessionId !== sessionId) return false;
+        if (currentSessionId === sessionId && activeCompactView) {
+            activeCompactView.cancel(label || '压缩已停止');
+        }
+        clearActiveCompact({ keepView: true });
+        isTyping = false;
+        isCancellingResponse = false;
+        config.updateSendBtnState();
+        return true;
+    }
+
+    function failActiveCompact(sessionId, label) {
+        if (activeCompactSessionId !== sessionId) return false;
+        if (currentSessionId === sessionId && activeCompactView) {
+            activeCompactView.fail(label || '压缩失败');
+        }
+        clearActiveCompact({ keepView: true });
+        isTyping = false;
+        isCancellingResponse = false;
+        config.updateSendBtnState();
+        return true;
+    }
+
+    function scheduleActiveCompactPoll(sessionId) {
+        if (activeCompactPollTimer) clearTimeout(activeCompactPollTimer);
+        activeCompactPollTimer = setTimeout(function () {
+            pollActiveCompact(sessionId);
+        }, 1200);
+    }
+
+    async function pollActiveCompact(sessionId) {
+        if (activeCompactSessionId !== sessionId) return;
+        try {
+            var res = await fetch('/api/sessions/' + sessionId + '?limit=1');
+            if (!res.ok) throw new Error('poll failed');
+            var data = await res.json();
+            if (activeCompactSessionId !== sessionId) return;
+            if (data.activeRun && data.activeRun.kind === 'compact') {
+                scheduleActiveCompactPoll(sessionId);
+                return;
+            }
+            clearActiveCompact({ keepView: true });
+            isTyping = false;
+            isCancellingResponse = false;
+            config.updateSendBtnState();
+            await loadSession(sessionId, { force: true, silent: true });
+        } catch (_) {
+            if (activeCompactSessionId === sessionId) scheduleActiveCompactPoll(sessionId);
+        }
+    }
+
     async function loadSession(id, options) {
         options = options || {};
-        if (id === currentSessionId && activeStreamSessionId === id) {
+        if (id === currentSessionId && (activeStreamSessionId === id || activeCompactSessionId === id)) {
             config.inputEl.focus();
             return;
         }
@@ -198,7 +322,9 @@ export function createSessionController(config) {
             currentNewestMessageId = config.renderSessionMessages(data.messages || [], !!data.hasMoreMessages);
             await config.fetchModelConfig(currentSessionProvider);
 
-            if (data.activeStream) {
+            if (data.activeRun && data.activeRun.kind === 'compact') {
+                resumeActiveCompact(id, data.activeRun);
+            } else if (data.activeStream) {
                 resumeActiveStream(id, data.activeStream);
             }
 
@@ -244,10 +370,13 @@ export function createSessionController(config) {
     }
 
     return {
+        cancelActiveCompact: cancelActiveCompact,
         cancelCurrentResponse: cancelCurrentResponse,
         clearActiveStreamForSession: clearActiveStreamForSession,
         createNewChat: createNewChat,
         deleteSession: deleteSession,
+        failActiveCompact: failActiveCompact,
+        finishActiveCompact: finishActiveCompact,
         getActiveStreamSessionId: function () {
             return activeStreamSessionId;
         },
@@ -275,6 +404,7 @@ export function createSessionController(config) {
         loadSession: loadSession,
         resumeActiveStream: resumeActiveStream,
         setActiveStream: setActiveStream,
+        startActiveCompact: startActiveCompact,
         setCancelling: function (value) {
             isCancellingResponse = !!value;
         },

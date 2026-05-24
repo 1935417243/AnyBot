@@ -95,6 +95,124 @@ export function createMessageRenderer(config) {
         return row;
     }
 
+    function appendContextCompactDivider(text, opts) {
+        opts = opts || {};
+        clearEmpty();
+        var row = createContextCompactDivider(text, opts);
+        config.messagesEl.appendChild(row);
+        config.scrollBottom();
+        return row;
+    }
+
+    function appendContextCompactProgress(opts) {
+        opts = opts || {};
+        clearEmpty();
+        var view = createContextCompactProgress(opts);
+        config.messagesEl.appendChild(view.row);
+        config.scrollBottom();
+        return view;
+    }
+
+    function createContextCompactDivider(text, opts) {
+        opts = opts || {};
+        var row = document.createElement('div');
+        row.className = 'message-row context-compact-divider';
+        var label = String(text || '上下文已压缩').trim() || '上下文已压缩';
+        row.innerHTML =
+            getContextCompactDividerHtml(label);
+        if (opts.createdAt) {
+            config.attachMessageMeta(row, {
+                createdAt: opts.createdAt,
+                copyText: label,
+            });
+        }
+        return row;
+    }
+
+    function createContextCompactProgress(opts) {
+        var startedAt = opts.startedAt || Date.now();
+        var label = String(opts.label || '正在压缩上下文').trim() || '正在压缩上下文';
+        var row = document.createElement('div');
+        row.className = 'message-row context-compact-progress is-running';
+        row.innerHTML =
+            '<div class="context-compact-progress-status" data-role="status">处理中 0s</div>' +
+            '<div class="context-compact-progress-rule"></div>' +
+            '<div class="context-compact-progress-divider">' +
+            getContextCompactDividerHtml(label) +
+            '</div>';
+
+        var statusEl = row.querySelector('[data-role="status"]');
+        var labelEl = row.querySelector('.context-compact-divider-label span');
+        var timer = setInterval(function () {
+            updateStatus('处理中');
+        }, 1000);
+
+        function elapsedMs() {
+            return Math.max(0, Date.now() - startedAt);
+        }
+
+        function updateStatus(prefix) {
+            if (!statusEl) return;
+            statusEl.textContent = prefix + ' ' + formatCompactDuration(elapsedMs());
+        }
+
+        function updateLabel(nextLabel) {
+            if (!labelEl) return;
+            labelEl.textContent = String(nextLabel || '').trim() || label;
+        }
+
+        function finish(className, statusPrefix, nextLabel) {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+            row.classList.remove('is-running', 'is-complete', 'is-cancelled', 'is-failed');
+            row.classList.add(className);
+            updateStatus(statusPrefix);
+            updateLabel(nextLabel);
+            config.scrollBottom();
+        }
+
+        return {
+            row: row,
+            complete: function (nextLabel, completeOpts) {
+                completeOpts = completeOpts || {};
+                finish('is-complete', '已处理', nextLabel || '上下文已压缩');
+                if (completeOpts.messageId) row.dataset.messageId = String(completeOpts.messageId);
+            },
+            cancel: function (nextLabel) {
+                finish('is-cancelled', '已停止', nextLabel || '压缩已停止');
+            },
+            fail: function (nextLabel) {
+                finish('is-failed', '处理失败', nextLabel || '压缩失败');
+            },
+            remove: function () {
+                if (timer) clearInterval(timer);
+                row.remove();
+            },
+        };
+    }
+
+    function getContextCompactDividerHtml(label) {
+        return '' +
+            '<div class="context-compact-divider-line"></div>' +
+            '<div class="context-compact-divider-label">' +
+            '<svg class="context-compact-divider-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
+            '<path d="M5 2.5h5l2.5 2.5v8.5H5V2.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
+            '<path d="M10 2.5V5h2.5M3.5 5.5v8h7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>' +
+            '<span>' + escapeHtml(label) + '</span>' +
+            '</div>' +
+            '<div class="context-compact-divider-line"></div>';
+    }
+
+    function formatCompactDuration(ms) {
+        var seconds = Math.max(0, Math.round(ms / 1000));
+        var mins = Math.floor(seconds / 60);
+        var secs = seconds % 60;
+        return mins > 0 ? mins + 'm ' + secs + 's' : secs + 's';
+    }
+
     function createAssistantBubble(text, changeReview, opts) {
         var bubble = document.createElement('div');
         bubble.className = 'bubble';
@@ -209,6 +327,8 @@ export function createMessageRenderer(config) {
     }
 
     return {
+        appendContextCompactDivider: appendContextCompactDivider,
+        appendContextCompactProgress: appendContextCompactProgress,
         appendMessage: appendMessage,
         clearEmpty: clearEmpty,
         renderAssistantText: renderAssistantText,

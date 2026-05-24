@@ -96,6 +96,16 @@ export type ChatTurnResult = {
   contextUsage?: RunResult["contextUsage"];
 };
 
+export type CompactChatSessionResult = {
+  content: string;
+  title: string;
+  messageId: number;
+  createdAt: number;
+  sessionId: string | null;
+  provider: string;
+  contextUsage?: RunResult["contextUsage"];
+};
+
 function isRegisteredProviderType(providerType: string): boolean {
   return getRegisteredProviderTypes().includes(providerType);
 }
@@ -448,4 +458,103 @@ export async function runChatTurn(
 ): Promise<ChatTurnResult> {
   const prepared = prepareChatTurn(opts);
   return runPreparedChatTurn(prepared, opts);
+}
+
+export async function compactChatSession(opts: {
+  session: ChatSessionRecord;
+  workdir?: string;
+  modelId?: string;
+  signal?: AbortSignal;
+  logPrefix: string;
+  logFields?: Record<string, unknown>;
+}): Promise<CompactChatSessionResult> {
+  const provider = getSessionProvider(opts.session);
+  if (provider.type !== "claude-code") {
+    throw new ChatTurnValidationError("当前只有 Claude Code 会话支持上下文压缩", 409);
+  }
+  if (!opts.session.sessionId) {
+    throw new ChatTurnValidationError("当前会话还没有可压缩的 Claude Code 上下文", 409);
+  }
+
+  const command = provider.listSlashCommands?.().find((item) => item.id === "compact");
+  if (!command) {
+    throw new ChatTurnValidationError("当前 Provider 不支持上下文压缩", 409);
+  }
+
+  const workdir = opts.workdir || getWorkdir();
+  const model = resolveRunModel(provider, opts.modelId);
+  const sandbox = getSandbox();
+  const prompt = command.command || "/compact";
+
+  logger.info(`${opts.logPrefix}.start`, {
+    sessionId: opts.session.id,
+    providerSessionId: opts.session.sessionId,
+    provider: provider.type,
+    model,
+    workdir,
+    command: prompt,
+    ...(opts.logFields || {}),
+  });
+
+  try {
+    const result = await provider.run({
+      workdir,
+      sandbox,
+      model,
+      prompt,
+      sessionId: opts.session.sessionId,
+      rawProviderCommand: true,
+      signal: opts.signal,
+    });
+    const providerSessionId = result.sessionId || opts.session.sessionId;
+    const createdAt = Date.now();
+    const content = "上下文已压缩";
+    const metadata = JSON.stringify({
+      contextCompact: {
+        version: 1,
+        provider: provider.type,
+        command: prompt,
+        contextUsage: result.contextUsage || null,
+      },
+    });
+    const messageId = db.addMessage(opts.session.id, "assistant", content, metadata);
+
+    db.updateSession({
+      id: opts.session.id,
+      title: opts.session.title,
+      sessionId: providerSessionId,
+      provider: opts.session.provider,
+      updatedAt: createdAt,
+    });
+    opts.session.sessionId = providerSessionId;
+    opts.session.updatedAt = createdAt;
+    emitSessionsChanged(opts.session.id, "context_compacted");
+
+    logger.info(`${opts.logPrefix}.success`, {
+      sessionId: opts.session.id,
+      providerSessionId,
+      provider: provider.type,
+      contextUsage: result.contextUsage || null,
+      ...(opts.logFields || {}),
+    });
+
+    return {
+      content,
+      title: opts.session.title,
+      messageId,
+      createdAt,
+      sessionId: providerSessionId,
+      provider: provider.type,
+      contextUsage: result.contextUsage,
+    };
+  } catch (error) {
+    logger.error(`${opts.logPrefix}.failed`, {
+      sessionId: opts.session.id,
+      providerSessionId: opts.session.sessionId,
+      provider: provider.type,
+      error,
+      ...(opts.logFields || {}),
+    });
+    throw error;
+  }
 }

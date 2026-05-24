@@ -2506,6 +2506,81 @@
             justify-content: flex-start;
         }
 
+        .message-row.context-compact-divider {
+            position: relative;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 28px 30px;
+            color: var(--text-muted);
+        }
+
+        .message-row.context-compact-progress {
+            display: block;
+            padding: 8px 28px 30px;
+            color: var(--text-muted);
+        }
+
+        .context-compact-progress-status {
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.4;
+            padding: 0 0 16px;
+        }
+
+        .context-compact-progress-rule {
+            height: 1px;
+            background: var(--border);
+        }
+
+        .context-compact-progress-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-top: 28px;
+        }
+
+        .context-compact-progress.is-running .context-compact-divider-label {
+            color: var(--text-dim);
+        }
+
+        .context-compact-progress.is-cancelled .context-compact-divider-label,
+        .context-compact-progress.is-failed .context-compact-divider-label {
+            color: var(--text-muted);
+        }
+
+        .context-compact-divider-line {
+            height: 1px;
+            flex: 1;
+            background: var(--border);
+        }
+
+        .context-compact-divider-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .context-compact-divider-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+
+        .message-row.context-compact-divider .message-hover-meta {
+            display: none;
+        }
+
+        .message-row.context-compact-progress .message-hover-meta {
+            display: none;
+        }
+
         .bubble {
             position: relative;
         }

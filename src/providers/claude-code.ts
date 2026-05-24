@@ -6,7 +6,9 @@ import {
   type PermissionMode,
   type SDKMessage,
   type SDKAssistantMessage,
+  type SDKCompactBoundaryMessage,
   type SDKResultMessage,
+  type SDKStatusMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { ProviderCancelledError } from "./types.js";
 import type {
@@ -16,6 +18,7 @@ import type {
   ProviderModel,
   ProviderCapabilities,
   ProviderContextUsage,
+  ProviderSlashCommand,
 } from "./types.js";
 import {
   ProviderTimeoutError,
@@ -88,6 +91,14 @@ function isSdkAssistantMessage(message: SDKMessage): message is SDKAssistantMess
   return message.type === "assistant";
 }
 
+function isSdkCompactBoundaryMessage(message: SDKMessage): message is SDKCompactBoundaryMessage {
+  return message.type === "system" && "subtype" in message && message.subtype === "compact_boundary";
+}
+
+function isSdkStatusMessage(message: SDKMessage): message is SDKStatusMessage {
+  return message.type === "system" && "subtype" in message && message.subtype === "status";
+}
+
 function mapSandboxToPermissionMode(sandbox: SandboxMode): PermissionMode {
   switch (sandbox) {
     case "danger-full-access":
@@ -139,9 +150,59 @@ function calculateClaudeAssistantUsageTokens(usage: unknown): number {
   );
 }
 
+function buildContextUsage(
+  usedTokens: number,
+  maxTokens: number | undefined,
+  tokenBreakdown?: Partial<Pick<
+    ProviderContextUsage,
+    "inputTokens" | "outputTokens" | "cacheCreationInputTokens" | "cacheReadInputTokens"
+  >>,
+): ProviderContextUsage | undefined {
+  if (!Number.isFinite(usedTokens) || usedTokens <= 0) return undefined;
+  if (!maxTokens || !Number.isFinite(maxTokens) || maxTokens <= 0) return undefined;
+
+  const usedPercentage = Math.min(100, Math.round((usedTokens / maxTokens) * 1000) / 10);
+  return {
+    usedTokens,
+    maxTokens,
+    usedPercentage,
+    remainingPercentage: Math.max(0, Math.round((100 - usedPercentage) * 10) / 10),
+    ...tokenBreakdown,
+    source: "claude-code",
+  };
+}
+
 function extractContextWindowFromResult(result: SDKResultMessage): number | undefined {
   const modelUsages = Object.values(result.modelUsage || {});
   return modelUsages.find((entry) => entry.contextWindow > 0)?.contextWindow;
+}
+
+function extractContextUsageFromCompactBoundary(
+  message: SDKCompactBoundaryMessage | null,
+  maxTokens: number | undefined,
+): ProviderContextUsage | undefined {
+  const postTokens = message?.compact_metadata.post_tokens;
+  if (typeof postTokens !== "number" || !Number.isFinite(postTokens)) return undefined;
+  return buildContextUsage(postTokens, maxTokens);
+}
+
+function extractContextUsageFromResult(result: SDKResultMessage): ProviderContextUsage | undefined {
+  const usageEntries = Object.values(result.modelUsage || {});
+  const usage = usageEntries.find((entry) => entry.contextWindow > 0);
+  if (!usage) return undefined;
+
+  const inputTokens = usage.inputTokens || 0;
+  const outputTokens = usage.outputTokens || 0;
+  const cacheCreationInputTokens = usage.cacheCreationInputTokens || 0;
+  const cacheReadInputTokens = usage.cacheReadInputTokens || 0;
+  const usedTokens = inputTokens + outputTokens + cacheCreationInputTokens + cacheReadInputTokens;
+  const maxTokens = usage.contextWindow || 0;
+  return buildContextUsage(usedTokens, maxTokens, {
+    inputTokens,
+    outputTokens,
+    cacheCreationInputTokens,
+    cacheReadInputTokens,
+  });
 }
 
 function extractContextUsageFromAssistant(
@@ -156,20 +217,12 @@ function extractContextUsageFromAssistant(
   const cacheCreationInputTokens = getUsageNumber(usage, "cache_creation_input_tokens");
   const cacheReadInputTokens = getUsageNumber(usage, "cache_read_input_tokens");
   const usedTokens = calculateClaudeAssistantUsageTokens(usage);
-  if (!usedTokens) return undefined;
-
-  const usedPercentage = Math.min(100, Math.round((usedTokens / maxTokens) * 1000) / 10);
-  return {
-    usedTokens,
-    maxTokens,
-    usedPercentage,
-    remainingPercentage: Math.max(0, Math.round((100 - usedPercentage) * 10) / 10),
+  return buildContextUsage(usedTokens, maxTokens, {
     inputTokens,
     outputTokens,
     cacheCreationInputTokens,
     cacheReadInputTokens,
-    source: "claude-code",
-  };
+  });
 }
 
 function mergeStreamedAndFinalResponse(streamed: string, finalResult: string): string {
@@ -245,6 +298,17 @@ export class ClaudeCodeProvider implements IProvider {
     ];
   }
 
+  listSlashCommands(): ProviderSlashCommand[] {
+    return [
+      {
+        id: "compact",
+        name: "压缩",
+        command: "/compact",
+        description: "压缩此对话的上下文",
+      },
+    ];
+  }
+
   async run(opts: RunOptions): Promise<RunResult> {
     return this.execute(opts);
   }
@@ -269,7 +333,9 @@ export class ClaudeCodeProvider implements IProvider {
       timeoutMs = DEFAULT_TIMEOUT_MS,
       signal,
     } = opts;
-    const prompt = `${WORKDIR_SAFETY_PROMPT}\n\n${opts.prompt}`;
+    const prompt = opts.rawProviderCommand
+      ? opts.prompt
+      : `${WORKDIR_SAFETY_PROMPT}\n\n${opts.prompt}`;
     const sandbox = opts.sandbox ?? DEFAULT_SANDBOX;
     const startedAt = Date.now();
     const abortController = new AbortController();
@@ -317,6 +383,8 @@ export class ClaudeCodeProvider implements IProvider {
     try {
       let resultMessage: SDKResultMessage | null = null;
       let lastAssistantMessage: SDKAssistantMessage | null = null;
+      let compactBoundaryMessage: SDKCompactBoundaryMessage | null = null;
+      let compactError: string | null = null;
       let streamedResponseText = "";
       const env: NodeJS.ProcessEnv = {
         ...process.env,
@@ -423,6 +491,12 @@ export class ClaudeCodeProvider implements IProvider {
         if (isSdkAssistantMessage(message)) {
           lastAssistantMessage = message;
         }
+        if (isSdkCompactBoundaryMessage(message)) {
+          compactBoundaryMessage = message;
+        }
+        if (isSdkStatusMessage(message) && message.compact_result === "failed") {
+          compactError = message.compact_error || "Claude Code 上下文压缩失败";
+        }
 
         if (onEvent) {
           const delta = extractAssistantTextDelta(message);
@@ -482,8 +556,29 @@ export class ClaudeCodeProvider implements IProvider {
         throw new ProviderProcessError(1, output);
       }
 
+      if (compactError) {
+        logger.error("provider.exec.compact_failed", {
+          provider: this.type,
+          workdir,
+          sandbox,
+          durationMs: Date.now() - startedAt,
+          sessionId: resultMessage.session_id,
+          error: compactError,
+        });
+        throw new ProviderProcessError(1, compactError);
+      }
+
       const responseText = mergeStreamedAndFinalResponse(streamedResponseText, resultMessage.result);
-      if (!responseText) {
+      const contextWindow = extractContextWindowFromResult(resultMessage);
+      const contextUsage = extractContextUsageFromCompactBoundary(
+        compactBoundaryMessage,
+        contextWindow,
+      ) || extractContextUsageFromAssistant(
+        lastAssistantMessage,
+        contextWindow,
+      ) || extractContextUsageFromResult(resultMessage);
+
+      if (!responseText && !opts.rawProviderCommand) {
         logger.error("provider.exec.empty_response", {
           provider: this.type,
           workdir,
@@ -493,11 +588,6 @@ export class ClaudeCodeProvider implements IProvider {
         });
         throw new ProviderEmptyOutputError();
       }
-
-      const contextUsage = extractContextUsageFromAssistant(
-        lastAssistantMessage,
-        extractContextWindowFromResult(resultMessage),
-      );
 
       logger.info("provider.exec.success", {
         provider: this.type,
