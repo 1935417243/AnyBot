@@ -4,8 +4,9 @@ import { logger } from "../../logger.js";
 import {
   ChatTurnValidationError,
   compactChatSession,
+  isSupportedProviderSlashCommand,
   prepareChatTurn,
-  runChatTurn,
+  prepareProviderCommandTurn,
   runPreparedChatTurn,
   type PreparedChatTurn,
 } from "../../chat-runner.js";
@@ -31,6 +32,90 @@ import {
   type ChatPromptProject,
   type ChatPromptSkill,
 } from "../services/web-chat-input.js";
+
+function cleanProviderCommand(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isCompactCommand(value: string): boolean {
+  return value.trim().toLowerCase() === "/compact";
+}
+
+function getAutomaticProviderCommand(
+  session: db.ChatSessionMetadata,
+  userText: string,
+  attachmentCount: number,
+  skillCount: number,
+  projectCount: number,
+): string {
+  const commandText = userText.trim();
+  if (!commandText || !commandText.startsWith("/")) return "";
+  if (isCompactCommand(commandText)) return "";
+  if (attachmentCount > 0 || skillCount > 0 || projectCount > 0) return "";
+  return isSupportedProviderSlashCommand(session, commandText) ? commandText : "";
+}
+
+type WebMessageRequestBody = {
+  content?: string;
+  attachments?: ChatAttachment[];
+  skills?: ChatPromptSkill[];
+  projects?: ChatPromptProject[];
+  modelId?: string;
+  providerCommand?: string;
+};
+
+type PreparedWebMessageRequest = {
+  input: ReturnType<typeof prepareWebChatInput>;
+  modelId?: string;
+  providerCommandText: string;
+};
+
+type WebMessageRequestError = {
+  statusCode: number;
+  error: string;
+};
+
+function prepareWebMessageRequest(
+  body: WebMessageRequestBody,
+  session: db.ChatSessionMetadata,
+): PreparedWebMessageRequest | WebMessageRequestError {
+  const { content, attachments, skills, projects, modelId, providerCommand } = body;
+  const explicitProviderCommand = cleanProviderCommand(providerCommand);
+  const requestAttachments = Array.isArray(attachments) ? attachments : [];
+  const requestSkills = Array.isArray(skills) ? skills : [];
+  const requestProjects = Array.isArray(projects) ? projects : [];
+  const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects, {
+    sessionProjectId: session.projectId,
+  });
+  if (!input.userText && requestAttachments.length === 0 && !explicitProviderCommand) {
+    return { statusCode: 400, error: "消息不能为空" };
+  }
+
+  const providerCommandText = explicitProviderCommand || getAutomaticProviderCommand(
+    session,
+    input.userText,
+    requestAttachments.length,
+    requestSkills.length,
+    requestProjects.length,
+  );
+  if (providerCommandText && isCompactCommand(providerCommandText)) {
+    return { statusCode: 400, error: "请使用压缩上下文入口" };
+  }
+  if (
+    explicitProviderCommand &&
+    (requestAttachments.length > 0 || requestSkills.length > 0 || requestProjects.length > 0)
+  ) {
+    return { statusCode: 400, error: "执行命令时不能同时附加文件、技能或项目" };
+  }
+
+  return { input, modelId, providerCommandText };
+}
+
+function isWebMessageRequestError(
+  request: PreparedWebMessageRequest | WebMessageRequestError,
+): request is WebMessageRequestError {
+  return "statusCode" in request;
+}
 
 export function createMessagesRouter(): Router {
   const router = Router();
@@ -142,23 +227,12 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    const { content, attachments, skills, projects, modelId } = req.body as {
-      content?: string;
-      attachments?: ChatAttachment[];
-      skills?: ChatPromptSkill[];
-      projects?: ChatPromptProject[];
-      modelId?: string;
-    };
-    const requestAttachments = Array.isArray(attachments) ? attachments : [];
-    const requestSkills = Array.isArray(skills) ? skills : [];
-    const requestProjects = Array.isArray(projects) ? projects : [];
-    const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects, {
-      sessionProjectId: session.projectId,
-    });
-    if (!input.userText && requestAttachments.length === 0) {
-      res.status(400).json({ error: "消息不能为空" });
+    const request = prepareWebMessageRequest(req.body as WebMessageRequestBody, session);
+    if (isWebMessageRequestError(request)) {
+      res.status(request.statusCode).json({ error: request.error });
       return;
     }
+    const { input, modelId, providerCommandText } = request;
 
     let sessionWorkdir: string;
     try {
@@ -170,18 +244,25 @@ export function createMessagesRouter(): Router {
 
     let prepared: PreparedChatTurn;
     try {
-      prepared = prepareChatTurn({
-        session,
-        userText: input.userText,
-        storedUserContent: input.storedUserContent,
-        titleText: input.titleText,
-        userMetadata: input.userMetadata,
-        imagePaths: input.imagePaths,
-        modelId,
-        workdir: sessionWorkdir,
-        includeWorkspaceMemory: !session.projectId,
-        requireStreaming: true,
-      });
+      prepared = providerCommandText
+        ? prepareProviderCommandTurn({
+            session,
+            commandText: providerCommandText,
+            modelId,
+            workdir: sessionWorkdir,
+          })
+        : prepareChatTurn({
+            session,
+            userText: input.userText,
+            storedUserContent: input.storedUserContent,
+            titleText: input.titleText,
+            userMetadata: input.userMetadata,
+            imagePaths: input.imagePaths,
+            modelId,
+            workdir: sessionWorkdir,
+            includeWorkspaceMemory: !session.projectId,
+            requireStreaming: true,
+          });
     } catch (error) {
       if (error instanceof ChatTurnValidationError) {
         res.status(error.statusCode).json({ error: error.message });
@@ -227,23 +308,12 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    const { content, attachments, skills, projects, modelId } = req.body as {
-      content?: string;
-      attachments?: ChatAttachment[];
-      skills?: ChatPromptSkill[];
-      projects?: ChatPromptProject[];
-      modelId?: string;
-    };
-    const requestAttachments = Array.isArray(attachments) ? attachments : [];
-    const requestSkills = Array.isArray(skills) ? skills : [];
-    const requestProjects = Array.isArray(projects) ? projects : [];
-    const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects, {
-      sessionProjectId: session.projectId,
-    });
-    if (!input.userText && requestAttachments.length === 0) {
-      res.status(400).json({ error: "消息不能为空" });
+    const request = prepareWebMessageRequest(req.body as WebMessageRequestBody, session);
+    if (isWebMessageRequestError(request)) {
+      res.status(request.statusCode).json({ error: request.error });
       return;
     }
+    const { input, modelId, providerCommandText } = request;
 
     let sessionWorkdir: string;
     try {
@@ -254,17 +324,26 @@ export function createMessagesRouter(): Router {
     }
 
     try {
-      const result = await runChatTurn({
-        session,
-        userText: input.userText,
-        storedUserContent: input.storedUserContent,
-        titleText: input.titleText,
-        userMetadata: input.userMetadata,
-        imagePaths: input.imagePaths,
-        modelId,
-        workdir: sessionWorkdir,
-        includeWorkspaceMemory: !session.projectId,
-        logPrefix: "web.chat",
+      const prepared = providerCommandText
+        ? prepareProviderCommandTurn({
+            session,
+            commandText: providerCommandText,
+            modelId,
+            workdir: sessionWorkdir,
+          })
+        : prepareChatTurn({
+            session,
+            userText: input.userText,
+            storedUserContent: input.storedUserContent,
+            titleText: input.titleText,
+            userMetadata: input.userMetadata,
+            imagePaths: input.imagePaths,
+            modelId,
+            workdir: sessionWorkdir,
+            includeWorkspaceMemory: !session.projectId,
+          });
+      const result = await runPreparedChatTurn(prepared, {
+        logPrefix: providerCommandText ? "web.chat.provider_command" : "web.chat",
         logFields: { fileCount: input.fileCount, skillCount: input.skillCount, projectCount: input.projectCount },
       });
 

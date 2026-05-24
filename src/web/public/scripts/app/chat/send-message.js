@@ -8,9 +8,17 @@ export function createSendMessageController(config) {
             return;
         }
 
+        await sendOutgoingMessage(outgoing);
+    }
+
+    async function sendOutgoingMessage(outgoing, options) {
+        options = options || {};
         beginOutgoingMessage(outgoing);
 
         var body = buildMessageRequestBody(outgoing, config.getState().modelConfig);
+        if (options.providerCommand) {
+            body.providerCommand = options.providerCommand;
+        }
         var agentView = null;
 
         try {
@@ -93,10 +101,22 @@ export function createSendMessageController(config) {
     }
 
     function sendProviderCommand(commandText) {
-        if (!isCompactCommand(commandText)) return false;
-        var outgoing = collectOutgoingMessage({ text: '/compact' });
+        var normalizedCommand = normalizeProviderCommandText(commandText);
+        if (!normalizedCommand) return false;
+        if (isCompactCommand(normalizedCommand)) {
+            var compactOutgoing = collectOutgoingMessage({ text: '/compact' });
+            if (!compactOutgoing) return true;
+            compactContext(compactOutgoing);
+            return true;
+        }
+
+        var outgoing = collectOutgoingMessage({ text: normalizedCommand });
         if (!outgoing) return true;
-        compactContext(outgoing);
+        if (outgoing.attachments.length > 0 || outgoing.skills.length > 0 || outgoing.projects.length > 0) {
+            config.showError('执行命令时不能同时附加文件、技能或项目');
+            return true;
+        }
+        sendOutgoingMessage(outgoing, { providerCommand: normalizedCommand });
         return true;
     }
 
@@ -176,6 +196,12 @@ export function createSendMessageController(config) {
     function isCompactCommand(text) {
         var value = String(text || '').trim().toLowerCase();
         return value === '/compact';
+    }
+
+    function normalizeProviderCommandText(text) {
+        var value = String(text || '').trim();
+        if (!value) return '';
+        return value.charAt(0) === '/' ? value : '/' + value;
     }
 
     function collectOutgoingMessage(options) {

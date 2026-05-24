@@ -62,6 +62,7 @@ export type PreparedChatTurn = {
   userMetadata: string | null;
   imagePaths: string[];
   providerSessionId: string | null;
+  rawProviderCommand?: boolean;
 };
 
 export type PrepareChatTurnOptions = {
@@ -75,6 +76,13 @@ export type PrepareChatTurnOptions = {
   workdir?: string;
   includeWorkspaceMemory?: boolean;
   requireStreaming?: boolean;
+};
+
+export type PrepareProviderCommandTurnOptions = {
+  session: ChatSessionRecord;
+  commandText: string;
+  modelId?: string;
+  workdir?: string;
 };
 
 export type RunPreparedChatTurnOptions = {
@@ -147,6 +155,39 @@ function resolveRunModel(provider: IProvider, requestedModelId?: string): string
     throw new ChatTurnValidationError(`不支持的模型: ${modelId}`);
   }
   return modelId;
+}
+
+function normalizeProviderCommandText(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
+
+function getProviderSlashCommand(
+  provider: IProvider,
+  commandText: string,
+): ReturnType<Required<IProvider>["listSlashCommands"]>[number] | null {
+  const normalized = normalizeProviderCommandText(commandText).toLowerCase();
+  if (!normalized) return null;
+  const commands = provider.listSlashCommands?.() || [];
+  return commands.find((item) => {
+    const command = normalizeProviderCommandText(item.command || item.id).toLowerCase();
+    const id = normalizeProviderCommandText(item.id).toLowerCase();
+    return command === normalized || id === normalized;
+  }) || null;
+}
+
+export function isSupportedProviderSlashCommand(
+  session: Pick<db.ChatSession, "id" | "provider">,
+  commandText: string,
+): boolean {
+  return Boolean(getProviderSlashCommand(getSessionProvider(session), commandText));
+}
+
+function getProviderSlashCommandPrompt(
+  command: ReturnType<Required<IProvider>["listSlashCommands"]>[number],
+): string {
+  return normalizeProviderCommandText(command.command || command.id);
 }
 
 async function safeCreateChangeSnapshotForWorkdir(
@@ -286,6 +327,40 @@ export function prepareChatTurn(opts: PrepareChatTurnOptions): PreparedChatTurn 
   };
 }
 
+export function prepareProviderCommandTurn(
+  opts: PrepareProviderCommandTurnOptions,
+): PreparedChatTurn {
+  const provider = getSessionProvider(opts.session);
+  const command = getProviderSlashCommand(provider, opts.commandText);
+  if (!command) {
+    throw new ChatTurnValidationError("当前 Provider 不支持这个命令", 409);
+  }
+
+  const model = resolveRunModel(provider, opts.modelId);
+  const workdir = opts.workdir || getWorkdir();
+  const sandbox = getSandbox();
+  const source = opts.session.source || "web";
+  const prompt = getProviderSlashCommandPrompt(command);
+  const providerSessionId = opts.session.sessionId || null;
+
+  return {
+    session: opts.session,
+    provider,
+    model,
+    workdir,
+    sandbox,
+    source,
+    prompt,
+    userText: prompt,
+    storedUserContent: prompt,
+    titleText: command.name || prompt,
+    userMetadata: null,
+    imagePaths: [],
+    providerSessionId,
+    rawProviderCommand: true,
+  };
+}
+
 export function canStreamPreparedChatTurn(prepared: PreparedChatTurn): boolean {
   return isStreamingProvider(prepared.provider);
 }
@@ -333,6 +408,7 @@ export async function runPreparedChatTurn(
       imagePaths: prepared.imagePaths.length > 0 ? prepared.imagePaths : undefined,
       sessionId: prepared.providerSessionId || undefined,
       newSessionId: prepared.providerSessionId ? undefined : randomUUID(),
+      rawProviderCommand: prepared.rawProviderCommand,
       signal: opts.signal,
     };
     const result = opts.stream && isStreamingProvider(prepared.provider)
