@@ -36,7 +36,8 @@ export function createContextUsageController(options) {
         if (!contextUsageEl || !contextUsageRingEl || !latestContextUsage) return;
 
         var usedPercent = Math.max(0, Math.min(100, Number(latestContextUsage.usedPercentage || 0)));
-        var remainingPercent = Math.max(0, Math.round((100 - usedPercent) * 10) / 10);
+        var displayUsedPercent = Math.round(usedPercent);
+        var displayRemainingPercent = Math.max(0, 100 - displayUsedPercent);
         var usedTokens = Number(latestContextUsage.usedTokens || 0);
         var maxTokens = Number(latestContextUsage.maxTokens || 0);
         var color = contextUsageColor(usedPercent);
@@ -49,7 +50,7 @@ export function createContextUsageController(options) {
 
         if (contextUsagePercentEl) {
             contextUsagePercentEl.textContent =
-                Math.round(usedPercent) + '% 已用（剩余 ' + Math.round(remainingPercent) + '%）';
+                displayUsedPercent + '% 已用（剩余 ' + displayRemainingPercent + '%）';
         }
         if (contextUsageTokensEl) {
             contextUsageTokensEl.textContent =
