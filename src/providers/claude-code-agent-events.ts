@@ -78,6 +78,7 @@ export type ClaudeAgentStreamEvent =
         title: string;
         summary: string;
         input?: string;
+        files?: string[];
         startedAt: number;
         status: "running";
       };
@@ -154,10 +155,15 @@ export function extractAssistantThinkingDelta(message: SDKMessage): string | nul
   return event.delta.thinking ? sanitizeAgentText(event.delta.thinking) : null;
 }
 
-export function createToolStartEvent(input: HookInput): ClaudeAgentStreamEvent | null {
+export function createToolStartEvent(
+  input: HookInput,
+  workdir: string,
+): ClaudeAgentStreamEvent | null {
   if (input.hook_event_name !== "PreToolUse") return null;
   const toolInput = input.tool_input;
   const summary = summarizeToolInput(input.tool_name, toolInput);
+  const files = extractFilePaths(input.tool_name, toolInput)
+    .map((file) => normalizeDisplayPath(file, workdir));
   return {
     type: "tool_start",
     tool: {
@@ -166,6 +172,7 @@ export function createToolStartEvent(input: HookInput): ClaudeAgentStreamEvent |
       title: buildToolTitle(input.tool_name, summary),
       summary,
       input: summarizeRawToolInput(input.tool_name, toolInput),
+      files: files.length > 0 ? files : undefined,
       startedAt: Date.now(),
       status: "running",
     },

@@ -435,7 +435,7 @@ export class ClaudeCodeProvider implements IProvider {
                         {
                             hooks: [
                                 async (input) => {
-                                    const event = createToolStartEvent(input);
+                                    const event = createToolStartEvent(input, workdir);
                                     if (event) await onEvent(event);
                                     return {};
                                 },

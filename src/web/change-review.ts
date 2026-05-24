@@ -58,6 +58,7 @@ const dataDir =
   process.env.DATA_DIR || process.env.CODEX_DATA_DIR || path.join(process.cwd(), ".data");
 const reviewDir = path.join(dataDir, "change-reviews");
 const SNAPSHOT_SKIP_DIRS = new Set([".git", "node_modules", ".data", ".run", "tmp"]);
+const ALWAYS_SNAPSHOT_FILES = ["CLAUDE.md"];
 const MAX_SNAPSHOT_FILE_BYTES = 10 * 1024 * 1024;
 const BINARY_DIFF_EXTENSIONS = new Set([
   ".7z",
@@ -157,6 +158,23 @@ function splitNul(value: string): string[] {
   return value.split("\0").filter(Boolean);
 }
 
+function normalizeSnapshotPath(workdir: string, filePath: string): string | null {
+  const root = path.resolve(workdir);
+  const absolutePath = path.resolve(root, filePath);
+  if (!absolutePath.startsWith(root + path.sep) && absolutePath !== root) return null;
+
+  const relativePath = path.relative(root, absolutePath);
+  if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) return null;
+
+  const parts = relativePath.split(path.sep);
+  if (parts.some((part) => SNAPSHOT_SKIP_DIRS.has(part))) return null;
+  return parts.join(path.posix.sep);
+}
+
+function isPathInside(parentPath: string, childPath: string): boolean {
+  return childPath === parentPath || childPath.startsWith(parentPath + path.sep);
+}
+
 function parsePorcelainPaths(output: string): string[] {
   const entries = splitNul(output);
   const paths = new Set<string>();
@@ -178,20 +196,54 @@ function parsePorcelainPaths(output: string): string[] {
   return Array.from(paths);
 }
 
-async function readFileSnapshot(workdir: string, relativePath: string): Promise<SnapshotFile> {
-  const filePath = path.resolve(workdir, relativePath);
-  if (!filePath.startsWith(path.resolve(workdir) + path.sep) && filePath !== path.resolve(workdir)) {
-    throw new Error(`文件路径越界: ${relativePath}`);
-  }
+async function readReviewableFileSnapshot(
+  workdir: string,
+  relativePath: string,
+): Promise<SnapshotFile | null> {
+  const root = path.resolve(workdir);
+  const normalizedPath = normalizeSnapshotPath(root, relativePath);
+  if (!normalizedPath) return null;
 
+  const filePath = path.resolve(root, normalizedPath);
   try {
+    const lstat = await fs.promises.lstat(filePath);
+    let stat = lstat;
+
+    if (lstat.isSymbolicLink()) {
+      const realPath = await fs.promises.realpath(filePath).catch(() => null);
+      if (!realPath || !isPathInside(root, realPath)) return null;
+      const linkedStat = await fs.promises.stat(filePath).catch(() => null);
+      if (!linkedStat) return null;
+      stat = linkedStat;
+    }
+
+    if (!stat.isFile() || stat.size > MAX_SNAPSHOT_FILE_BYTES) return null;
+
     const content = await fs.promises.readFile(filePath);
+    if (content.length > MAX_SNAPSHOT_FILE_BYTES) return null;
     return { exists: true, contentBase64: content.toString("base64") };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return { exists: false, contentBase64: null };
     }
-    throw error;
+    return null;
+  }
+}
+
+export async function addPathsToChangeSnapshot(
+  snapshot: ChangeSnapshot | null,
+  filePaths: string[],
+): Promise<void> {
+  if (!snapshot) return;
+
+  for (const filePath of filePaths) {
+    const normalizedPath = normalizeSnapshotPath(snapshot.workdir, filePath);
+    if (!normalizedPath) continue;
+    if (snapshot.filesAtStart.has(normalizedPath) || snapshot.changedAtStart.has(normalizedPath)) {
+      continue;
+    }
+    const fileSnapshot = await readReviewableFileSnapshot(snapshot.workdir, normalizedPath);
+    if (fileSnapshot) snapshot.changedAtStart.set(normalizedPath, fileSnapshot);
   }
 }
 
@@ -231,7 +283,8 @@ async function walkWorkspaceFiles(workdir: string): Promise<string[]> {
 async function createFilesystemSnapshot(workdir: string): Promise<ChangeSnapshot | null> {
   const filesAtStart = new Map<string, SnapshotFile>();
   for (const filePath of await walkWorkspaceFiles(workdir)) {
-    filesAtStart.set(filePath, await readFileSnapshot(workdir, filePath));
+    const fileSnapshot = await readReviewableFileSnapshot(workdir, filePath);
+    if (fileSnapshot) filesAtStart.set(filePath, fileSnapshot);
   }
   return {
     workdir,
@@ -368,16 +421,18 @@ export async function createChangeSnapshot(workdir: string): Promise<ChangeSnaps
     const changedAtStart = new Map<string, SnapshotFile>();
 
     for (const filePath of changedPaths) {
-      changedAtStart.set(filePath, await readFileSnapshot(workdir, filePath));
+      const fileSnapshot = await readReviewableFileSnapshot(workdir, filePath);
+      if (fileSnapshot) changedAtStart.set(filePath, fileSnapshot);
     }
-
-    return {
+    const snapshot = {
       workdir,
       mode: "git",
       trackedAtStart,
       changedAtStart,
       filesAtStart: new Map(),
-    };
+    } satisfies ChangeSnapshot;
+    await addPathsToChangeSnapshot(snapshot, ALWAYS_SNAPSHOT_FILES);
+    return snapshot;
   } catch {
     return createFilesystemSnapshot(workdir);
   }
@@ -391,12 +446,14 @@ export async function collectChangeReview(
   const afterFiles =
     snapshot.mode === "filesystem"
       ? new Map(
-          await Promise.all(
-            (await walkWorkspaceFiles(snapshot.workdir)).map(async (filePath) => [
-              filePath,
-              await readFileSnapshot(snapshot.workdir, filePath),
-            ] as const),
-          ),
+          (
+            await Promise.all(
+              (await walkWorkspaceFiles(snapshot.workdir)).map(async (filePath) => {
+                const fileSnapshot = await readReviewableFileSnapshot(snapshot.workdir, filePath);
+                return fileSnapshot ? ([filePath, fileSnapshot] as const) : null;
+              }),
+            )
+          ).filter((entry): entry is readonly [string, SnapshotFile] => entry !== null),
         )
       : null;
   const afterPaths =
@@ -413,19 +470,22 @@ export async function collectChangeReview(
   const files: StoredFileChange[] = [];
 
   for (const filePath of Array.from(candidates).sort()) {
-    const beforeSnapshot =
-      snapshot.filesAtStart.get(filePath) ||
-      snapshot.changedAtStart.get(filePath) ||
-      (snapshot.trackedAtStart.has(filePath)
-        ? {
-            exists: true,
-            contentBase64: (
-              await runGitBuffer(snapshot.workdir, ["show", `HEAD:${filePath}`])
-            ).toString("base64"),
-          }
-        : { exists: false, contentBase64: null });
+    let beforeSnapshot =
+      snapshot.filesAtStart.get(filePath) || snapshot.changedAtStart.get(filePath) || null;
+    if (!beforeSnapshot && snapshot.trackedAtStart.has(filePath)) {
+      try {
+        const content = await runGitBuffer(snapshot.workdir, ["show", `HEAD:${filePath}`]);
+        if (content.length > MAX_SNAPSHOT_FILE_BYTES) continue;
+        beforeSnapshot = { exists: true, contentBase64: content.toString("base64") };
+      } catch {
+        continue;
+      }
+    }
+    beforeSnapshot ||= { exists: false, contentBase64: null };
+
     const afterSnapshot =
-      afterFiles?.get(filePath) || (await readFileSnapshot(snapshot.workdir, filePath));
+      afterFiles?.get(filePath) || (await readReviewableFileSnapshot(snapshot.workdir, filePath));
+    if (!afterSnapshot) continue;
 
     const beforeBuffer = beforeSnapshot.exists ? decodeBase64(beforeSnapshot.contentBase64) : null;
     const afterBuffer = afterSnapshot.exists ? decodeBase64(afterSnapshot.contentBase64) : null;

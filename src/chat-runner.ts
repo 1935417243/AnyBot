@@ -28,6 +28,7 @@ import { getModelForProvider } from "./web/model-config.js";
 import * as db from "./web/db.js";
 import { buildAssistantMetadata, type AgentStreamEvent } from "./web/agent-stream.js";
 import {
+  addPathsToChangeSnapshot,
   collectChangeReview,
   createChangeSnapshot,
   type PublicChangeReview,
@@ -370,7 +371,11 @@ export async function runPreparedChatTurn(
   opts: RunPreparedChatTurnOptions,
 ): Promise<ChatTurnResult> {
   const agentEvents: ClaudeAgentStreamEvent[] = [];
+  const changeSnapshot = await safeCreateChangeSnapshotForWorkdir(prepared.workdir);
   const emitStream = async (event: AgentStreamEvent): Promise<void> => {
+    if (event.type === "tool_start" && event.tool.files?.length) {
+      await addPathsToChangeSnapshot(changeSnapshot, event.tool.files);
+    }
     if (shouldPersistAgentEvent(event)) {
       agentEvents.push(event);
     }
@@ -398,7 +403,6 @@ export async function runPreparedChatTurn(
 
   logger.info(`${opts.logPrefix}.start`, buildLogFields(prepared, opts));
 
-  const changeSnapshot = await safeCreateChangeSnapshotForWorkdir(prepared.workdir);
   try {
     const runOptions = {
       workdir: prepared.workdir,
