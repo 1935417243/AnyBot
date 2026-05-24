@@ -220,7 +220,7 @@ export function createSlashPickerController(config) {
         pickerTokenEnd = trigger.end;
         pickerQuery = trigger.query;
         activeIndex = 0;
-        visualActive = false;
+        visualActive = true;
         filterItems();
         renderPicker();
     }
@@ -542,7 +542,7 @@ export function createSlashPickerController(config) {
         pickerTokenEnd = trigger.end;
         pickerQuery = trigger.query;
         activeIndex = 0;
-        visualActive = false;
+        visualActive = true;
         renderPicker();
     }
 
