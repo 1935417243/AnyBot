@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { createAutomationsRouter } from "./routes/automations.js";
 import { createChangeReviewsRouter } from "./routes/change-reviews.js";
 import { createChannelsRouter } from "./routes/channels.js";
 import { createDataRouter } from "./routes/data.js";
@@ -21,6 +22,7 @@ export function createApiRouter(): Router {
   const router = Router();
 
   router.use(createEventsRouter());
+  router.use(createAutomationsRouter());
   router.use(createProjectsRouter());
   router.use(createSessionsRouter());
   router.use(createSettingsRouter());

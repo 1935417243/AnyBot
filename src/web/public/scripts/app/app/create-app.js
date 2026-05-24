@@ -1,4 +1,5 @@
 import { createAttachmentController } from '../chat/attachments.js';
+import { createAutomationsPageController } from '../automations/automations-page.js';
 import { createContextUsageController, formatTokenCount } from '../chat/context-usage.js';
 import { bindChatInputEvents } from '../chat/input-events.js';
 import { createInputHistoryController } from '../chat/input-history.js';
@@ -117,8 +118,10 @@ export function createAnyBotApp(dom, deps) {
         chatView,
         channelView,
         skillsView,
+        automationView,
         channelsBtn,
         skillsBtn,
+        automationsBtn,
     } = dom;
 
     let contextUsageController = null;
@@ -133,6 +136,7 @@ export function createAnyBotApp(dom, deps) {
     let settingsController = null;
     let channelsPageController = null;
     let skillsPageController = null;
+    let automationsPageController = null;
     let viewRouter = null;
     let pendingAttachments = [];
     const toastController = createToastController({ documentRef: documentRef });
@@ -706,7 +710,18 @@ export function createAnyBotApp(dom, deps) {
         skillsView: skillsView,
     });
 
+    automationsPageController = createAutomationsPageController({
+        automationView: automationView,
+        getActiveProviderType: function () {
+            return slashItemsStore ? slashItemsStore.getActiveProviderType() : '';
+        },
+        getChannelMeta: getChannelMeta,
+        showError: showError,
+    });
+
     viewRouter = createViewRouter({
+        automationsBtn: automationsBtn,
+        automationView: automationView,
         channelsBtn: channelsBtn,
         channelView: channelView,
         chatView: chatView,
@@ -715,8 +730,14 @@ export function createAnyBotApp(dom, deps) {
         fetchChannels: function () {
             return channelsPageController.fetchChannels();
         },
+        fetchAutomations: function () {
+            return automationsPageController.fetchInitialData();
+        },
         fetchSkills: function () {
             return skillsPageController.fetchSkills();
+        },
+        handleAutomationsEscape: function () {
+            return automationsPageController.handleEscape();
         },
         handleChannelsEscape: function () {
             return channelsPageController.handleEscape();
@@ -727,7 +748,13 @@ export function createAnyBotApp(dom, deps) {
         hasChannelsData: function () {
             return channelsPageController.hasChannelsData();
         },
+        hasAutomationsData: function () {
+            return automationsPageController.hasAutomationsData();
+        },
         newChatBtn: newChatBtn,
+        renderAutomationsPage: function () {
+            return automationsPageController.render();
+        },
         renderChannelsPage: function () {
             return channelsPageController.render();
         },

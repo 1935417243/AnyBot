@@ -19,10 +19,12 @@ export function createViewRouter(options) {
         options.chatView.style.display = 'none';
         options.channelView.style.display = 'none';
         options.skillsView.style.display = 'none';
+        options.automationView.style.display = 'none';
         options.settingsView.style.display = 'none';
         options.newChatBtn.classList.remove('active');
         options.channelsBtn.classList.remove('active');
         options.skillsBtn.classList.remove('active');
+        options.automationsBtn.classList.remove('active');
         options.settingsBtn.classList.remove('active');
     }
 
@@ -53,6 +55,15 @@ export function createViewRouter(options) {
         if (options.renderSkillsPage) options.renderSkillsPage();
     }
 
+    function showAutomationsPage() {
+        hideAllViews();
+        currentView = 'automations';
+        options.automationView.style.display = 'flex';
+        options.automationsBtn.classList.add('active');
+        renderHistory();
+        if (options.renderAutomationsPage) options.renderAutomationsPage();
+    }
+
     function showSettingsView() {
         hideAllViews();
         currentView = 'settings';
@@ -74,7 +85,18 @@ export function createViewRouter(options) {
         showSkillsPage();
     }
 
+    async function openAutomationsPage() {
+        if (currentView === 'automations') return;
+        if (!options.hasAutomationsData || !options.hasAutomationsData()) {
+            if (options.fetchAutomations) await options.fetchAutomations();
+        }
+        showAutomationsPage();
+    }
+
     function handleDocumentKeydown(e) {
+        if (e.key === 'Escape' && options.handleAutomationsEscape && options.handleAutomationsEscape()) {
+            return;
+        }
         if (e.key === 'Escape' && options.handleChannelsEscape && options.handleChannelsEscape()) {
             return;
         }
@@ -89,6 +111,9 @@ export function createViewRouter(options) {
         options.skillsBtn.addEventListener('click', function () {
             openSkillsPage();
         });
+        options.automationsBtn.addEventListener('click', function () {
+            openAutomationsPage();
+        });
         documentRef.addEventListener('keydown', handleDocumentKeydown);
     }
 
@@ -102,6 +127,7 @@ export function createViewRouter(options) {
         hideAllViews: hideAllViews,
         showChatView: showChatView,
         showChannelsPage: showChannelsPage,
+        showAutomationsPage: showAutomationsPage,
         showSettingsView: showSettingsView,
         showSkillsPage: showSkillsPage,
     };

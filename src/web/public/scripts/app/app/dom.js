@@ -89,7 +89,9 @@ export function getAppDom(documentRef) {
         chatView: byId(documentRef, 'chat-view'),
         channelView: byId(documentRef, 'channel-view'),
         skillsView: byId(documentRef, 'skills-view'),
+        automationView: byId(documentRef, 'automations-view'),
         channelsBtn: byId(documentRef, 'channels-btn'),
         skillsBtn: byId(documentRef, 'skills-btn'),
+        automationsBtn: byId(documentRef, 'automations-btn'),
     };
 }
