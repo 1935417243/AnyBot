@@ -68,10 +68,10 @@ sudo xattr -rd com.apple.quarantine "/Applications/AnyBot.app"
 
 至少配置一个 Provider：
 
-| Provider | 安装方式 | 说明 |
+| Provider | 运行方式 | 说明 |
 |----------|---------|------|
-| Codex CLI | 随 `@openai/codex-sdk` 依赖安装 native binary；仍需要完成本机 Codex 登录或配置，安装说明见 [Codex CLI 文档](https://developers.openai.com/codex/cli) | 支持会话续聊、Sandbox、图片输入 |
-| Claude Code | 默认使用 `@anthropic-ai/claude-agent-sdk` 随包能力；需要外部 CLI 时可在高级设置中指定，安装说明见 [Claude Code 文档](https://code.claude.com/docs/en/overview) | 支持会话续聊、Sandbox 映射、Agent 流式事件 |
+| Codex CLI | 默认使用随 `@openai/codex-sdk` 提供的平台 native binary，不要求全局安装 `codex` 命令；仍需要完成 Codex 登录或 API 配置，使用说明见 [Codex CLI 文档](https://developers.openai.com/codex/cli) | 支持会话续聊、Sandbox、图片输入 |
+| Claude Code | 默认使用随 `@anthropic-ai/claude-agent-sdk` 提供的平台 native binary，不要求全局安装 Claude Code；需要外部 CLI 时可在高级设置中指定，使用说明见 [Claude Code 文档](https://code.claude.com/docs/en/overview) | 支持会话续聊、Sandbox 映射、Agent 流式事件 |
 
 ### 3. 源码运行
 

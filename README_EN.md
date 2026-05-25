@@ -68,10 +68,10 @@ If your app is named `Anybot.app`, adjust the path accordingly.
 
 Configure at least one Provider:
 
-| Provider | Installation | Notes |
+| Provider | Runtime | Notes |
 |----------|--------------|-------|
-| Codex CLI | Native binary is provided through `@openai/codex-sdk`; local Codex login/configuration is still required. See the [Codex CLI docs](https://developers.openai.com/codex/cli) | Session resume, sandbox, image input |
-| Claude Code | Uses `@anthropic-ai/claude-agent-sdk` by default; configure an external executable from advanced settings only when needed. See the [Claude Code docs](https://code.claude.com/docs/en/overview) | Session resume, sandbox mapping, streamed Agent events |
+| Codex CLI | Uses the platform native binary provided by `@openai/codex-sdk` by default, so a globally installed `codex` command is not required. Codex login or API configuration is still required. See the [Codex CLI docs](https://developers.openai.com/codex/cli) | Session resume, sandbox, image input |
+| Claude Code | Uses the platform native binary provided by `@anthropic-ai/claude-agent-sdk` by default, so a global Claude Code install is not required. Configure an external executable from advanced settings only when needed. See the [Claude Code docs](https://code.claude.com/docs/en/overview) | Session resume, sandbox mapping, streamed Agent events |
 
 ### 3. Run From Source
 
