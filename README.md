@@ -2,50 +2,36 @@
 
 # AnyBot
 
-把 AI CLI 工具变成可远程使用的 AI 助手——安装桌面 App 后即可通过内置 **Web UI** 对话和配置，也可以通过 **飞书机器人** / **QQ 机器人** / **Telegram 机器人** / **个人微信** 在手机 / 桌面端随时向你这台机器上的 AI 发消息。
+AnyBot 是一个运行在你自己电脑上的 AI Agent 工作台，把 Codex CLI、Claude Code 等本地 Agent 能力接入桌面 App、Web UI 和常用聊天渠道。你可以在内置 **Web UI** 中对话、管理项目、查看 Agent 执行过程、审核文件变更和配置自动化任务；也可以通过 **飞书机器人**、**QQ 机器人**、**Telegram 机器人** 或 **个人微信** 在手机和桌面端远程使用这台机器上的 Agent。
 
-目前支持 [OpenAI Codex CLI](https://github.com/openai/codex) 和 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 作为 Provider。
-
-桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
+当前 Provider 支持 [OpenAI Codex CLI](https://github.com/openai/codex) 和 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)。桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
 
 ---
 
 ## 特性
 
-- **多 Provider 架构** — 可插拔的 AI CLI 后端，当前支持 Codex CLI、Claude Code，未来可扩展更多
-- **Web UI** — 开箱即用的本地聊天界面，支持 Markdown 渲染、代码高亮、会话管理
-- **附件支持** — Web UI 中通过 📎 按钮、粘贴图片或拖拽文件发送附件（图片 + 任意文件，50MB 上限）
-- **多平台集成** — 同时支持飞书（长连接）、QQ 机器人（WebSocket）、Telegram、个人微信，手机上也能用
-- **主动推送** — 通过 API 主动向频道 Owner 发送消息，适合自动化通知场景
-- **技能管理** — 在 Web UI 中浏览、启用 / 禁用 / 删除技能
-- **代理配置** — 在 Web UI 中配置 HTTP / SOCKS5 代理，支持保存与连通性测试
-- **会话续聊** — 复用 Provider 原生 session，上下文不丢失；输入 `/new` 开启新会话
-- **图片理解** — 发送图片，支持多模态对话
-- **文件回传** — 生成的图片、文件自动发送回聊天
-- **模型切换** — 在 Web UI 或聊天中通过 `/provider`、`/model` 命令随时切换 Provider 和模型
-- **聊天命令** — 所有频道统一支持 `/help`、`/new`、`/provider`、`/model` 命令
-- **后台运行** — 支持 daemon 模式，开机即用
-- **桌面安装包** — 支持 Electron 打包，普通用户安装后直接通过 Web UI 配置和使用
+- **多 Provider**：支持 Codex CLI 和 Claude Code，可在 Web UI 或频道命令中切换 Provider 和模型。
+- **Agent Web UI**：本地聊天界面，支持 Markdown、代码高亮、流式 Agent 事件、停止响应、上下文压缩和会话历史。
+- **项目工作区**：在侧边栏管理项目，项目会话会把项目目录作为 Provider 工作目录；也支持在单轮消息中额外选择项目。
+- **技能入口**：Web UI 可浏览、启用、禁用、删除技能，并在输入框 `/` 菜单中按当前 Provider 展示可用技能和命令。
+- **附件上传**：Web UI 支持按钮、粘贴图片和拖拽上传，单文件上限 50MB；图片能力取决于当前 Provider。
+- **变更审核**：Agent 修改文件后生成变更快照，可在 Web UI 中查看 diff、通过或撤销。
+- **多频道接入**：支持飞书长连接、QQ Bot WebSocket、Telegram 长轮询和个人微信通道。
+- **主动推送**：通过 `/api/send` 向已配置 Owner 的频道发送通知。
+- **自动化任务**：Web UI 可创建、更新和删除自动化任务，执行结果可交付到本地或频道。
+- **桌面体验**：Electron 桌面壳、托盘、开机启动、Windows 安装版应用内更新。
 
 ---
 
 ## 截图预览
 
-| 聊天界面 | 模型切换 |
+| 新对话 | 技能 |
 |:---:|:---:|
-| ![聊天界面](assets/webUI聊天展示.png) | ![模型切换](assets/模型切换.png) |
+| ![新对话](assets/主页.png) | ![技能](assets/技能页.png) |
 
-| 提供商切换 | 频道管理 |
+| 频道 | 设置 |
 |:---:|:---:|
-| ![提供商切换](assets/提供商切换.png) | ![频道管理](assets/频道管理.png) |
-
-| 技能管理 | 代理设置 |
-|:---:|:---:|
-| ![技能管理](assets/技能管理.png) | ![代理设置](assets/代理.png) |
-
-| 手机端操作 |
-|:---:|
-| ![手机端操作](assets/手机端演示.png) |
+| ![频道](assets/频道页.png) | ![设置](assets/设置页.png) |
 
 ---
 
@@ -53,111 +39,54 @@
 
 ### 1. 安装桌面 App（推荐）
 
-从 [GitHub Releases](https://github.com/1935417243/AnyBot/releases) 下载对应平台的安装包：
+从 [GitHub Releases](https://github.com/1935417243/AnyBot/releases) 下载对应平台安装包：
 
 | 平台 | 安装包 | 说明 |
 |------|--------|------|
-| Windows | `AnyBot-Setup-x.x.x.exe` | 双击安装，之后从开始菜单或桌面快捷方式启动 |
+| Windows | `AnyBot-Setup-x.x.x.exe` | 双击安装后从开始菜单或桌面快捷方式启动 |
 | macOS | `AnyBot-x.x.x-*.dmg` | 打开 `.dmg`，将 `AnyBot.app` 拖到 Applications 后启动 |
 
-启动后会自动打开 AnyBot 桌面窗口。Provider、模型、权限、代理和频道都可以在设置中配置。
+桌面 App 不要求用户手动安装 Node.js。启动后会自动打开 AnyBot 窗口，Provider、模型、权限、项目、频道和隐私设置都可以在 Web UI 中配置。
 
-Windows 安装版支持在 **设置 -> 关于 -> 检测更新** 中检查新版本；macOS 暂时请手动下载新版 `.dmg` 覆盖安装。
+Windows 安装版支持在 **设置 -> 关于 -> 检测更新** 中检查新版本；macOS 暂时需要手动下载新版 `.dmg` 覆盖安装。
 
 #### macOS 提示“应用已损坏，无法打开”
 
-由于 macOS 的安全机制，非 App Store 下载的应用可能会触发此提示。如果你确认安装包来自 AnyBot 的 GitHub Releases，可以在终端执行以下命令清除隔离标记：
+如果你确认安装包来自 AnyBot 的 GitHub Releases，可以在终端执行：
 
 ```bash
 sudo xattr -rd com.apple.quarantine "/Applications/AnyBot.app"
 ```
 
-如果你的 Applications 中应用名显示为 `Anybot.app`，请把命令里的路径改成实际名称。
+如果 Applications 中应用名显示为 `Anybot.app`，请把命令里的路径改成实际名称。
 
-### 2. Provider 前置依赖
+### 2. Provider 前置配置
 
-以及至少配置一个 Provider：
+至少配置一个 Provider：
 
 | Provider | 安装方式 | 说明 |
 |----------|---------|------|
-| [Codex CLI](https://github.com/openai/codex) | 随 `@openai/codex-sdk` 依赖安装；需要完成本机 Codex 登录/配置 | OpenAI 的 CLI 工具 |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | 使用本机已登录的 `claude` 命令；项目依赖已包含 SDK | Anthropic 的 CLI 工具 |
-
-桌面 App 不要求用户手动安装 Node.js；只有源码运行或开发时才需要 Node.js 和 npm。
+| Codex CLI | 随 `@openai/codex-sdk` 依赖安装 native binary；仍需要完成本机 Codex 登录或配置 | 支持会话续聊、Sandbox、图片输入 |
+| Claude Code | 默认使用 `@anthropic-ai/claude-agent-sdk` 随包能力；需要外部 CLI 时可在高级设置中指定 | 支持会话续聊、Sandbox 映射、Agent 流式事件 |
 
 ### 3. 源码运行
 
-源码运行需要先安装：
-
-| 依赖 | 最低版本 | 说明 |
-|------|---------|------|
-| [Node.js](https://nodejs.org/) | 18+ | 运行环境 |
-| npm | 随 Node.js 附带 | 包管理 |
-
-<details>
-<summary><b>Windows 安装指南</b></summary>
-
-1. 从 [Node.js 官网](https://nodejs.org/)下载安装 LTS 版本。
-2. 安装 Git for Windows，或使用你已有的 Git 环境。
-3. 在 PowerShell / Windows Terminal 中运行后续命令。
-
-</details>
-
-<details>
-<summary><b>Linux 安装指南</b></summary>
-
-**Ubuntu / Debian：**
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-sudo apt-get install -y nodejs
-```
-
-**CentOS / RHEL / Fedora：**
-
-```bash
-curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
-sudo yum install -y nodejs   # Fedora 用 dnf
-```
-
-**使用 nvm（推荐，不需要 sudo）：**
-
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-source ~/.bashrc   # 或 source ~/.zshrc
-nvm install --lts
-```
-
-</details>
-
-<details>
-<summary><b>macOS 安装指南</b></summary>
-
-```bash
-brew install node
-```
-
-</details>
+源码运行和开发建议使用 **Node.js 22**，以贴近 CI 环境。
 
 ```bash
 git clone https://github.com/1935417243/AnyBot.git
 cd AnyBot
-npm install
+npm ci
 npm start
 ```
 
-启动后打开 `http://localhost:19981` 即可使用 Web UI。Provider、模型、权限、代理和频道都在 Web UI 中配置。
+启动后打开 `http://localhost:19981` 使用 Web UI。
 
 ### 4. 后台运行
 
 ```bash
-# 后台运行（daemon）
 npm run bot:start
-
-# 查看状态
 npm run bot:status
-
-# 停止
 npm run bot:stop
 ```
 
@@ -165,411 +94,177 @@ npm run bot:stop
 
 ## Provider 架构
 
-AnyBot 使用可插拔的 Provider 架构，每个 AI CLI 工具对应一个 Provider 实现：
+| Provider | 状态 | 图片输入 | 说明 |
+|----------|------|----------|------|
+| `codex` | 可用 | 支持 | 使用 Codex SDK/CLI，支持 Sandbox 模式和 Agent 事件 |
+| `claude-code` | 可用 | 暂不支持 | 使用 Claude Agent SDK，支持会话续聊、权限模式和上下文压缩 |
 
-| Provider | 状态 | CLI 工具 | 说明 |
-|----------|------|---------|------|
-| `codex` | ✅ 可用 | [Codex CLI](https://github.com/openai/codex) | OpenAI 的 CLI，支持 Sandbox 模式 |
-| `claude-code` | ✅ 可用 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Anthropic 的 CLI，支持会话续聊、Sandbox 映射 |
-
-通过环境变量 `PROVIDER=codex` 或 `PROVIDER=claude-code` 切换默认 Provider，也可在 Web UI 中随时切换。
+Provider 和模型选择会在 Web UI 中保存；每个 Provider 会记住上次选择的模型。
 
 ---
 
 ## Web UI
 
-内置的 Web 聊天界面，无需额外部署：
+Web UI 是当前推荐入口，主要能力包括：
 
-- 多会话管理，历史记录持久化（SQLite）
-- Markdown 渲染 + 代码语法高亮 + 一键复制
-- 附件支持：通过 📎 按钮上传文件、粘贴图片、拖拽文件到对话区（50MB 上限）
-  - 图片附件自动传递给 Provider 做多模态理解
-  - 非图片文件路径作为上下文传入，Provider 可读取处理
-- Provider 和模型切换
-- 频道配置管理（飞书、QQ 机器人、Telegram、微信）
-- 技能管理（浏览、启用 / 禁用、删除）
-- 代理设置（HTTP / SOCKS5、认证、连通性测试）
-- 深色主题
+- 多会话历史和 SQLite 持久化。
+- 项目管理、项目会话、目录树和默认工作目录设置。
+- Markdown 渲染、代码复制、长消息折叠、上下文用量展示。
+- Agent 流式过程展示、取消响应、`/compact` 上下文压缩。
+- 文件上传、图片预览、本地图片访问。
+- Slash picker：按当前 Provider 展示技能、项目和 Provider 原生命令。
+- 变更审核：展示 Agent 改动 diff，支持通过或撤销。
+- Provider、模型、Sandbox/权限、应用外观、日志、数据导入导出和频道配置。
+- 技能管理：按 Provider 隔离扫描技能目录，支持启用、禁用、删除和打开文件夹。
+- 自动化任务管理。
 
 ---
 
-## 飞书集成
+## 频道能力
 
-通过飞书长连接模式接入，**无需公网回调地址**。
+不同频道受平台协议限制，支持范围不同：
 
-### 飞书侧配置
+| 频道 | 接入方式 | 输入 | 输出 | 备注 |
+|------|----------|------|------|------|
+| 飞书 | 长连接事件订阅 | 文本、图片 | 文本、图片、`FILE:` 文件 | 群聊默认仅 @ 回复，可配置为全部回复 |
+| QQ Bot | WebSocket 网关 | 文本 | 文本 | 支持频道、群聊和 C2C/私聊事件 |
+| Telegram | Bot API 长轮询 | 文本、图片 | 文本 | 图片 caption 会作为上下文；长回复自动拆分 |
+| 个人微信 | 微信通道协议 | 文本、图片、文件 | 文本、图片、`FILE:` 文件 | 扫码绑定，不需要 OpenClaw |
 
-在 [飞书开放平台](https://open.feishu.cn/) 创建应用后：
+所有频道都支持频道命令：`/help`、`/new`、`/provider`、`/model`、`/workspace`。不带 `/` 的 `provider 1`、`model 1`、`workspace 1` 也可用于按序号切换。
 
-1. 开启 **机器人** 能力
-2. 开启 **长连接模式** 的事件订阅
-3. 订阅事件 `im.message.receive_v1`
-4. 授予 **发送消息** 权限
-5. 如需处理图片消息，还需授予 **读取消息资源** 相关权限
-6. 发布应用
+### 频道配置
 
-### 连接配置
-
-频道配置保存在 `.data/channels.json`，有三种方式管理：
-
-| 方式 | 说明 |
-|------|------|
-| **Web UI** | 启动服务后在设置页面中按频道填写配置 |
-| **REST API** | `GET /api/channels` 查看、`PUT /api/channels/:type` 更新 |
-| **手动编辑** | 直接编辑 `.data/channels.json` |
-
-<details>
-<summary><b>channels.json 完整字段说明</b></summary>
+频道配置保存在 `.data/channels.json`，推荐直接在 Web UI 中管理。
 
 ```jsonc
 {
   "feishu": {
-    "enabled": true,
-    "appId": "cli_xxxx",
-    "appSecret": "xxxx",
-    "groupChatMode": "mention",   // "mention"（仅 @机器人时回复）或 "all"（所有消息都回复）
-    "botOpenId": "ou_xxxx",       // 可选；mention 模式下用于精确判断是否 @了机器人
-    "ackReaction": "OK",          // 收到消息后的 reaction 表情，留空可关闭
-    "ownerChatId": "oc_xxxx"      // 可选；用于 /api/send 主动推送消息的目标聊天 ID
+    "enabled": false,
+    "appId": "",
+    "appSecret": "",
+    "groupChatMode": "mention",
+    "botOpenId": "",
+    "ackReaction": "OK",
+    "ownerChatId": ""
   },
   "qqbot": {
-    "enabled": true,
-    "appId": "your_app_id",
-    "appSecret": "your_app_secret",
-    "ownerChatId": ""             // 可选；主动推送的目标聊天 ID
+    "enabled": false,
+    "appId": "",
+    "appSecret": "",
+    "ownerChatId": ""
   },
   "telegram": {
-    "enabled": true,
-    "token": "1234567890:AA...",
-    "ownerChatId": ""             // 可选；主动推送的目标 chat ID
+    "enabled": false,
+    "token": "",
+    "ownerChatId": ""
   },
   "weixin": {
-    "enabled": true,
-    "accountId": "",              // 扫码绑定后自动填入
-    "token": "",                  // 扫码绑定后自动填入
+    "enabled": false,
+    "accountId": "",
+    "token": "",
     "baseUrl": "https://ilinkai.weixin.qq.com",
     "botType": "3",
     "botAgent": "AnyBot/0.1.0",
-    "ownerChatId": ""             // 可选；扫码用户或首次来信用户会自动填入
+    "ownerChatId": ""
   }
 }
 ```
 
-</details>
+### 飞书
 
-### 使用方式
+在飞书开放平台创建应用后，开启机器人能力和长连接模式，订阅 `im.message.receive_v1`，授予发送消息权限；如需处理图片，还需要读取消息资源相关权限。
 
-- **私聊** — 直接发消息给机器人
-- **群聊** — 默认仅 @ 机器人时回复（可改为回复所有消息）
-- 发送图片 — 自动下载并交给 Provider 处理
-- 回复中的图片 / 文件会自动上传回飞书（单文件上限 30MB）
-- 支持所有聊天命令（见下方[聊天命令](#聊天命令)）
+### QQ Bot
 
----
+在 QQ 开放平台创建机器人应用，获取 App ID 和 App Secret，并配置消息接收权限。当前实现接入公域/频道消息、群聊和 C2C/私聊事件。
 
-## QQ 机器人集成
+### Telegram
 
-通过 QQ 开放平台 WebSocket 网关接入，支持频道、群聊和私聊。
+通过 [@BotFather](https://t.me/BotFather) 创建机器人并获取 Bot Token。群组中需要 @ 机器人或使用带 bot 名称的命令触发回复。
 
-### QQ 侧配置
+### 个人微信
 
-在 [QQ 开放平台](https://q.qq.com/) 创建机器人应用后：
-
-1. 获取 **App ID** 和 **App Secret**
-2. 配置机器人的消息接收权限
-
-### 连接配置
-
-与飞书相同，通过 Web UI、REST API 或 `.data/channels.json` 中的 `qqbot` 字段配置 App ID / App Secret。
-
-### 使用方式
-
-- **频道消息** — 在 QQ 频道中 @ 机器人
-- **群聊** — 在群中 @ 机器人发送消息
-- **私聊** — 直接给机器人发消息
-- 支持所有聊天命令（见下方[聊天命令](#聊天命令)）
+启用微信频道后，首次启动会生成二维码，用个人微信扫码确认。扫码成功后会写回 `accountId`、`token` 和 `ownerChatId`。如果登录态失效，清空 `weixin.token` 后重启即可重新绑定。
 
 ---
 
-## Telegram 集成
+## 技能与 Slash
 
-通过 Telegram Bot API 长轮询接入，**无需 webhook 或公网回调地址**。
-
-### Telegram 侧配置
-
-1. 在 Telegram 中联系 [@BotFather](https://t.me/BotFather)
-2. 使用 `/newbot` 创建机器人
-3. 记录生成的 **Bot Token**
-4. 将机器人拉入群组后，如需群内使用，请在消息中 @ 机器人
-
-### 连接配置
-
-与其它频道相同，可通过以下方式配置 `telegram.token`：
-
-| 方式 | 说明 |
-|------|------|
-| **Web UI** | 在“频道”页面选择 Telegram，填写 Bot Token |
-| **REST API** | `GET /api/channels` 查看、`PUT /api/channels/telegram` 更新 |
-| **手动编辑** | 直接编辑 `.data/channels.json` 中的 `telegram` 字段 |
-
-### 使用方式
-
-- **私聊** — 直接给机器人发消息
-- **群聊** — 在群里 @ 机器人后发送消息
-- **图片消息** — 自动下载图片并交给 Provider 处理，caption 会一并作为上下文
-- **长回复拆分** — 超过 Telegram 单条消息长度时自动分段发送
-- 支持所有聊天命令（见下方[聊天命令](#聊天命令)）
-
----
-
-## 微信集成
-
-通过腾讯微信通道协议接入个人微信，AnyBot 自己完成扫码登录、长轮询收消息和回复发送，不需要安装 OpenClaw。
-
-### 连接配置
-
-1. 在 Web UI 的“频道”页面启用“微信”，或编辑 `.data/channels.json` 中的 `weixin.enabled` 为 `true`
-2. 重启 AnyBot
-3. 终端会显示二维码，用个人微信扫码并在手机上确认
-4. 扫码成功后，`weixin.accountId`、`weixin.token` 和 `ownerChatId` 会自动写回配置
-
-如果登录态失效，清空 `weixin.token` 后重启服务即可重新扫码绑定。
-
-### 使用方式
-
-- **私聊** — 直接用绑定的个人微信收发文本、图片和文件消息
-- **主动推送** — `/api/send` 可使用 `{ "channel": "weixin", "message": "..." }`
-- 图片会下载后转给 Provider 进行多模态理解；回复中的本地图片路径和 `FILE:` 文件会通过微信 CDN 加密上传后发送
-- 支持所有聊天命令（见下方[聊天命令](#聊天命令)）
-
----
-
-## 聊天命令
-
-所有频道（飞书、QQ、Telegram、微信）统一支持以下命令：
-
-| 命令 | 说明 |
-|------|------|
-| `/help` | 显示可用命令列表 |
-| `/new` | 开启新窗口，重置当前会话 |
-| `provider` 或 `/provider` | 查看可用供应商列表及当前选择，列表会显示 `1`、`2` 等序号 |
-| `provider <序号>` | 切换供应商，例如 `provider 1` |
-| `model` 或 `/model` | 查看当前供应商的可用模型列表，列表会显示 `1`、`2` 等序号 |
-| `model <序号>` | 切换模型，例如 `model 1` |
-| `workspace` 或 `/workspace` | 查看工作区列表，第 1 项是默认工作目录，后面是项目列表 |
-| `workspace <序号>` | 切换工作区并开启新对话，例如 `workspace 1` |
-
-切换供应商时会自动记住每个供应商上次使用的模型，再次切回时自动恢复。
-
----
-
-## 技能管理
-
-通过 Web UI 管理技能（读取 Provider 对应的技能目录下的 `SKILL.md` 文件）：
-
-- 浏览所有已安装技能，查看名称与描述
-- 启用 / 禁用指定技能
-- 删除不需要的技能
-- 快速打开技能所在文件夹
-
-切换 Provider 后，技能列表自动切换到对应 Provider 的技能目录：
+技能目录按 Provider 隔离：
 
 | Provider | 技能目录 |
 |----------|---------|
 | `codex` | `$CODEX_HOME/skills/`，未设置时为 `~/.codex/skills/` |
 | `claude-code` | `$CLAUDE_CONFIG_DIR/skills/`，未设置时为 `~/.claude/skills/` |
 
----
-
-## 代理配置
-
-代理功能当前暂时关闭。历史配置会保留在 `.data/proxy.json`，但应用启动、保存配置和导入配置时都不会再向 Provider 注入 `HTTP_PROXY` / `HTTPS_PROXY`。
-
-### 支持内容
-
-- 暂不启用 `HTTP` / `SOCKS5` 代理
-- Web UI 会显示“代理功能已暂时关闭”
-- 旧代理配置会保留，方便后续重新设计后迁移或恢复
-
-### 配置方式
-
-| 方式 | 说明 |
-|------|------|
-| **Web UI** | 代理控件会禁用 |
-| **REST API** | `GET /api/proxy` 会返回 `featureEnabled: false`；`PUT /api/proxy` 不会启用代理；`POST /api/proxy/test` 返回暂时关闭 |
-| **手动编辑** | `.data/proxy.json` 可保留旧配置，但当前不会生效 |
+Web UI 的 `/` 入口会按当前 Provider 展示可用技能、项目和命令。技能只注入本轮选择的技能名，不注入技能描述或文件内容；项目选择会按项目名和绝对路径写入本轮提示词。
 
 ---
 
-## 环境变量
+## 主动推送
 
-AnyBot 不再读取 `.env` 文件。Provider、模型和权限等常用设置会保存到 `.data/*.json`，也可以在 Web UI 中修改。下面这些变量只作为系统环境变量兼容入口使用，需要时直接在启动命令或系统服务配置里传入。
-
-### 通用配置
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `PROVIDER` | `codex` | 使用的 Provider：`codex`、`claude-code` |
-| `WEB_PORT` | `19981` | Web UI 端口 |
-| `LOG_LEVEL` | `info` | 日志级别：`debug` / `info` / `warn` / `error` |
-| `LOG_INCLUDE_CONTENT` | `false` | 日志中包含消息内容（调试用） |
-| `LOG_INCLUDE_PROMPT` | `false` | 日志中包含完整 prompt（调试用） |
-| `LOG_RETENTION_DAYS` | `3` | 日志保留天数，超过后自动删除 |
-
-### Codex CLI 配置
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `CODEX_BIN` | 随包 Codex CLI | 可选；指定外部 Codex CLI 可执行文件路径。留空或设为 `codex` 时优先使用随包 native binary |
-| `CODEX_MODEL` | — | 覆盖使用的模型 |
-| `CODEX_SANDBOX` | `workspace-write` | 安全模式：`read-only` / `workspace-write` / `danger-full-access` |
-| `CODEX_SYSTEM_PROMPT` | — | 追加到内置提示词后面的自定义系统提示词 |
-| `CODEX_WORKDIR` | 当前目录 | 工作目录 |
-
-### Claude Code 配置
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `CLAUDE_CODE_BIN` | — | 可选；留空使用 SDK 随包安装的 Claude Code native binary。需要指定外部 CLI 时填写可执行文件完整路径 |
-| `ANTHROPIC_API_KEY` | — | 可选；只在你想改用 API Key 认证时启用 |
-| `CLAUDE_AGENT_MODEL` | — | 覆盖使用的模型 |
-| `CLAUDE_AGENT_PERMISSION_MODE` | — | 覆盖权限模式：`default` / `acceptEdits` / `bypassPermissions` / `plan` / `dontAsk` / `auto` |
-| `CLAUDE_AGENT_MAX_TURNS` | — | 最大 Agent 循环轮数 |
-
-注意：设置 `CLAUDE_CODE_BIN` 后，SDK 会执行它指向的可执行文件，不会读取 shell function 或 alias。如果你的 `claude` 是 shell function 包装器，请把同等逻辑保存成脚本，并将 `CLAUDE_CODE_BIN` 指向该脚本。
-
----
-
-## REST API
-
-Web UI 通过以下 API 与后端交互，也可以直接调用：
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/api/sessions` | 获取会话列表 |
-| `POST` | `/api/sessions` | 创建新会话 |
-| `GET` | `/api/sessions/:id` | 获取会话详情（含消息） |
-| `DELETE` | `/api/sessions/:id` | 删除会话 |
-| `POST` | `/api/sessions/:id/messages` | 发送消息，支持附件 `{ "content": "...", "attachments": [...] }` |
-| `POST` | `/api/upload` | 上传文件（50MB 上限），返回文件路径与类型 |
-| `POST` | `/api/send` | 通过频道机器人主动推送消息 `{ "channel": "feishu", "message": "..." }` |
-| `GET` | `/api/model-config` | 获取当前模型配置（含 Provider 信息） |
-| `PUT` | `/api/model-config` | 切换模型 `{ "modelId": "..." }` |
-| `GET` | `/api/providers` | 获取可用 Provider 列表 |
-| `PUT` | `/api/providers/current` | 切换 Provider `{ "provider": "codex" }` |
-| `GET` | `/api/channels` | 获取频道配置 |
-| `PUT` | `/api/channels/:type` | 更新频道配置 |
-| `GET` | `/api/proxy` | 获取代理配置 |
-| `PUT` | `/api/proxy` | 更新代理配置 |
-| `POST` | `/api/proxy/test` | 测试代理连通性 |
-| `GET` | `/api/skills` | 获取技能列表 |
-| `PUT` | `/api/skills/:id/toggle` | 启用 / 禁用技能 `{ "enabled": true }` |
-| `DELETE` | `/api/skills/:id` | 删除技能 |
-| `POST` | `/api/skills/open-folder` | 在文件管理器中打开技能目录 |
-
----
-
-## 主动推送消息
-
-通过 `/api/send` 接口可以让频道机器人主动向 Owner 发送消息，适用于自动化通知、告警等场景：
+AnyBot 保留了轻量本地 API，方便脚本把通知推送到已配置 Owner 的频道。常见用法是发送部署结果、定时任务结果或本机自动化提醒。
 
 ```bash
 curl -X POST http://localhost:19981/api/send \
   -H "Content-Type: application/json" \
-  -d '{"channel": "telegram", "message": "部署完成 ✅"}'
+  -d '{"channel": "telegram", "message": "部署完成"}'
 ```
 
-`channel` 可选 `feishu`、`qqbot`、`telegram`、`weixin`，需要在对应频道配置中设置 `ownerChatId`。
+`channel` 可选 `feishu`、`qqbot`、`telegram`、`weixin`，需要对应频道配置 `ownerChatId`。
+
+---
+
+## 运行数据
+
+默认运行数据写入 `.data/`，日志写入 `.run/`。桌面 App 会使用 Electron 的用户数据目录，并在其中维护 `.data/`、`.run/` 和上传目录。
+
+常见文件：
+
+- `.data/chat.db`：会话、消息、项目和自动化存储。
+- `.data/app-settings.json`：应用设置。
+- `.data/model-config.json`：Provider 与模型选择。
+- `.data/runtime-config.json`：Sandbox/权限默认值。
+- `.data/channels.json`：频道配置。
+- `.data/disabled-skills.json`：技能启用状态。
+- `.data/change-reviews/`：变更审核快照。
 
 ---
 
 ## 工作原理
 
-- 每个聊天（Web 会话 / 飞书 chat / QQ 聊天）绑定一个 Provider session，后续消息通过续聊机制保持上下文
-- 会话绑定关系保存在 SQLite 中；各频道的绑定在进程重启后自动重建
-- 飞书消息先加一个 reaction（默认 ✅）表示已收到，再等待 Provider 完整回复
-- QQ 机器人通过 WebSocket 网关接收消息，OAuth2 自动管理 Token
-- 启用代理后，Provider 与 Telegram 等出站请求会走全局代理；飞书、QQ、微信和本机地址默认直连
-- 支持文本、图片和附件消息；其它消息类型会收到提示
-- Web UI 附件通过 multer 中间件上传到工作目录下的 `tmp/uploads/`
-- `/new` 重置当前会话，`/provider` 和 `/model` 切换供应商和模型，`/help` 查看命令帮助
-- 图片消息先下载到临时目录，通过 Provider 传入
-- 回复中的本机图片路径（`![alt](/path.png)` 或纯路径）会自动上传
-- 回复中的 `FILE: /path/to/file.ext` 会作为文件发送
-- 日志为单行 JSON，写入 `.run/` 目录，按 10 分钟切分，默认保留 3 天
+- `src/index.ts` 启动 Provider、Web 服务和已启用频道。
+- `src/chat-runner.ts` 是 Web UI 和频道进入模型调用的统一编排层，负责 Provider session、项目工作目录、prompt、消息落库、流式事件和变更审核。
+- Web 会话和频道会话都绑定 Provider 原生 session，后续消息通过续聊机制保持上下文。
+- 项目会话会把项目目录作为 Provider 工作目录；普通对话使用默认工作目录。
+- Web UI 上传文件保存到工作目录下的 `tmp/uploads/`。
+- Agent 回复中的本机图片路径和 `FILE: /path/to/file.ext` 只会在支持附件回传的频道中上传发送。
+- 日志为单行 JSON，按日期和时间分片写入 `.run/`，默认保留 3 天。
 
 ---
 
 ## 项目结构
 
-```
+```text
 AnyBot/
 ├── src/
 │   ├── index.ts                    # 进程入口：启动 Provider、Web 服务和频道
 │   ├── chat-runner.ts              # 会话编排：Provider 调用、流式事件、变更审核和消息落库
-│   ├── app-settings.ts             # 应用设置读写与环境变量兼容入口
+│   ├── app-settings.ts             # 应用设置读写
 │   ├── sandbox-config.ts           # Provider sandbox / 权限模式配置
 │   ├── prompt.ts                   # 共享系统提示词构建
 │   ├── shared.ts                   # 共享运行配置、ID 和路径辅助
 │   ├── logger.ts                   # 结构化日志
 │   ├── lark.ts                     # 飞书 API（消息、文件、图片）
 │   ├── message.ts                  # 消息解析（输入输出）
-│   ├── proxy.ts                    # 代理相关兼容逻辑
-│   ├── types.ts                    # 通用类型定义
-│   ├── utils/                      # 通用工具
 │   ├── providers/                  # Provider 抽象层
-│   │   ├── types.ts                # IProvider 接口定义
-│   │   ├── index.ts                # ProviderManager（工厂 + 注册）
-│   │   ├── codex.ts                # Codex CLI Provider 实现
-│   │   ├── claude-code.ts          # Claude Code Provider 实现
-│   │   └── claude-code-agent-events.ts # Claude Code Agent 事件转换
 │   ├── channels/                   # 微信、Telegram、飞书、QQ 等频道集成
-│   │   ├── index.ts                # ChannelManager
-│   │   ├── commands.ts             # 频道聊天命令（/help, /provider, /model 等）
-│   │   ├── config.ts               # channels.json 读写
-│   │   ├── feishu.ts               # 飞书频道实现
-│   │   ├── qqbot.ts                # QQ 机器人频道实现
-│   │   ├── telegram.ts             # Telegram 频道实现
-│   │   ├── weixin.ts               # 微信频道实现
-│   │   └── types.ts                # 频道接口定义（含 sendToOwner 主动推送）
 │   ├── web/                        # Express API、SQLite 存储和 Web UI 静态资源
-│   │   ├── server.ts               # 静态资源服务和 /api 挂载
-│   │   ├── api.ts                  # 轻量 API 组合入口
-│   │   ├── db.ts                   # SQLite 会话、消息和项目存储
-│   │   ├── model-config.ts         # Provider + 模型配置
-│   │   ├── proxy-config.ts         # proxy.json 读写
-│   │   ├── skills.ts               # Provider 隔离的技能扫描与状态管理
-│   │   ├── slash-items.ts          # Web UI slash picker 数据源
-│   │   ├── agent-stream.ts         # Agent 流式事件整理
-│   │   ├── change-review.ts        # 变更审核快照与状态
-│   │   ├── events.ts               # Web 事件广播
-│   │   ├── routes/                 # 领域路由，负责请求/响应、校验和状态码
-│   │   │   ├── sessions.ts         # 会话列表、创建、详情和删除
-│   │   │   ├── messages.ts         # Web 对话发送、流式响应和取消
-│   │   │   ├── send.ts             # 频道主动推送
-│   │   │   ├── providers.ts        # Provider 列表与切换
-│   │   │   ├── settings.ts         # 模型和应用设置
-│   │   │   ├── channels.ts         # 频道配置
-│   │   │   ├── skills.ts           # 技能与 slash items
-│   │   │   ├── projects.ts         # 项目列表与目录树
-│   │   │   ├── files.ts            # 文件上传与访问
-│   │   │   ├── proxy.ts            # 代理配置接口
-│   │   │   ├── data.ts             # 本地数据导入/导出
-│   │   │   ├── events.ts           # SSE / 事件接口
-│   │   │   ├── change-reviews.ts   # 变更审核接口
-│   │   │   └── desktop-update.ts   # 桌面更新检查
-│   │   ├── services/               # 路由复用的业务逻辑和纯辅助函数
-│   │   └── public/                 # 无构建流程的浏览器端 HTML / CSS / ES modules
-│   │       ├── index.html
-│   │       ├── styles/
-│   │       └── scripts/
-│   │           └── app/            # app、chat、sidebar、settings、channels、skills、ui、utils 分层
-│   └── agent/                      # Agent 提示词模板
-│       └── md_files/
-│           ├── AGENTS.md           # Agent 行为规则
-│           ├── BOOTSTRAP.md        # 首次启动引导
-│           ├── MEMORY.md           # 长期记忆模板
-│           └── PROFILE.md          # Agent 身份与用户档案
+│   │   ├── routes/                 # 领域路由
+│   │   ├── services/               # 复用业务逻辑和纯辅助函数
+│   │   └── public/                 # 无构建流程的 HTML / CSS / ES modules
+│   └── agent/md_files/             # Agent 提示词模板
 ├── electron/                       # Electron 桌面入口与打包后处理
 ├── scripts/                        # 构建、发布资源复制和 daemon 辅助脚本
 ├── installer/windows/              # Windows 安装器配置
@@ -580,15 +275,30 @@ AnyBot/
 
 ---
 
+## 开发命令
+
+```bash
+npm ci
+npm run dev
+npm run check
+npm run build
+npm run build:release
+npm run electron:dev
+npm run electron:build
+```
+
+提交前至少运行 `npm run check`。涉及桌面壳、发布资源或安装包时，运行对应 build/electron 命令。
+
+---
+
 ## 添加新 Provider
 
-AnyBot 的 Provider 架构是可扩展的，添加新 CLI 工具只需三步：
+1. 在 `src/providers/` 下实现 `IProvider`。
+2. 在 `src/providers/index.ts` 中注册 Provider 工厂。
+3. 在 `src/app-settings.ts` 和 `src/providers/index.ts` 中接入 Provider 专属运行配置。
+4. 如需 Web UI slash 命令，实现 `listSlashCommands()`，并确保后端能可靠处理。
 
-1. **实现 `IProvider` 接口** — 在 `src/providers/` 下创建新文件，实现 `listModels()` 和 `run()` 方法
-2. **注册到工厂** — 在 `src/providers/index.ts` 的 `providerFactories` 中添加新条目
-3. **添加环境变量** — 在 `src/index.ts` 的 `getProviderConfig()` 中读取对应的环境变量
-
-可参考 `src/providers/codex.ts` 和 `src/providers/claude-code.ts` 作为实现模板。
+可参考 `src/providers/codex.ts` 和 `src/providers/claude-code.ts`。
 
 ---
 
