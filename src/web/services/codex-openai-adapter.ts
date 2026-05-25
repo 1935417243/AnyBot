@@ -1029,23 +1029,19 @@ function outputToAnthropicContent(output: ResponsesOutputItem[]): AnthropicConte
 }
 
 export function listCodexAdapterModels(): JsonObject {
-  const settings = getCodexSettings();
   const models = [
-    settings.codexDefaultModel,
-    settings.codexFastModel,
-    settings.codexCodeModel,
-  ]
-    .map((model) => model?.trim())
-    .filter((model): model is string => Boolean(model));
-  const unique = Array.from(new Set(models));
+    "gpt-5.5",
+    "gpt-mini",
+    "gpt-codex",
+  ];
   return {
     object: "list",
-    data: unique.map((id) => ({
+    data: models.map((id) => ({
       id,
       object: "model",
       created: 0,
       owned_by: "anybot",
     })),
-    models: unique,
+    models,
   };
 }

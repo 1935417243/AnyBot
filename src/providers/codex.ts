@@ -562,10 +562,9 @@ export class CodexProvider implements IProvider {
         mapped ? `映射到 ${mapped}` : fallback;
 
       return [
-        { id: "gpt-5.5", name: "GPT-5.5", description: describeMapping("默认通用模型", this.codexDefaultModel) },
-        { id: "gpt-5.4", name: "GPT-5.4", description: describeMapping("通用模型", this.codexDefaultModel) },
-        { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", description: describeMapping("轻量快速模型", this.codexFastModel || this.codexDefaultModel) },
-        { id: "gpt-5.3-codex", name: "GPT-5.3 Codex", description: describeMapping("编程模型", this.codexCodeModel || this.codexDefaultModel) },
+        { id: "gpt-5.5", name: "gpt-5.5", description: describeMapping("默认通用模型", this.codexDefaultModel) },
+        { id: "gpt-mini", name: "gpt-mini", description: describeMapping("轻量快速模型", this.codexFastModel || this.codexDefaultModel) },
+        { id: "gpt-codex", name: "gpt-codex", description: describeMapping("编程模型", this.codexCodeModel || this.codexDefaultModel) },
       ];
     }
 

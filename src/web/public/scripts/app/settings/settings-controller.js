@@ -1233,21 +1233,21 @@ export function createSettingsController(options) {
     }
 
     function buildCodexCompatFields(cfg) {
-        return '<div class="settings-row"><span><strong>Anthropic Base URL</strong><small>DeepSeek 等 Anthropic 兼容服务地址</small></span>' +
+        return '<div class="settings-row"><span><strong>Anthropic Base URL</strong><small>兼容 Anthropic API 的服务地址</small></span>' +
             buildProviderBaseUrlInput(cfg.codexAnthropicBaseUrl || '', 'Anthropic Base URL') + '</div>' +
             '<div class="settings-row"><span><strong>API Key</strong><small>访问兼容服务所需的密钥</small></span>' +
             buildProviderSecretInput('settings-provider-api-key', cfg.codexApiKey || '', 'API Key') + '</div>' +
-            '<div class="settings-row"><span><strong>默认模型</strong><small>用于 GPT-5.5 / GPT-5.4</small></span>' +
-            buildProviderModelInput('settings-provider-codex-default-model', cfg.codexDefaultModel || '', '默认模型') + '</div>' +
-            '<div class="settings-row"><span><strong>快速模型</strong><small>用于 GPT-5.4 Mini</small></span>' +
-            buildProviderModelInput('settings-provider-codex-fast-model', cfg.codexFastModel || '', '快速模型') + '</div>' +
-            '<div class="settings-row"><span><strong>Code 模型</strong><small>用于 GPT-5.3 Codex</small></span>' +
-            buildProviderModelInput('settings-provider-codex-code-model', cfg.codexCodeModel || '', 'Code 模型') + '</div>';
+            '<div class="settings-row"><span><strong>gpt-5.5</strong><small>映射到默认通用模型</small></span>' +
+            buildProviderModelInput('settings-provider-codex-default-model', cfg.codexDefaultModel || '', 'gpt-5.5') + '</div>' +
+            '<div class="settings-row"><span><strong>gpt-mini</strong><small>映射到轻量快速模型</small></span>' +
+            buildProviderModelInput('settings-provider-codex-fast-model', cfg.codexFastModel || '', 'gpt-mini') + '</div>' +
+            '<div class="settings-row"><span><strong>gpt-codex</strong><small>映射到编程模型</small></span>' +
+            buildProviderModelInput('settings-provider-codex-code-model', cfg.codexCodeModel || '', 'gpt-codex') + '</div>';
     }
 
     function buildClaudeCodeCompatToggle(cfg) {
         var checked = cfg.anthropicCompatEnabled === true;
-        return '<div class="settings-row compat-toggle-row"><span><strong>Anthropic 兼容接口</strong><small>开启后使用下方 URL、密钥和模型映射</small></span>' +
+        return '<div class="settings-row compat-toggle-row"><span><strong>Anthropic 兼容接口</strong><small>开启后 Claude Code 仅在 AnyBot 内映射到兼容服务\n</small></span>' +
             '<label class="settings-switch" aria-label="Anthropic 兼容接口">' +
             '<input id="settings-provider-anthropic-compat-enabled" type="checkbox"' + (checked ? ' checked' : '') + '>' +
             '<span class="settings-switch-slider"></span>' +
@@ -1382,7 +1382,9 @@ export function createSettingsController(options) {
         var fields = [
             ['Anthropic Base URL', document.getElementById('settings-provider-anthropic-base-url')],
             ['API Key', document.getElementById('settings-provider-api-key')],
-            ['默认模型', document.getElementById('settings-provider-codex-default-model')],
+            ['gpt-5.5', document.getElementById('settings-provider-codex-default-model')],
+            ['gpt-mini', document.getElementById('settings-provider-codex-fast-model')],
+            ['gpt-codex', document.getElementById('settings-provider-codex-code-model')],
         ];
         var missing = fields.filter(function (entry) {
             var input = entry[1];
