@@ -8,6 +8,29 @@ import {
 export function createCodexOpenAIRouter(): Router {
   const router = Router();
 
+  router.post("/codex-openai/runs/:runId/v1/responses", (req: Request, res: Response) => {
+    handleCodexResponsesRequest(req, res).catch((error) => {
+      res.status(500).json({
+        error: {
+          message: error instanceof Error ? error.message : "Codex 适配层请求失败",
+          type: "server_error",
+          code: "adapter_error",
+        },
+      });
+    });
+  });
+  router.post("/codex-openai/runs/:runId/responses", (req: Request, res: Response) => {
+    handleCodexResponsesRequest(req, res).catch((error) => {
+      res.status(500).json({
+        error: {
+          message: error instanceof Error ? error.message : "Codex 适配层请求失败",
+          type: "server_error",
+          code: "adapter_error",
+        },
+      });
+    });
+  });
+
   router.post("/codex-openai/v1/responses", (req: Request, res: Response) => {
     handleCodexResponsesRequest(req, res).catch((error) => {
       res.status(500).json({

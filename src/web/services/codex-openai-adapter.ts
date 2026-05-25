@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { createHash, randomUUID } from "node:crypto";
 import { fetch as undiciFetch } from "undici";
 import { getProviderRuntimeSettings } from "../../app-settings.js";
+import { publishCodexAdapterStreamEvent } from "../../codex-adapter-stream.js";
 import { logger } from "../../logger.js";
 
 type JsonObject = Record<string, unknown>;
@@ -672,6 +673,7 @@ async function streamAnthropicResponse(
   };
   const output = response.output as ResponsesOutputItem[];
   const blocks = new Map<number, StreamBlockState>();
+  const adapterRunId = getString(req.params.runId).trim();
   let inputTokens = 0;
   let outputTokens = 0;
 
@@ -707,7 +709,7 @@ async function streamAnthropicResponse(
     }
 
     if (type === "content_block_delta") {
-      updateStreamBlock(payload, blocks, res, nextSeq);
+      updateStreamBlock(payload, blocks, res, nextSeq, adapterRunId);
       return;
     }
 
@@ -893,6 +895,7 @@ function updateStreamBlock(
   blocks: Map<number, StreamBlockState>,
   res: Response,
   nextSeq: () => number,
+  adapterRunId?: string,
 ): void {
   const index = getNumber(payload.index) || 0;
   const state = blocks.get(index);
@@ -902,6 +905,9 @@ function updateStreamBlock(
   if (state.type === "text" && deltaType === "text_delta") {
     const text = getString(delta?.text);
     state.text += text;
+    if (adapterRunId && text) {
+      publishCodexAdapterStreamEvent(adapterRunId, { type: "answer_delta", text });
+    }
     writeSse(res, "response.output_text.delta", {
       type: "response.output_text.delta",
       sequence_number: nextSeq(),
@@ -923,6 +929,9 @@ function updateStreamBlock(
   } else if (state.type === "reasoning" && (deltaType === "thinking_delta" || deltaType === "reasoning_content_delta")) {
     const text = getString(delta?.thinking) || getString(delta?.text);
     state.text += text;
+    if (adapterRunId && text) {
+      publishCodexAdapterStreamEvent(adapterRunId, { type: "thinking_delta", text });
+    }
     writeSse(res, "response.reasoning_summary_text.delta", {
       type: "response.reasoning_summary_text.delta",
       sequence_number: nextSeq(),

@@ -9,6 +9,7 @@ import {
 } from "@openai/codex-sdk";
 import { accessSync, constants, mkdirSync } from "fs";
 import fs from "fs/promises";
+import { randomUUID } from "crypto";
 import { createRequire } from "module";
 import os from "os";
 import path from "path";
@@ -28,6 +29,7 @@ import {
 import { logger } from "../logger.js";
 import { DEFAULT_SANDBOX } from "../sandbox-config.js";
 import { DEFAULT_PROVIDER_TIMEOUT_MS, getDataDir } from "../app-settings.js";
+import { registerCodexAdapterStream } from "../codex-adapter-stream.js";
 import { resolveExecutable } from "../utils/process.js";
 
 export class ProviderTimeoutError extends Error {
@@ -127,6 +129,14 @@ export type CodexExecutableResolution = {
 function cleanString(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function buildCodexAdapterRunBaseUrl(baseUrl: string, runId: string): string {
+  const clean = baseUrl.replace(/\/+$/, "");
+  if (clean.endsWith("/v1")) {
+    return `${clean.slice(0, -3)}/runs/${encodeURIComponent(runId)}/v1`;
+  }
+  return `${clean}/runs/${encodeURIComponent(runId)}`;
 }
 
 function getCodexTargetTriple(): string | null {
@@ -495,6 +505,7 @@ export class CodexProvider implements IProvider {
   private readonly codex: Codex;
   private readonly codexHome: string | undefined;
   private readonly codexCompatEnabled: boolean;
+  private readonly codexAdapterBaseUrl: string | undefined;
   private readonly codexAnthropicBaseUrl: string | undefined;
   private readonly codexDefaultModel: string | undefined;
   private readonly codexFastModel: string | undefined;
@@ -515,23 +526,24 @@ export class CodexProvider implements IProvider {
       ? { codexPathOverride: executable.codexPathOverride }
       : {};
     this.codexCompatEnabled = opts?.codexCompatEnabled === true;
+    this.codexAdapterBaseUrl = cleanString(opts?.codexAdapterBaseUrl);
     this.codexAnthropicBaseUrl = cleanString(opts?.codexAnthropicBaseUrl);
     this.codexDefaultModel = cleanString(opts?.codexDefaultModel);
     this.codexFastModel = cleanString(opts?.codexFastModel);
     this.codexCodeModel = cleanString(opts?.codexCodeModel);
-    if (this.codexCompatEnabled && opts?.codexAdapterBaseUrl) {
+    if (this.codexCompatEnabled && this.codexAdapterBaseUrl) {
       this.codexHome = path.join(getDataDir(), "codex");
       mkdirSync(this.codexHome, { recursive: true });
       const env = this.buildIsolatedCodexEnv();
       codexOptions.env = env;
       codexOptions.apiKey = "anybot-local-codex-adapter";
-      codexOptions.baseUrl = opts.codexAdapterBaseUrl;
+      codexOptions.baseUrl = this.codexAdapterBaseUrl;
       codexOptions.config = {
         model_provider: "anybot",
         model_providers: {
           anybot: {
             name: "AnyBot Codex Adapter",
-            base_url: opts.codexAdapterBaseUrl,
+            base_url: this.codexAdapterBaseUrl,
             wire_api: "responses",
           },
         },
@@ -593,6 +605,18 @@ export class CodexProvider implements IProvider {
     const abortController = new AbortController();
     const toolStateById = new Map<string, ToolState>();
     const textByAgentMessageId = new Map<string, string>();
+    const adapterRunId = onEvent && this.codexCompatEnabled && this.codexAdapterBaseUrl
+      ? randomUUID()
+      : undefined;
+    let adapterAnswerStreamed = false;
+    const unregisterAdapterStream = adapterRunId && onEvent
+      ? registerCodexAdapterStream(adapterRunId, (event) => {
+          if (event.type === "answer_delta" && event.text) {
+            adapterAnswerStreamed = true;
+          }
+          return onEvent(event);
+        })
+      : undefined;
 
     let timedOut = false;
     let providerSessionId = sessionId || null;
@@ -641,9 +665,10 @@ export class CodexProvider implements IProvider {
         sandboxMode: sandbox as ThreadOptions["sandboxMode"],
         model: model || undefined,
       };
+      const codex = this.createCodexForAdapterRun(adapterRunId);
       const thread = sessionId
-        ? this.codex.resumeThread(sessionId, threadOptions)
-        : this.codex.startThread(threadOptions);
+        ? codex.resumeThread(sessionId, threadOptions)
+        : codex.startThread(threadOptions);
       const { events } = await thread.runStreamed(buildInput(prompt, imagePaths), {
         signal: abortController.signal,
       });
@@ -677,6 +702,7 @@ export class CodexProvider implements IProvider {
             toolStateById,
             textByAgentMessageId,
             onEvent,
+            adapterAnswerStreamed,
           );
           if (text !== null) responseText = text;
         }
@@ -781,6 +807,7 @@ export class CodexProvider implements IProvider {
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener("abort", abortFromSignal);
+      unregisterAdapterStream?.();
     }
   }
 
@@ -797,18 +824,44 @@ export class CodexProvider implements IProvider {
     return env;
   }
 
+  private createCodexForAdapterRun(runId: string | undefined): Codex {
+    if (!runId || !this.codexCompatEnabled || !this.codexAdapterBaseUrl) {
+      return this.codex;
+    }
+
+    const baseUrl = buildCodexAdapterRunBaseUrl(this.codexAdapterBaseUrl, runId);
+    const codexOptions: CodexOptions = this.codexPathOverride
+      ? { codexPathOverride: this.codexPathOverride }
+      : {};
+    codexOptions.env = this.buildIsolatedCodexEnv();
+    codexOptions.apiKey = "anybot-local-codex-adapter";
+    codexOptions.baseUrl = baseUrl;
+    codexOptions.config = {
+      model_provider: "anybot",
+      model_providers: {
+        anybot: {
+          name: "AnyBot Codex Adapter",
+          base_url: baseUrl,
+          wire_api: "responses",
+        },
+      },
+    };
+    return new Codex(codexOptions);
+  }
+
   private async handleItemEvent(
     event: Extract<ThreadEvent, { item: ThreadItem }>,
     toolStateById: Map<string, ToolState>,
     textByAgentMessageId: Map<string, string>,
     onEvent?: StreamHandler,
+    suppressAgentMessageDelta?: boolean,
   ): Promise<string | null> {
     const { item } = event;
 
     if (item.type === "agent_message") {
       const previous = textByAgentMessageId.get(item.id) || "";
       const next = sanitizeAgentText(item.text || "");
-      if (onEvent && next.length > previous.length) {
+      if (onEvent && !suppressAgentMessageDelta && next.length > previous.length) {
         await onEvent({ type: "answer_delta", text: next.slice(previous.length) });
       }
       textByAgentMessageId.set(item.id, next);
