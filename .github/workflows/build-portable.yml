@@ -80,10 +80,10 @@ jobs:
             | Windows | `AnyBot-Setup-*.exe` |
 
             ### 本次更新
-            - 新增 Codex / Claude Code 执行时长设置，可在设置页调整 Agent 单次运行超时时间，默认 15 分钟。
-            - 优化变更审核展示，自动隐藏图片、压缩包、Office、数据库、日志、`.min.js` 等不适合展示 diff 的文件。
-            - 优化二进制文件变更识别，避免在审核面板和 Agent 流式事件中展示无意义 diff。
-            - 修复侧边栏缓存失效项目 ID 时，会话列表接口返回“项目不存在”的问题。
+            - 新增 Codex Responses 适配层，可在 AnyBot 内将 Codex 映射到 DeepSeek 等 Anthropic 兼容服务，不影响全局 Codex 配置。
+            - 优化 Codex 适配层流式输出，WebUI 可继续展示回答增量和思考过程。
+            - 修复 Codex 适配层初始化 `CODEX_HOME`、工具 schema 转换和工具参数流式拼接问题。
+            - 收敛 Codex 适配模型为 `gpt-5.5`、`gpt-mini`、`gpt-codex` ，并在设置页配置对应上游模型映射。
 
             ### 使用说明
             - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
