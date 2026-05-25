@@ -4,7 +4,7 @@
 
 AnyBot 是一个运行在你自己电脑上的 AI Agent 工作台，把 Codex CLI、Claude Code 等本地 Agent 能力接入桌面 App、Web UI 和常用聊天渠道。你可以在内置 **Web UI** 中对话、管理项目、查看 Agent 执行过程、审核文件变更和配置自动化任务；也可以通过 **飞书机器人**、**QQ 机器人**、**Telegram 机器人** 或 **个人微信** 在手机和桌面端远程使用这台机器上的 Agent。
 
-当前 Provider 支持 [OpenAI Codex CLI](https://github.com/openai/codex) 和 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)。桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
+当前 Provider 支持 [OpenAI Codex CLI](https://developers.openai.com/codex/cli) 和 [Claude Code](https://code.claude.com/docs/en/overview)。桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
 
 ---
 
@@ -70,8 +70,8 @@ sudo xattr -rd com.apple.quarantine "/Applications/AnyBot.app"
 
 | Provider | 安装方式 | 说明 |
 |----------|---------|------|
-| Codex CLI | 随 `@openai/codex-sdk` 依赖安装 native binary；仍需要完成本机 Codex 登录或配置 | 支持会话续聊、Sandbox、图片输入 |
-| Claude Code | 默认使用 `@anthropic-ai/claude-agent-sdk` 随包能力；需要外部 CLI 时可在高级设置中指定 | 支持会话续聊、Sandbox 映射、Agent 流式事件 |
+| Codex CLI | 随 `@openai/codex-sdk` 依赖安装 native binary；仍需要完成本机 Codex 登录或配置，安装说明见 [Codex CLI 文档](https://developers.openai.com/codex/cli) | 支持会话续聊、Sandbox、图片输入 |
+| Claude Code | 默认使用 `@anthropic-ai/claude-agent-sdk` 随包能力；需要外部 CLI 时可在高级设置中指定，安装说明见 [Claude Code 文档](https://code.claude.com/docs/en/overview) | 支持会话续聊、Sandbox 映射、Agent 流式事件 |
 
 ### 3. 源码运行
 

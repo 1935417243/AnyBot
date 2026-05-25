@@ -4,7 +4,7 @@
 
 AnyBot is an AI Agent workspace that runs on your own computer. It connects local Agent backends such as Codex CLI and Claude Code to a desktop app, Web UI, and everyday chat channels. From the built-in **Web UI**, you can chat, manage projects, inspect Agent activity, review file changes, and configure automations. You can also use **Feishu Bot**, **QQ Bot**, **Telegram Bot**, or **personal Weixin** to remotely reach the Agent running on that machine.
 
-Current Providers are [OpenAI Codex CLI](https://github.com/openai/codex) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code). The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
+Current Providers are [OpenAI Codex CLI](https://developers.openai.com/codex/cli) and [Claude Code](https://code.claude.com/docs/en/overview). The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
 
 ---
 
@@ -70,8 +70,8 @@ Configure at least one Provider:
 
 | Provider | Installation | Notes |
 |----------|--------------|-------|
-| Codex CLI | Native binary is provided through `@openai/codex-sdk`; local Codex login/configuration is still required | Session resume, sandbox, image input |
-| Claude Code | Uses `@anthropic-ai/claude-agent-sdk` by default; configure an external executable from advanced settings only when needed | Session resume, sandbox mapping, streamed Agent events |
+| Codex CLI | Native binary is provided through `@openai/codex-sdk`; local Codex login/configuration is still required. See the [Codex CLI docs](https://developers.openai.com/codex/cli) | Session resume, sandbox, image input |
+| Claude Code | Uses `@anthropic-ai/claude-agent-sdk` by default; configure an external executable from advanced settings only when needed. See the [Claude Code docs](https://code.claude.com/docs/en/overview) | Session resume, sandbox mapping, streamed Agent events |
 
 ### 3. Run From Source
 
