@@ -60,6 +60,13 @@ const dataDir =
 const reviewDir = path.join(dataDir, "change-reviews");
 const SNAPSHOT_SKIP_DIRS = new Set([".git", "node_modules", ".data", ".run", "tmp"]);
 const ALWAYS_SNAPSHOT_FILES = ["CLAUDE.md"];
+const DESKTOP_USER_DATA_REVIEW_FILES = new Set([
+  "agents.md",
+  "bootstrap.md",
+  "claude.md",
+  "memory.md",
+  "profile.md",
+]);
 const MAX_SNAPSHOT_FILE_BYTES = 10 * 1024 * 1024;
 
 async function ensureReviewDir(): Promise<void> {
@@ -103,6 +110,26 @@ function splitNul(value: string): string[] {
   return value.split("\0").filter(Boolean);
 }
 
+function isDesktopRuntimeWorkdir(workdir: string): boolean {
+  if (process.env.ANYBOT_DESKTOP !== "1") return false;
+  return path.resolve(workdir) === path.dirname(path.resolve(dataDir));
+}
+
+function shouldSkipSnapshotPath(
+  workdir: string,
+  parts: string[],
+): boolean {
+  const normalizedParts = parts.map((part) => part.toLowerCase());
+  if (normalizedParts.some((part) => SNAPSHOT_SKIP_DIRS.has(part))) return true;
+  if (!isDesktopRuntimeWorkdir(workdir)) return false;
+
+  return !DESKTOP_USER_DATA_REVIEW_FILES.has(normalizedParts.join(path.posix.sep));
+}
+
+function shouldReviewFile(workdir: string, filePath: string): boolean {
+  return !shouldSuppressDiffFile(filePath) && normalizeSnapshotPath(workdir, filePath) !== null;
+}
+
 function normalizeSnapshotPath(workdir: string, filePath: string): string | null {
   const root = path.resolve(workdir);
   const absolutePath = path.resolve(root, filePath);
@@ -112,7 +139,7 @@ function normalizeSnapshotPath(workdir: string, filePath: string): string | null
   if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) return null;
 
   const parts = relativePath.split(path.sep);
-  if (parts.some((part) => SNAPSHOT_SKIP_DIRS.has(part))) return null;
+  if (shouldSkipSnapshotPath(root, parts)) return null;
   return parts.join(path.posix.sep);
 }
 
@@ -205,15 +232,15 @@ async function walkWorkspaceFiles(workdir: string): Promise<string[]> {
     }
 
     for (const entry of entries) {
-      if (entry.name.startsWith(".") && SNAPSHOT_SKIP_DIRS.has(entry.name)) continue;
-      if (SNAPSHOT_SKIP_DIRS.has(entry.name)) continue;
-
       const absolutePath = path.join(dir, entry.name);
+      const relativeParts = path.relative(root, absolutePath).split(path.sep);
       if (entry.isDirectory()) {
+        if (shouldSkipSnapshotPath(root, relativeParts)) continue;
         await walk(absolutePath);
         continue;
       }
       if (!entry.isFile()) continue;
+      if (shouldSkipSnapshotPath(root, relativeParts)) continue;
 
       const stat = await fs.promises.stat(absolutePath).catch(() => null);
       if (!stat || stat.size > MAX_SNAPSHOT_FILE_BYTES) continue;
@@ -315,7 +342,7 @@ function countDiffLines(diff: string): { additions: number; deletions: number } 
 }
 
 function getPublicReview(review: StoredChangeReview): PublicChangeReview {
-  const visibleFiles = review.files.filter((file) => !shouldSuppressDiffFile(file.path));
+  const visibleFiles = review.files.filter((file) => shouldReviewFile(review.workdir, file.path));
   const publicFiles = visibleFiles.map((file) => {
     const isBinary = hasBinaryDiffExtension(file.path);
     return {
@@ -420,7 +447,7 @@ export async function collectChangeReview(
   const files: StoredFileChange[] = [];
 
   for (const filePath of Array.from(candidates).sort()) {
-    if (shouldSuppressDiffFile(filePath)) continue;
+    if (!shouldReviewFile(snapshot.workdir, filePath)) continue;
 
     let beforeSnapshot =
       snapshot.filesAtStart.get(filePath) || snapshot.changedAtStart.get(filePath) || null;
@@ -509,7 +536,7 @@ export async function revertChangeReview(id: string): Promise<PublicChangeReview
 
   const root = path.resolve(review.workdir);
   for (const file of review.files) {
-    if (shouldSuppressDiffFile(file.path)) continue;
+    if (!shouldReviewFile(review.workdir, file.path)) continue;
 
     const absolutePath = path.resolve(root, file.path);
     if (!absolutePath.startsWith(root + path.sep) && absolutePath !== root) {
@@ -533,6 +560,8 @@ export async function revertChangeReview(id: string): Promise<PublicChangeReview
   }
 
   for (const file of review.files) {
+    if (!shouldReviewFile(review.workdir, file.path)) continue;
+
     const absolutePath = path.resolve(root, file.path);
     if (file.beforeContentBase64 === null) {
       await fs.promises.rm(absolutePath, { force: true });

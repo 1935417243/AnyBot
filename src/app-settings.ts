@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,33 +61,80 @@ export interface AppSettings {
 
 export const DEFAULT_PROVIDER_TIMEOUT_MS = 15 * 60 * 1000;
 const MAX_PROVIDER_TIMEOUT_MS = 2_147_000_000;
+const DESKTOP_DEFAULT_WORKDIR_NAME = "AnyBotData";
+const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md", "BOOTSTRAP.md"];
 
-const DEFAULT_SETTINGS: AppSettings = {
-  general: {
-    theme: "system",
-    language: "auto",
-    openAtLogin: false,
-    openWindowOnStart: true,
-    webPort: 19981,
-  },
-  providers: {},
-  workspace: {
-    defaultWorkdir: process.cwd(),
-  },
-  permissions: {
-    requireDangerousConfirmation: true,
-  },
-  privacy: {
-    logLevel: "info",
-    logIncludeContent: false,
-    logIncludePrompt: false,
-    logRetentionDays: 3,
-  },
-};
+function isDesktopRuntime(): boolean {
+  return process.env.ANYBOT_DESKTOP === "1";
+}
+
+function getDesktopUserDataDir(): string {
+  return path.dirname(path.resolve(dataDir));
+}
+
+function getDefaultWorkdir(): string {
+  return isDesktopRuntime() ? path.join(os.homedir(), DESKTOP_DEFAULT_WORKDIR_NAME) : process.cwd();
+}
+
+function isDesktopUserDataWorkdir(workdir: string): boolean {
+  return isDesktopRuntime() && path.resolve(workdir) === getDesktopUserDataDir();
+}
+
+function createDefaultSettings(): AppSettings {
+  return {
+    general: {
+      theme: "system",
+      language: "auto",
+      openAtLogin: false,
+      openWindowOnStart: true,
+      webPort: 19981,
+    },
+    providers: {},
+    workspace: {
+      defaultWorkdir: getDefaultWorkdir(),
+    },
+    permissions: {
+      requireDangerousConfirmation: true,
+    },
+    privacy: {
+      logLevel: "info",
+      logIncludeContent: false,
+      logIncludePrompt: false,
+      logRetentionDays: 3,
+    },
+  };
+}
+
+const DEFAULT_SETTINGS: AppSettings = createDefaultSettings();
+
+function copyWorkspaceMemoryFiles(sourceDir: string, targetDir: string): void {
+  if (path.resolve(sourceDir) === path.resolve(targetDir)) return;
+
+  for (const file of WORKSPACE_MEMORY_FILES) {
+    const source = path.join(sourceDir, file);
+    const target = path.join(targetDir, file);
+    try {
+      if (!existsSync(source) || existsSync(target)) continue;
+      copyFileSync(source, target);
+    } catch {
+      // Best effort only; the user can still pick or edit the workspace from settings.
+    }
+  }
+}
+
+function ensureDesktopDefaultWorkdir(workdir: string): void {
+  if (!isDesktopRuntime()) return;
+  if (path.resolve(workdir) !== path.resolve(getDefaultWorkdir())) return;
+
+  mkdirSync(workdir, { recursive: true });
+  copyWorkspaceMemoryFiles(getDesktopUserDataDir(), workdir);
+  copyWorkspaceMemoryFiles(path.join(__dirname, "agent", "md_files"), workdir);
+}
 
 function ensureConfig(): void {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(CONFIG_PATH)) {
+    ensureDesktopDefaultWorkdir(DEFAULT_SETTINGS.workspace.defaultWorkdir);
     writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_SETTINGS, null, 2), "utf-8");
   }
 }
@@ -169,6 +217,13 @@ function mergeSettings(value: unknown): AppSettings {
   const permissions = (raw.permissions || {}) as Partial<AppSettings["permissions"]>;
   const privacy = (raw.privacy || {}) as Partial<AppSettings["privacy"]>;
   const providers = raw.providers && typeof raw.providers === "object" ? raw.providers : {};
+  const requestedWorkdir =
+    typeof workspace.defaultWorkdir === "string" && workspace.defaultWorkdir.trim()
+      ? path.resolve(workspace.defaultWorkdir.trim())
+      : DEFAULT_SETTINGS.workspace.defaultWorkdir;
+  const defaultWorkdir = isDesktopUserDataWorkdir(requestedWorkdir)
+    ? DEFAULT_SETTINGS.workspace.defaultWorkdir
+    : requestedWorkdir;
 
   return {
     general: {
@@ -188,10 +243,7 @@ function mergeSettings(value: unknown): AppSettings {
       Object.entries(providers).map(([provider, config]) => [provider, normalizeProviderSettings(config)]),
     ),
     workspace: {
-      defaultWorkdir:
-        typeof workspace.defaultWorkdir === "string" && workspace.defaultWorkdir.trim()
-          ? path.resolve(workspace.defaultWorkdir.trim())
-          : DEFAULT_SETTINGS.workspace.defaultWorkdir,
+      defaultWorkdir,
     },
     permissions: {
       requireDangerousConfirmation:
@@ -228,6 +280,7 @@ export function readAppSettings(): AppSettings {
     const rawText = readFileSync(CONFIG_PATH, "utf-8");
     const raw = JSON.parse(rawText);
     cachedSettings = mergeSettings(raw);
+    ensureDesktopDefaultWorkdir(cachedSettings.workspace.defaultWorkdir);
     const normalizedText = JSON.stringify(cachedSettings, null, 2);
     if (rawText.trim() !== normalizedText) {
       writeFileSync(CONFIG_PATH, normalizedText, "utf-8");
@@ -235,6 +288,7 @@ export function readAppSettings(): AppSettings {
     return cachedSettings;
   } catch {
     cachedSettings = DEFAULT_SETTINGS;
+    ensureDesktopDefaultWorkdir(cachedSettings.workspace.defaultWorkdir);
     writeFileSync(CONFIG_PATH, JSON.stringify(cachedSettings, null, 2), "utf-8");
     return cachedSettings;
   }
@@ -243,6 +297,7 @@ export function readAppSettings(): AppSettings {
 export function writeAppSettings(settings: AppSettings): AppSettings {
   const next = mergeSettings(settings);
   ensureConfig();
+  ensureDesktopDefaultWorkdir(next.workspace.defaultWorkdir);
   writeFileSync(CONFIG_PATH, JSON.stringify(next, null, 2), "utf-8");
   cachedSettings = next;
   return next;
