@@ -983,7 +983,7 @@ if (!hasSingleInstanceLock) {
   });
 
   app.on("window-all-closed", () => {
-    if (process.platform === "win32" && tray && !isQuitting) {
+    if (!isQuitting && (process.platform === "darwin" || (process.platform === "win32" && tray))) {
       return;
     }
 
