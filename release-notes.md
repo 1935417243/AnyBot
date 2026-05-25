@@ -6,7 +6,10 @@
 | Windows | `AnyBot-Setup-*.exe` |
 
 ### 本次更新
-- 修复 macOS App 关闭窗口后直接退出的问题。
+- 桌面端默认使用独立工作区，避免误扫描 Electron 运行缓存。
+- 修复资源变更审核中缓存文件误显示的问题。
+- 修复技能、频道、工作区和提供商切换后的页面刷新问题。
+- 移除 `BOOTSTRAP.md` 工作区初始化提示逻辑。
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
