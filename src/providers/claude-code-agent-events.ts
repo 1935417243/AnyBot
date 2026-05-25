@@ -10,6 +10,7 @@ import type {
   SDKTaskStartedMessage,
   SDKTaskUpdatedMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { hasBinaryDiffFileType, shouldSuppressDiffFile } from "../diff-file-types.js";
 import type { ProviderContextUsage } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -393,6 +394,8 @@ async function collectDiff(
   workdir: string,
   file: string,
 ): Promise<{ diff: string; diffType: "text" | "binary" } | undefined> {
+  if (shouldSuppressDiffFile(file)) return undefined;
+
   try {
     const { stdout } = await execFileAsync(
       "git",
@@ -401,6 +404,9 @@ async function collectDiff(
     );
     const diff = sanitizeAgentText(stdout).trimEnd();
     if (!diff) return undefined;
+    if (hasBinaryDiffFileType(file)) {
+      return { diff: "", diffType: "binary" };
+    }
     const diffType = /(?:^|\n)(?:Binary files .* differ|GIT binary patch)(?:\n|$)/.test(diff)
       ? "binary"
       : "text";

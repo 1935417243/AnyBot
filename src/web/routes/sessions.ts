@@ -59,10 +59,6 @@ export function createSessionsRouter(): Router {
 
     const scope = readStringQuery(req.query.scope);
     const projectId = readStringQuery(req.query.projectId);
-    if (projectId && !db.getProject(projectId)) {
-      res.status(404).json({ error: "项目不存在" });
-      return;
-    }
 
     const cursorRaw = readStringQuery(req.query.cursor);
     const cursor = cursorRaw ? decodeSessionCursor(cursorRaw) : null;

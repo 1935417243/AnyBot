@@ -4,6 +4,7 @@ import os from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
+import { hasBinaryDiffFileType, shouldSuppressDiffFile } from "../diff-file-types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -60,62 +61,6 @@ const reviewDir = path.join(dataDir, "change-reviews");
 const SNAPSHOT_SKIP_DIRS = new Set([".git", "node_modules", ".data", ".run", "tmp"]);
 const ALWAYS_SNAPSHOT_FILES = ["CLAUDE.md"];
 const MAX_SNAPSHOT_FILE_BYTES = 10 * 1024 * 1024;
-const BINARY_DIFF_EXTENSIONS = new Set([
-  ".7z",
-  ".a",
-  ".ai",
-  ".apk",
-  ".avi",
-  ".avif",
-  ".bin",
-  ".bmp",
-  ".class",
-  ".db",
-  ".dll",
-  ".dmg",
-  ".doc",
-  ".docx",
-  ".dylib",
-  ".eot",
-  ".exe",
-  ".gif",
-  ".gz",
-  ".heic",
-  ".icns",
-  ".ico",
-  ".jar",
-  ".jpeg",
-  ".jpg",
-  ".m4a",
-  ".mkv",
-  ".mov",
-  ".mp3",
-  ".mp4",
-  ".ogg",
-  ".otf",
-  ".pdf",
-  ".png",
-  ".ppt",
-  ".pptx",
-  ".psd",
-  ".rar",
-  ".so",
-  ".sqlite",
-  ".tar",
-  ".tgz",
-  ".tif",
-  ".tiff",
-  ".ttf",
-  ".wav",
-  ".wasm",
-  ".webm",
-  ".webp",
-  ".woff",
-  ".woff2",
-  ".xls",
-  ".xlsx",
-  ".zip",
-]);
 
 async function ensureReviewDir(): Promise<void> {
   await fs.promises.mkdir(reviewDir, { recursive: true });
@@ -306,7 +251,7 @@ function bufferEqualsBase64(buffer: Buffer | null, encoded: string | null): bool
 }
 
 function hasBinaryDiffExtension(relativePath: string): boolean {
-  return BINARY_DIFF_EXTENSIONS.has(path.extname(relativePath).toLowerCase());
+  return hasBinaryDiffFileType(relativePath);
 }
 
 function isLikelyBinary(buffer: Buffer): boolean {
@@ -370,20 +315,25 @@ function countDiffLines(diff: string): { additions: number; deletions: number } 
 }
 
 function getPublicReview(review: StoredChangeReview): PublicChangeReview {
-  return {
-    id: review.id,
-    status: review.status,
-    fileCount: review.fileCount,
-    totalAdditions: review.totalAdditions,
-    totalDeletions: review.totalDeletions,
-    files: review.files.map((file) => ({
+  const visibleFiles = review.files.filter((file) => !shouldSuppressDiffFile(file.path));
+  const publicFiles = visibleFiles.map((file) => {
+    const isBinary = hasBinaryDiffExtension(file.path);
+    return {
       path: file.path,
       status: file.status,
       additions: file.additions,
       deletions: file.deletions,
-      diff: file.diff,
-      diffType: file.diffType || inferDiffTypeFromDiff(file.diff),
-    })),
+      diff: isBinary ? "" : file.diff,
+      diffType: isBinary ? "binary" as const : file.diffType || inferDiffTypeFromDiff(file.diff),
+    };
+  });
+  return {
+    id: review.id,
+    status: review.status,
+    fileCount: publicFiles.length,
+    totalAdditions: publicFiles.reduce((sum, file) => sum + file.additions, 0),
+    totalDeletions: publicFiles.reduce((sum, file) => sum + file.deletions, 0),
+    files: publicFiles,
     error: review.error,
   };
 }
@@ -470,6 +420,8 @@ export async function collectChangeReview(
   const files: StoredFileChange[] = [];
 
   for (const filePath of Array.from(candidates).sort()) {
+    if (shouldSuppressDiffFile(filePath)) continue;
+
     let beforeSnapshot =
       snapshot.filesAtStart.get(filePath) || snapshot.changedAtStart.get(filePath) || null;
     if (!beforeSnapshot && snapshot.trackedAtStart.has(filePath)) {
@@ -534,7 +486,9 @@ export async function collectChangeReview(
 
 export async function getChangeReview(id: string): Promise<PublicChangeReview | null> {
   const review = await loadStoredReview(id);
-  return review ? getPublicReview(review) : null;
+  if (!review) return null;
+  const publicReview = getPublicReview(review);
+  return publicReview.files.length > 0 ? publicReview : null;
 }
 
 export async function approveChangeReview(id: string): Promise<PublicChangeReview> {
@@ -555,6 +509,8 @@ export async function revertChangeReview(id: string): Promise<PublicChangeReview
 
   const root = path.resolve(review.workdir);
   for (const file of review.files) {
+    if (shouldSuppressDiffFile(file.path)) continue;
+
     const absolutePath = path.resolve(root, file.path);
     if (!absolutePath.startsWith(root + path.sep) && absolutePath !== root) {
       review.error = `无法安全撤销：文件路径越界 ${file.path}`;

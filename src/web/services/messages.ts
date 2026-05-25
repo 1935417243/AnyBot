@@ -70,7 +70,6 @@ async function hydrateChangeReviewMetadata(
         const existing = metadata.changeReview as { id?: string } | undefined;
         if (!existing?.id) return message;
         const hydrated = await getChangeReview(existing.id);
-        if (!hydrated) return message;
         return {
           ...message,
           metadata: JSON.stringify({ ...metadata, changeReview: hydrated }),
