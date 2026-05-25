@@ -14,6 +14,7 @@ export type AppTheme = "light" | "dark" | "system";
 export interface ProviderRuntimeSettings {
   bin?: string;
   maxTurns?: number;
+  timeoutMs?: number;
   apiKey?: string;
   apiKeyHelper?: string;
   permissionMode?: string;
@@ -50,6 +51,9 @@ export interface AppSettings {
     logRetentionDays: number;
   };
 }
+
+export const DEFAULT_PROVIDER_TIMEOUT_MS = 15 * 60 * 1000;
+const MAX_PROVIDER_TIMEOUT_MS = 2_147_000_000;
 
 const DEFAULT_SETTINGS: AppSettings = {
   general: {
@@ -115,6 +119,15 @@ function normalizeProviderSettings(value: unknown): ProviderRuntimeSettings {
   if (typeof raw.apiKeyHelper === "string") settings.apiKeyHelper = raw.apiKeyHelper;
   if (typeof raw.permissionMode === "string") settings.permissionMode = raw.permissionMode;
   if (typeof raw.defaultModel === "string") settings.defaultModel = raw.defaultModel;
+  const timeoutMs =
+    typeof raw.timeoutMs === "number"
+      ? raw.timeoutMs
+      : typeof raw.timeoutMs === "string"
+        ? Number(raw.timeoutMs)
+        : NaN;
+  if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+    settings.timeoutMs = Math.min(Math.floor(timeoutMs), MAX_PROVIDER_TIMEOUT_MS);
+  }
   if (typeof raw.anthropicCompatEnabled === "boolean") {
     settings.anthropicCompatEnabled = raw.anthropicCompatEnabled;
   }

@@ -57,6 +57,7 @@ export interface ProviderConfig {
   type: string;
   bin?: string;
   defaultModel?: string;
+  timeoutMs?: number;
   [key: string]: unknown;
 }
 

@@ -1509,6 +1509,38 @@
             min-width: 120px;
         }
 
+        .provider-timeout-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            width: 100%;
+        }
+
+        .provider-timeout-input {
+            width: 180px;
+            min-width: 120px;
+            min-height: 42px;
+            border-radius: 8px;
+            font-family: 'Sora', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: left;
+            padding: 0 12px;
+            transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .provider-timeout-input:hover {
+            border-color: var(--border-hover);
+            background: var(--sidebar-hover);
+        }
+
+        .provider-timeout-unit {
+            color: var(--text-muted);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
         .settings-checkbox {
             width: 42px;
             height: 24px;
@@ -2016,6 +2048,10 @@
             .settings-row {
                 align-items: flex-start;
                 flex-direction: column;
+            }
+
+            .provider-timeout-control {
+                width: 100%;
             }
 
             .settings-about-card {

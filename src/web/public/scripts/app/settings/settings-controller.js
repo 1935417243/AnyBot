@@ -42,6 +42,7 @@ export function createSettingsController(options) {
     const settingsProviderModelMenu = options.settingsProviderModelMenu;
     const settingsProviderModelSelect = options.settingsProviderModelSelect;
     const settingsProviderModelTrigger = options.settingsProviderModelTrigger;
+    const settingsProviderTimeoutFields = options.settingsProviderTimeoutFields;
     const settingsProviderSelect = options.settingsProviderSelect;
     const settingsProviderTrigger = options.settingsProviderTrigger;
     const settingsSandboxCombobox = options.settingsSandboxCombobox;
@@ -809,6 +810,7 @@ export function createSettingsController(options) {
     var remoteProviderModelSuggestions = [];
     var remoteProviderModelFetchTimer = null;
     var remoteProviderModelFetchSeq = 0;
+    var DEFAULT_PROVIDER_TIMEOUT_MINUTES = 15;
 
     function getProviderSettingsDefinition(providerType) {
         return PROVIDER_SETTINGS_DEFINITIONS[providerType] || null;
@@ -1126,12 +1128,19 @@ export function createSettingsController(options) {
         var definition = getProviderSettingsDefinition(provider.type);
         var hasProviderSettings = !!definition;
         var showProviderFields = !!(definition && definition.isExpanded(cfg));
+        var showModelSelect = isProviderInstalled(provider);
+        var showTimeoutField = provider.type === 'codex' || provider.type === 'claude-code';
         var providerModelField = settingsProviderModelSelect && settingsProviderModelSelect.closest('.settings-field');
         var providerActions = settingsSaveBtn && settingsSaveBtn.closest('.settings-button-row');
         if (providerModelField) {
-            providerModelField.style.display = definition && definition.showModelSelect ? '' : 'none';
+            providerModelField.style.display = showModelSelect ? '' : 'none';
         }
         if (providerActions) providerActions.style.display = showProviderFields ? '' : 'none';
+        if (settingsProviderTimeoutFields) {
+            settingsProviderTimeoutFields.style.display = showTimeoutField ? '' : 'none';
+            settingsProviderTimeoutFields.innerHTML = showTimeoutField ? buildProviderTimeoutField(provider.type, cfg) : '';
+            if (showTimeoutField) bindProviderTimeoutField(provider.type);
+        }
         if (settingsProviderCompatToggleFields) {
             settingsProviderCompatToggleFields.style.display = hasProviderSettings ? '' : 'none';
             settingsProviderCompatToggleFields.innerHTML = definition ? definition.buildToggle(cfg) : '';
@@ -1146,7 +1155,40 @@ export function createSettingsController(options) {
             settingsProviderExtraFields.innerHTML = showProviderFields ? definition.buildFields(cfg) : '';
             if (showProviderFields) bindProviderModelSuggestionInputs();
         }
-        if (definition && definition.showModelSelect) fetchSettingsModelConfig(provider.type);
+        if (showModelSelect) fetchSettingsModelConfig(provider.type);
+    }
+
+    function getProviderTimeoutMinutes(cfg) {
+        var timeoutMs = Number(cfg && cfg.timeoutMs);
+        if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+            return Math.max(1, Math.round(timeoutMs / 60000));
+        }
+        return DEFAULT_PROVIDER_TIMEOUT_MINUTES;
+    }
+
+    function buildProviderTimeoutField(providerType, cfg) {
+        var minutes = getProviderTimeoutMinutes(cfg);
+        return '<span class="settings-field-label">执行时长</span>' +
+            '<div class="provider-timeout-control">' +
+            '<input class="settings-inline-input provider-timeout-input" id="settings-provider-timeout-minutes" type="number" min="1" max="35791" step="1"' +
+            ' inputmode="numeric" value="' + escapeAttr(String(minutes)) + '" data-provider-type="' + escapeAttr(providerType) + '">' +
+            '<span class="provider-timeout-unit">分钟</span>' +
+            '</div>';
+    }
+
+    function bindProviderTimeoutField(providerType) {
+        var input = document.getElementById('settings-provider-timeout-minutes');
+        if (!input) return;
+        input.addEventListener('change', function () {
+            persistProviderTimeout(providerType);
+        });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                persistProviderTimeout(providerType);
+                input.blur();
+            }
+        });
     }
 
     function buildClaudeCodeCompatToggle(cfg) {
@@ -1740,6 +1782,38 @@ export function createSettingsController(options) {
         } catch (e) {
             showError('保存默认模型失败');
         }
+    }
+
+    async function persistProviderTimeout(providerType) {
+        var input = document.getElementById('settings-provider-timeout-minutes');
+        if (!input) return false;
+        var minutes = Number(input.value);
+        if (!Number.isFinite(minutes) || minutes < 1) {
+            showSettingsStatus('执行超时需大于 0 分钟', 'error');
+            input.value = String(getProviderTimeoutMinutes(getProviderSettings(providerType)));
+            return false;
+        }
+        minutes = Math.floor(minutes);
+        input.value = String(minutes);
+        var nextSettings = Object.assign({}, getProviderSettings(providerType), {
+            timeoutMs: minutes * 60 * 1000,
+        });
+        var saved = await persistAppSettingsPatch({
+            providers: (function () {
+                var providers = {};
+                providers[providerType] = nextSettings;
+                return providers;
+            })(),
+        }, '已保存');
+        if (!saved) return false;
+
+        if (providerData && providerData.current === providerType) {
+            await switchProviderTo(providerType, { force: true, closeOnSuccess: false });
+        } else {
+            renderSettingsProviderDetails();
+        }
+        await fetchProviders();
+        return true;
     }
 
     async function saveSettingsProviderSettings() {

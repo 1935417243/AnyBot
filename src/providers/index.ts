@@ -62,10 +62,14 @@ export function getProviderConfig(type: string): Record<string, unknown> {
   );
   switch (normalizeProviderType(type)) {
     case "codex":
-      return dropUndefined({ bin: process.env.CODEX_BIN || settings.bin });
+      return dropUndefined({
+        bin: process.env.CODEX_BIN || settings.bin,
+        timeoutMs: settings.timeoutMs,
+      });
     case "claude-code":
       return dropUndefined({
         pathToClaudeCodeExecutable: getClaudeCodeExecutable(settings, useAnthropicCompat),
+        timeoutMs: settings.timeoutMs,
         defaultModel: useAnthropicCompat
           ? cleanString(settings.defaultModel) || anthropicAutoModel || cleanString(process.env.CLAUDE_AGENT_MODEL)
           : cleanString(process.env.CLAUDE_AGENT_MODEL),
@@ -104,11 +108,16 @@ export function getProviderConfig(type: string): Record<string, unknown> {
 }
 
 const providerFactories: Record<string, ProviderFactory> = {
-  codex: (config) => new CodexProvider({ bin: config?.bin as string | undefined }),
+  codex: (config) =>
+    new CodexProvider({
+      bin: config?.bin as string | undefined,
+      timeoutMs: config?.timeoutMs as number | undefined,
+    }),
   "claude-code": (config) =>
     new ClaudeCodeProvider({
       pathToClaudeCodeExecutable: config?.pathToClaudeCodeExecutable as string | undefined,
       maxTurns: config?.maxTurns as number | undefined,
+      timeoutMs: config?.timeoutMs as number | undefined,
       permissionMode: config?.permissionMode as PermissionMode | undefined,
       defaultModel: config?.defaultModel as string | undefined,
       apiKey: config?.apiKey as string | undefined,

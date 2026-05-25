@@ -31,12 +31,12 @@ import {
     extractAssistantTextDelta,
     extractAssistantThinkingDelta,
 } from "./claude-code-agent-events.js";
-import {getDataDir} from "../app-settings.js";
+import {DEFAULT_PROVIDER_TIMEOUT_MS, getDataDir} from "../app-settings.js";
 import {logger} from "../logger.js";
 import {DEFAULT_SANDBOX} from "../sandbox-config.js";
 import type {SandboxMode} from "../types.js";
 
-const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
 
 const WORKDIR_SAFETY_PROMPT = [
     "## 工作目录规则",
@@ -244,6 +244,7 @@ export class ClaudeCodeProvider implements IProvider {
 
     private readonly pathToClaudeCodeExecutable: string | undefined;
     private readonly maxTurns: number | undefined;
+    private readonly timeoutMs: number;
     private readonly permissionMode: PermissionMode | undefined;
     private readonly defaultModel: string | undefined;
     private readonly apiKey: string | undefined;
@@ -258,6 +259,7 @@ export class ClaudeCodeProvider implements IProvider {
     constructor(opts?: {
         pathToClaudeCodeExecutable?: string;
         maxTurns?: number;
+        timeoutMs?: number;
         permissionMode?: PermissionMode;
         defaultModel?: string;
         apiKey?: string;
@@ -271,6 +273,7 @@ export class ClaudeCodeProvider implements IProvider {
     }) {
         this.pathToClaudeCodeExecutable = opts?.pathToClaudeCodeExecutable;
         this.maxTurns = opts?.maxTurns;
+        this.timeoutMs = opts?.timeoutMs || DEFAULT_TIMEOUT_MS;
         this.permissionMode = opts?.permissionMode;
         this.defaultModel = opts?.defaultModel;
         this.apiKey = opts?.apiKey;
@@ -344,7 +347,7 @@ export class ClaudeCodeProvider implements IProvider {
             model,
             sessionId,
             newSessionId,
-            timeoutMs = DEFAULT_TIMEOUT_MS,
+            timeoutMs = this.timeoutMs,
             signal,
         } = opts;
         const prompt = opts.rawProviderCommand

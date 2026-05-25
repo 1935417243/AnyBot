@@ -26,6 +26,7 @@ import {
 } from "./claude-code-agent-events.js";
 import { logger } from "../logger.js";
 import { DEFAULT_SANDBOX } from "../sandbox-config.js";
+import { DEFAULT_PROVIDER_TIMEOUT_MS } from "../app-settings.js";
 import { resolveExecutable } from "../utils/process.js";
 
 export class ProviderTimeoutError extends Error {
@@ -66,7 +67,7 @@ export class ProviderExecutableNotFoundError extends Error {
   }
 }
 
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
 const DEFAULT_CODEX_CONTEXT_WINDOW = 258400;
 const CODEX_NPM_NAME = "@openai/codex";
 const CODEX_BUNDLED_BIN_LABEL = "bundled Codex CLI";
@@ -486,9 +487,10 @@ export class CodexProvider implements IProvider {
   private readonly bin: string;
   private readonly executablePath: string | null;
   private readonly codexPathOverride: string | undefined;
+  private readonly timeoutMs: number;
   private readonly codex: Codex;
 
-  constructor(opts?: { bin?: string }) {
+  constructor(opts?: { bin?: string; timeoutMs?: number }) {
     const executable = resolveCodexExecutable(opts?.bin);
     const codexOptions = executable.codexPathOverride
       ? { codexPathOverride: executable.codexPathOverride }
@@ -496,6 +498,7 @@ export class CodexProvider implements IProvider {
     this.bin = executable.bin;
     this.executablePath = executable.executablePath;
     this.codexPathOverride = executable.codexPathOverride;
+    this.timeoutMs = opts?.timeoutMs || DEFAULT_TIMEOUT_MS;
     this.codex = new Codex(codexOptions);
   }
 
@@ -528,7 +531,7 @@ export class CodexProvider implements IProvider {
       model,
       imagePaths = [],
       sessionId,
-      timeoutMs = DEFAULT_TIMEOUT_MS,
+      timeoutMs = this.timeoutMs,
       signal,
     } = opts;
     const sandbox = opts.sandbox ?? process.env.CODEX_SANDBOX ?? DEFAULT_SANDBOX;

@@ -53,6 +53,7 @@ export function getAppDom(documentRef) {
         settingsProviderModelCurrent: byId(documentRef, 'settings-provider-model-current'),
         settingsProviderModelMenu: byId(documentRef, 'settings-provider-model-menu'),
         settingsProviderModelSelect: byId(documentRef, 'settings-provider-model-select'),
+        settingsProviderTimeoutFields: byId(documentRef, 'settings-provider-timeout-fields'),
         settingsProviderCompatToggleFields: byId(documentRef, 'settings-provider-compat-toggle-fields'),
         settingsProviderBinFields: byId(documentRef, 'settings-provider-bin-fields'),
         settingsProviderExtraFields: byId(documentRef, 'settings-provider-extra-fields'),
