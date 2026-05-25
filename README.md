@@ -18,20 +18,24 @@ AnyBot 是一个运行在你自己电脑上的 AI Agent 工作台，把 Codex CL
 - **变更审核**：Agent 修改文件后生成变更快照，可在 Web UI 中查看 diff、通过或撤销。
 - **多频道接入**：支持飞书长连接、QQ Bot WebSocket、Telegram 长轮询和个人微信通道。
 - **主动推送**：通过 `/api/send` 向已配置 Owner 的频道发送通知。
-- **自动化任务**：Web UI 可创建、更新和删除自动化任务，执行结果可交付到本地或频道。
+- **自动化任务**：在本机按分钟、每天、每周或 Cron 触发 Agent 任务；过程在 Web UI 展示，结果可保存到本地或交付到已启用频道。
 - **桌面体验**：Electron 桌面壳、托盘、开机启动、Windows 安装版应用内更新。
 
 ---
 
 ## 截图预览
 
-| 新对话 | 技能 |
+| 新对话 | 自动化 |
 |:---:|:---:|
-| ![新对话](assets/主页.png) | ![技能](assets/技能页.png) |
+| ![新对话](assets/主页.png) | ![自动化](assets/自动化.png) |
 
-| 频道 | 设置 |
+| 技能 | 频道 |
 |:---:|:---:|
-| ![频道](assets/频道页.png) | ![设置](assets/设置页.png) |
+| ![技能](assets/技能页.png) | ![频道](assets/频道页.png) |
+
+| 设置 |
+|:---:|
+| ![设置](assets/设置页.png) |
 
 ---
 
@@ -116,7 +120,7 @@ Web UI 是当前推荐入口，主要能力包括：
 - 变更审核：展示 Agent 改动 diff，支持通过或撤销。
 - Provider、模型、Sandbox/权限、应用外观、日志、数据导入导出和频道配置。
 - 技能管理：按 Provider 隔离扫描技能目录，支持启用、禁用、删除和打开文件夹。
-- 自动化任务管理。
+- 自动化任务管理：配置触发时间、Provider、模型、项目、技能和交付方式；本地调度器会按配置新建会话并执行任务。
 
 ---
 
@@ -216,6 +220,14 @@ curl -X POST http://localhost:19981/api/send \
 
 ---
 
+## 自动化任务
+
+自动化运行在用户本机，不依赖云端服务。应用启动后会加载已启用任务，按 `nextRunAt` 找到最近一次执行时间并使用本地定时器触发；如果应用关闭或电脑睡眠，错过的任务不会在重启后补跑，会直接计算下一次未来执行时间。
+
+每次自动化执行都会创建一个新的本地会话，继续走 `ChatRunner`，因此 Provider、模型、项目目录、技能、Agent 过程展示、消息落库和变更审核都与普通 Web UI 对话保持一致。交付方式只决定结果出口：选择“本地”时结果保存在运行记录中；选择频道时，App 内仍展示完整过程，频道只收到最终结果。
+
+---
+
 ## 运行数据
 
 默认运行数据写入 `.data/`，日志写入 `.run/`。桌面 App 会使用 Electron 的用户数据目录，并在其中维护 `.data/`、`.run/` 和上传目录。
@@ -236,6 +248,7 @@ curl -X POST http://localhost:19981/api/send \
 
 - `src/index.ts` 启动 Provider、Web 服务和已启用频道。
 - `src/chat-runner.ts` 是 Web UI 和频道进入模型调用的统一编排层，负责 Provider session、项目工作目录、prompt、消息落库、流式事件和变更审核。
+- `src/automation-scheduler.ts` 是本地自动化调度器，负责跳过重启后错过的任务、触发到期任务、记录运行历史并交付最终结果。
 - Web 会话和频道会话都绑定 Provider 原生 session，后续消息通过续聊机制保持上下文。
 - 项目会话会把项目目录作为 Provider 工作目录；普通对话使用默认工作目录。
 - Web UI 上传文件保存到工作目录下的 `tmp/uploads/`。
@@ -251,6 +264,7 @@ AnyBot/
 ├── src/
 │   ├── index.ts                    # 进程入口：启动 Provider、Web 服务和频道
 │   ├── chat-runner.ts              # 会话编排：Provider 调用、流式事件、变更审核和消息落库
+│   ├── automation-scheduler.ts     # 本地自动化调度、运行记录和结果交付
 │   ├── app-settings.ts             # 应用设置读写
 │   ├── sandbox-config.ts           # Provider sandbox / 权限模式配置
 │   ├── prompt.ts                   # 共享系统提示词构建

@@ -18,20 +18,24 @@ Current Providers are [OpenAI Codex CLI](https://github.com/openai/codex) and [C
 - **Change review**: after Agent edits, inspect diffs and approve or revert changes from the Web UI.
 - **Channel integrations**: Feishu long connection, QQ Bot WebSocket, Telegram long polling, and personal Weixin.
 - **Proactive messaging**: send notifications to configured channel owners through `/api/send`.
-- **Automations**: create, update, and delete automation tasks from the Web UI.
+- **Automations**: run local Agent tasks on minute, daily, weekly, or Cron schedules; activity stays visible in the Web UI, and final results can be saved locally or delivered to enabled channels.
 - **Desktop app**: Electron shell, tray support, login item support, and in-app updates for Windows installer builds.
 
 ---
 
 ## Screenshots
 
-| New Chat | Skills |
+| New Chat | Automations |
 |:---:|:---:|
-| ![New Chat](assets/主页.png) | ![Skills](assets/技能页.png) |
+| ![New Chat](assets/主页.png) | ![Automations](assets/自动化.png) |
 
-| Channels | Settings |
+| Skills | Channels |
 |:---:|:---:|
-| ![Channels](assets/频道页.png) | ![Settings](assets/设置页.png) |
+| ![Skills](assets/技能页.png) | ![Channels](assets/频道页.png) |
+
+| Settings |
+|:---:|
+| ![Settings](assets/设置页.png) |
 
 ---
 
@@ -116,7 +120,7 @@ The Web UI is the recommended entry point:
 - Change review with diff inspection, approve, and revert.
 - Provider, model, sandbox/permission, appearance, logs, data import/export, and channel settings.
 - Provider-isolated skill management.
-- Automation task management.
+- Automation task management: configure schedule, Provider, model, project, skills, and delivery method; the local scheduler creates a new session for each run.
 
 ---
 
@@ -200,6 +204,14 @@ curl -X POST http://localhost:19981/api/send \
 
 ---
 
+## Automations
+
+Automations run on the user's own machine and do not depend on a cloud service. After the app starts, it loads enabled tasks, finds the nearest `nextRunAt`, and uses a local timer to trigger due tasks. If the app is closed or the computer is asleep, missed runs are not replayed on restart; AnyBot calculates the next future run instead.
+
+Each automation run creates a new local session and still goes through `ChatRunner`, so Provider selection, model choice, project working directory, skills, streamed Agent activity, message persistence, and change review behave like normal Web UI chats. Delivery only controls the final output: local delivery stores the result in run history, while channel delivery keeps the full process in the app and sends only the final result to the channel.
+
+---
+
 ## Runtime Data
 
 Runtime data defaults to `.data/`, and logs default to `.run/`. Desktop builds use Electron's user data directory and keep `.data/`, `.run/`, and uploads there.
@@ -223,6 +235,7 @@ AnyBot/
 ├── src/
 │   ├── index.ts                    # Entry: Providers, Web service, channels
 │   ├── chat-runner.ts              # Session orchestration, Provider calls, events, persistence
+│   ├── automation-scheduler.ts     # Local automation scheduling, run history, delivery
 │   ├── app-settings.ts             # App settings
 │   ├── sandbox-config.ts           # Provider sandbox / permission settings
 │   ├── prompt.ts                   # Shared system prompt builder
