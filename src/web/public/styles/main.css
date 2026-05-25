@@ -4223,6 +4223,12 @@
             border-color: rgba(96, 165, 250, 0.16);
         }
 
+        .automation-meta.red {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+            border-color: rgba(248, 113, 113, 0.16);
+        }
+
         .automation-card-side {
             display: flex;
             align-items: center;
@@ -4246,6 +4252,39 @@
             color: var(--text-muted);
             font-size: 12px;
             font-weight: 600;
+        }
+
+        .automation-run-history {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .automation-run-item {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 9px 10px;
+            background: var(--input-bg);
+        }
+
+        .automation-run-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 7px;
+        }
+
+        .automation-run-time {
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        .automation-run-output {
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1.55;
+            margin-top: 7px;
+            word-break: break-word;
         }
 
         .automation-toggle {

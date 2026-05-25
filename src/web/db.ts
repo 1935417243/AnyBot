@@ -37,6 +37,35 @@ export type Project = {
   updatedAt: number;
 };
 
+export type AutomationRow = {
+  id: string;
+  name: string;
+  prompt: string;
+  enabled: number;
+  provider: string;
+  modelId: string | null;
+  projectId: string | null;
+  channelType: string;
+  skillsJson: string;
+  scheduleJson: string;
+  nextRunAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type AutomationRunRow = {
+  id: string;
+  automationId: string;
+  sessionId: string | null;
+  status: string;
+  deliveryStatus: string;
+  output: string | null;
+  error: string | null;
+  startedAt: number | null;
+  finishedAt: number | null;
+  createdAt: number;
+};
+
 const dataDir = process.env.DATA_DIR || process.env.CODEX_DATA_DIR || path.join(process.cwd(), ".data");
 fs.mkdirSync(dataDir, { recursive: true });
 
@@ -75,6 +104,35 @@ db.exec(`
     created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
   );
 
+  CREATE TABLE IF NOT EXISTS automations (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    prompt        TEXT NOT NULL,
+    enabled       INTEGER NOT NULL DEFAULT 1,
+    provider      TEXT NOT NULL,
+    model_id      TEXT,
+    project_id    TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    channel_type  TEXT NOT NULL,
+    skills_json   TEXT NOT NULL DEFAULT '[]',
+    schedule_json TEXT NOT NULL,
+    next_run_at   INTEGER,
+    created_at    INTEGER NOT NULL,
+    updated_at    INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS automation_runs (
+    id              TEXT PRIMARY KEY,
+    automation_id   TEXT NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+    session_id      TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+    status          TEXT NOT NULL,
+    delivery_status TEXT NOT NULL DEFAULT 'none',
+    output          TEXT,
+    error           TEXT,
+    started_at      INTEGER,
+    finished_at     INTEGER,
+    created_at      INTEGER NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
 `);
 
@@ -97,6 +155,8 @@ try {
 db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_source_chat ON sessions(source, chat_id)`);;
 db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_provider ON sessions(provider)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_automations_enabled_next ON automations(enabled, next_run_at)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_automation_runs_automation_created ON automation_runs(automation_id, created_at DESC)`);
 
 const stmts = {
   listProjects: db.prepare(`
@@ -200,6 +260,110 @@ const stmts = {
 
   detachAllChannelSessions: db.prepare(`
     UPDATE sessions SET chat_id = NULL WHERE source != 'web' AND chat_id IS NOT NULL
+  `),
+
+  listAutomations: db.prepare(`
+    SELECT id, name, prompt, enabled, provider, model_id AS modelId, project_id AS projectId,
+           channel_type AS channelType, skills_json AS skillsJson, schedule_json AS scheduleJson,
+           next_run_at AS nextRunAt, created_at AS createdAt, updated_at AS updatedAt
+    FROM automations
+    ORDER BY updated_at DESC, created_at DESC
+  `),
+
+  getAutomation: db.prepare(`
+    SELECT id, name, prompt, enabled, provider, model_id AS modelId, project_id AS projectId,
+           channel_type AS channelType, skills_json AS skillsJson, schedule_json AS scheduleJson,
+           next_run_at AS nextRunAt, created_at AS createdAt, updated_at AS updatedAt
+    FROM automations WHERE id = ?
+  `),
+
+  insertAutomation: db.prepare(`
+    INSERT INTO automations (
+      id, name, prompt, enabled, provider, model_id, project_id, channel_type,
+      skills_json, schedule_json, next_run_at, created_at, updated_at
+    ) VALUES (
+      @id, @name, @prompt, @enabled, @provider, @modelId, @projectId, @channelType,
+      @skillsJson, @scheduleJson, @nextRunAt, @createdAt, @updatedAt
+    )
+  `),
+
+  updateAutomation: db.prepare(`
+    UPDATE automations
+    SET name = @name,
+        prompt = @prompt,
+        enabled = @enabled,
+        provider = @provider,
+        model_id = @modelId,
+        project_id = @projectId,
+        channel_type = @channelType,
+        skills_json = @skillsJson,
+        schedule_json = @scheduleJson,
+        next_run_at = @nextRunAt,
+        updated_at = @updatedAt
+    WHERE id = @id
+  `),
+
+  deleteAutomation: db.prepare(`DELETE FROM automations WHERE id = ?`),
+
+  listDueAutomations: db.prepare(`
+    SELECT id, name, prompt, enabled, provider, model_id AS modelId, project_id AS projectId,
+           channel_type AS channelType, skills_json AS skillsJson, schedule_json AS scheduleJson,
+           next_run_at AS nextRunAt, created_at AS createdAt, updated_at AS updatedAt
+    FROM automations
+    WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ?
+    ORDER BY next_run_at ASC, updated_at ASC
+  `),
+
+  getNextAutomation: db.prepare(`
+    SELECT id, name, prompt, enabled, provider, model_id AS modelId, project_id AS projectId,
+           channel_type AS channelType, skills_json AS skillsJson, schedule_json AS scheduleJson,
+           next_run_at AS nextRunAt, created_at AS createdAt, updated_at AS updatedAt
+    FROM automations
+    WHERE enabled = 1 AND next_run_at IS NOT NULL
+    ORDER BY next_run_at ASC, updated_at ASC
+    LIMIT 1
+  `),
+
+  insertAutomationRun: db.prepare(`
+    INSERT INTO automation_runs (
+      id, automation_id, session_id, status, delivery_status, output, error,
+      started_at, finished_at, created_at
+    ) VALUES (
+      @id, @automationId, @sessionId, @status, @deliveryStatus, @output, @error,
+      @startedAt, @finishedAt, @createdAt
+    )
+  `),
+
+  updateAutomationRun: db.prepare(`
+    UPDATE automation_runs
+    SET session_id = @sessionId,
+        status = @status,
+        delivery_status = @deliveryStatus,
+        output = @output,
+        error = @error,
+        started_at = @startedAt,
+        finished_at = @finishedAt
+    WHERE id = @id
+  `),
+
+  listAutomationRuns: db.prepare(`
+    SELECT id, automation_id AS automationId, session_id AS sessionId, status, delivery_status AS deliveryStatus,
+           output, error, started_at AS startedAt, finished_at AS finishedAt, created_at AS createdAt
+    FROM automation_runs
+    WHERE automation_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `),
+
+  deleteOldAutomationRuns: db.prepare(`
+    DELETE FROM automation_runs
+    WHERE automation_id = ?
+      AND id NOT IN (
+        SELECT id FROM automation_runs
+        WHERE automation_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+      )
   `),
 };
 
@@ -371,4 +535,51 @@ export function detachAllChannelSessions(): void {
 
 export function closeDb(): void {
   db.close();
+}
+
+export function listAutomationRows(): AutomationRow[] {
+  return stmts.listAutomations.all() as AutomationRow[];
+}
+
+export function getAutomationRow(id: string): AutomationRow | null {
+  return (stmts.getAutomation.get(id) as AutomationRow | undefined) || null;
+}
+
+export function createAutomationRow(row: AutomationRow): void {
+  stmts.insertAutomation.run(row);
+}
+
+export function updateAutomationRow(row: AutomationRow): boolean {
+  const result = stmts.updateAutomation.run(row);
+  return result.changes > 0;
+}
+
+export function deleteAutomationRow(id: string): boolean {
+  const result = stmts.deleteAutomation.run(id);
+  return result.changes > 0;
+}
+
+export function listDueAutomationRows(now: number): AutomationRow[] {
+  return stmts.listDueAutomations.all(now) as AutomationRow[];
+}
+
+export function getNextAutomationRow(): AutomationRow | null {
+  return (stmts.getNextAutomation.get() as AutomationRow | undefined) || null;
+}
+
+export function createAutomationRunRow(row: AutomationRunRow): void {
+  stmts.insertAutomationRun.run(row);
+}
+
+export function updateAutomationRunRow(row: AutomationRunRow): boolean {
+  const result = stmts.updateAutomationRun.run(row);
+  return result.changes > 0;
+}
+
+export function listAutomationRunRows(automationId: string, limit = 50): AutomationRunRow[] {
+  return stmts.listAutomationRuns.all(automationId, Math.max(1, Math.floor(limit))) as AutomationRunRow[];
+}
+
+export function deleteOldAutomationRunRows(automationId: string, keep = 100): void {
+  stmts.deleteOldAutomationRuns.run(automationId, automationId, Math.max(1, Math.floor(keep)));
 }

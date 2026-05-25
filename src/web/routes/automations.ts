@@ -7,7 +7,9 @@ import * as db from "../db.js";
 import {
   createAutomation,
   deleteAutomation,
+  getAutomation,
   listAutomations,
+  listAutomationRuns,
   updateAutomation,
   type AutomationInput,
 } from "../services/automations.js";
@@ -23,7 +25,7 @@ function validateAutomationInput(input: AutomationInput): string | null {
   if (input.channelType !== LOCAL_CHANNEL_TYPE && !getRegisteredChannelTypes().includes(input.channelType)) {
     return `不支持的交付方式: ${input.channelType}`;
   }
-  if (input.channelType !== LOCAL_CHANNEL_TYPE) {
+  if (input.channelType !== LOCAL_CHANNEL_TYPE && input.enabled !== false) {
     const channelsConfig = readChannelsConfig();
     if (!channelsConfig[input.channelType]?.enabled) return "交付方式未开启";
   }
@@ -39,6 +41,19 @@ export function createAutomationsRouter(): Router {
       res.json({ automations: listAutomations() });
     } catch (error) {
       res.status(500).json({ error: "读取自动化配置失败" });
+    }
+  });
+
+  router.get("/automations/:id/runs", (req: Request, res: Response) => {
+    try {
+      const automation = getAutomation(req.params.id as string);
+      if (!automation) {
+        res.status(404).json({ error: "自动化不存在" });
+        return;
+      }
+      res.json({ runs: listAutomationRuns(automation.id) });
+    } catch (error) {
+      res.status(500).json({ error: "读取自动化运行记录失败" });
     }
   });
 

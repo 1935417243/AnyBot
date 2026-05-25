@@ -22,6 +22,7 @@ import {
   getProviderTypes,
 } from "./web/model-config.js";
 import { startAllChannels } from "./channels/index.js";
+import { automationScheduler } from "./automation-scheduler.js";
 import type { ChannelCallbacks } from "./channels/index.js";
 import {
   getWorkdir,
@@ -247,6 +248,7 @@ async function main(): Promise<void> {
   });
 
   const channels = await startAllChannels(channelCallbacks);
+  automationScheduler.start();
   logger.info("service.started", {
     activeChannels: channels.map((c) => c.type),
   });

@@ -16,6 +16,7 @@ export function createAutomationsPageController(options) {
     const automationView = options.automationView;
 
     var automations = [];
+    var automationRuns = {};
     var providersData = null;
     var channelsData = null;
     var projects = [];
@@ -98,6 +99,11 @@ export function createAutomationsPageController(options) {
         return month + '-' + day + ' ' + hour + ':' + minute;
     }
 
+    function formatTimestamp(value) {
+        if (!value) return '-';
+        return formatDateTime(new Date(value));
+    }
+
     function nextRunLabel(schedule) {
         if (!schedule) return '未配置';
         var now = new Date();
@@ -145,6 +151,17 @@ export function createAutomationsPageController(options) {
         } catch (e) {
             console.error('Failed to fetch automations:', e);
             automations = [];
+        }
+    }
+
+    async function fetchAutomationRuns(id) {
+        try {
+            var res = await fetch('/api/automations/' + encodeURIComponent(id) + '/runs');
+            var data = await res.json();
+            automationRuns[id] = Array.isArray(data.runs) ? data.runs : [];
+        } catch (e) {
+            console.error('Failed to fetch automation runs:', e);
+            automationRuns[id] = [];
         }
     }
 
@@ -389,6 +406,7 @@ export function createAutomationsPageController(options) {
             '<div class="automation-drawer-body">' +
             detailBlock('执行内容', escapeHtml(automation.prompt)) +
             detailBlock('触发配置', escapeHtml(scheduleLabel(automation.schedule))) +
+            detailBlock('下次执行时间', escapeHtml(formatTimestamp(automation.nextRunAt))) +
             detailBlock('执行提供商', escapeHtml(providerLabel(automation.provider))) +
             detailBlock('模型', escapeHtml(modelLabel(automation.modelId))) +
             detailBlock('工作目录', escapeHtml(projectLabel(automation.projectId))) +
@@ -396,6 +414,7 @@ export function createAutomationsPageController(options) {
                 return '<span class="automation-meta green">' + escapeHtml(skill.name) + '</span>';
             }).join('') + '</div>') +
             detailBlock('交付方式', escapeHtml(channelLabel(automation.channelType))) +
+            detailBlock('运行记录', '<div id="automation-run-history" class="automation-run-history">加载中</div>') +
             '</div>' +
             '<div class="automation-drawer-footer">' +
             '<button class="automation-secondary-btn" id="automation-detail-edit" type="button">编辑</button>' +
@@ -405,10 +424,48 @@ export function createAutomationsPageController(options) {
             closeDetailDrawer();
             openEditEditor(id);
         });
+        fetchAutomationRuns(id).then(function () {
+            renderRunHistory(id);
+        });
         openOverlay();
         requestAnimationFrame(function () {
             drawer.classList.add('open');
         });
+    }
+
+    function runStatusLabel(status) {
+        if (status === 'running') return '运行中';
+        if (status === 'success') return '成功';
+        if (status === 'failed') return '失败';
+        return '等待中';
+    }
+
+    function deliveryStatusLabel(status) {
+        if (status === 'local') return '本地';
+        if (status === 'delivered') return '已推送';
+        if (status === 'delivery_failed') return '推送失败';
+        return '未交付';
+    }
+
+    function renderRunHistory(id) {
+        var container = document.getElementById('automation-run-history');
+        if (!container) return;
+        var runs = automationRuns[id] || [];
+        if (runs.length === 0) {
+            container.innerHTML = '<div class="automation-choice-empty">暂无运行记录</div>';
+            return;
+        }
+        container.innerHTML = runs.slice(0, 5).map(function (run) {
+            var text = run.error || run.output || '';
+            return '<div class="automation-run-item">' +
+                '<div class="automation-run-row">' +
+                '<span class="automation-meta ' + (run.status === 'success' ? 'green' : run.status === 'failed' ? 'red' : 'accent') + '">' + escapeHtml(runStatusLabel(run.status)) + '</span>' +
+                '<span class="automation-meta blue">' + escapeHtml(deliveryStatusLabel(run.deliveryStatus)) + '</span>' +
+                '<span class="automation-run-time">' + escapeHtml(formatTimestamp(run.startedAt || run.createdAt)) + '</span>' +
+                '</div>' +
+                (text ? '<div class="automation-run-output">' + escapeHtml(text.slice(0, 160)) + '</div>' : '') +
+                '</div>';
+        }).join('');
     }
 
     function detailBlock(label, valueHtml) {
