@@ -2,7 +2,14 @@
 
 # AnyBot
 
-AnyBot 是一个开源 Agent 项目，完整兼容 Claude Code 与 Codex，并支持 DeepSeek V4 等主流 LLM 模型接入。它运行在你自己的电脑上，把 Codex CLI、Claude Code 等本地 Agent 能力接入桌面 App、Web UI 和常用聊天渠道。你可以在内置 **Web UI** 中对话、管理项目、查看 Agent 执行过程、审核文件变更和配置自动化任务；也可以通过 **飞书机器人**、**QQ 机器人**、**Telegram 机器人** 或 **个人微信** 在手机和桌面端远程使用这台机器上的 Agent。
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Stars](https://img.shields.io/github/stars/1935417243/AnyBot)
+![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
+
+AnyBot 可以把你电脑上的 AI Coding Agent 变成远程助手。
+
+它运行在你自己的电脑上，把 Codex CLI、Claude Code 等本地 Agent 能力接入桌面 App、Web UI 和常用聊天渠道。你可以在内置 **Web UI** 中对话、管理项目、查看 Agent 执行过程、审核文件变更和配置自动化任务；也可以通过 **飞书机器人**、**QQ 机器人**、**Telegram 机器人** 或 **个人微信** 在手机和桌面端远程使用这台机器上的 Agent。
 
 当前 Provider 支持 [OpenAI Codex CLI](https://developers.openai.com/codex/cli) 和 [Claude Code](https://code.claude.com/docs/en/overview)。桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
 
@@ -36,6 +43,26 @@ AnyBot 是一个开源 Agent 项目，完整兼容 Claude Code 与 Codex，并�
 | 设置 |
 |:---:|
 | ![设置](assets/设置页.png) |
+
+---
+
+## 架构概览
+
+```mermaid
+flowchart LR
+    User[用户] --> WebUI[Web UI]
+    User --> Channels[飞书 / QQ / Telegram / 微信]
+    WebUI --> Runner[ChatRunner]
+    Channels --> Runner
+    Runner --> Providers[Provider 层]
+    Providers --> Codex[Codex CLI]
+    Providers --> Claude[Claude Code]
+    Providers --> DeepSeek[DeepSeek 兼容模型]
+    Runner --> Workspace[项目工作区]
+    Runner --> Skills[技能]
+    Runner --> Review[变更审核]
+    Runner --> Automation[自动化任务]
+```
 
 ---
 
@@ -105,9 +132,18 @@ npm run bot:stop
 
 Provider 和模型选择会在 Web UI 中保存；每个 Provider 会记住上次选择的模型。
 
-### Codex Responses 适配层
+## DeepSeek 支持
 
-在 **设置 -> 提供商 -> Codex** 中开启 **Responses 适配层** 后，Codex 会在 AnyBot 内映射到 DeepSeek 等 Anthropic 兼容服务，并使用独立 `CODEX_HOME`，不影响全局 `~/.codex` 配置。聊天框只展示 `gpt-5.5`、`gpt-mini`、`gpt-codex` 三个稳定别名，实际上游模型由设置页映射决定。
+AnyBot 可以通过 Codex Responses 适配层接入 DeepSeek 兼容服务。开启后，Codex Provider 会使用 AnyBot 内置的兼容服务配置和模型映射，并使用独立 `CODEX_HOME`，不影响用户全局 `~/.codex` 配置。
+
+适用场景：
+
+- 使用 DeepSeek 兼容模型驱动本机 Codex Agent。
+- 在 Web UI 中选择稳定模型别名。
+- 通过飞书、QQ、Telegram、个人微信等频道远程调用本机 Agent。
+- 配合项目工作区、技能和自动化任务完成代码分析、定时巡检、文档生成等任务。
+
+在 **设置 -> 提供商 -> Codex** 中开启 **Responses 适配层** 后，聊天框只展示 `gpt-5.5`、`gpt-mini`、`gpt-codex` 三个稳定别名，实际上游模型由设置页映射决定。
 
 ---
 

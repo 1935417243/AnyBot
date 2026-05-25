@@ -2,7 +2,14 @@
 
 # AnyBot
 
-AnyBot is an open-source Agent project, fully compatible with Claude Code and Codex, and supports DeepSeek V4 and other mainstream LLMs. It runs on your own computer and connects local Agent backends such as Codex CLI and Claude Code to a desktop app, Web UI, and everyday chat channels. From the built-in **Web UI**, you can chat, manage projects, inspect Agent activity, review file changes, and configure automations. You can also use **Feishu Bot**, **QQ Bot**, **Telegram Bot**, or **personal Weixin** to remotely reach the Agent running on that machine.
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Stars](https://img.shields.io/github/stars/1935417243/AnyBot)
+![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
+
+AnyBot turns your local AI coding agents into remote assistants.
+
+It runs on your own computer and connects local Agent backends such as Codex CLI and Claude Code to a desktop app, Web UI, and everyday chat channels. From the built-in **Web UI**, you can chat, manage projects, inspect Agent activity, review file changes, and configure automations. You can also use **Feishu Bot**, **QQ Bot**, **Telegram Bot**, or **personal Weixin** to remotely reach the Agent running on that machine.
 
 Current Providers are [OpenAI Codex CLI](https://developers.openai.com/codex/cli) and [Claude Code](https://code.claude.com/docs/en/overview). The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
 
@@ -39,6 +46,26 @@ Current Providers are [OpenAI Codex CLI](https://developers.openai.com/codex/cli
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart LR
+    User[User] --> WebUI[Web UI]
+    User --> Channels[Feishu / QQ / Telegram / Weixin]
+    WebUI --> Runner[ChatRunner]
+    Channels --> Runner
+    Runner --> Providers[Provider Layer]
+    Providers --> Codex[Codex CLI]
+    Providers --> Claude[Claude Code]
+    Providers --> DeepSeek[DeepSeek-compatible Models]
+    Runner --> Workspace[Project Workspaces]
+    Runner --> Skills[Skills]
+    Runner --> Review[Change Review]
+    Runner --> Automation[Automations]
+```
+
+---
+
 ## Quick Start
 
 ### 1. Install the Desktop App
@@ -70,7 +97,7 @@ Configure at least one Provider:
 
 | Provider | Runtime | Notes |
 |----------|--------------|-------|
-| Codex CLI | Uses the platform native binary provided by `@openai/codex-sdk` by default, so a globally installed `codex` command is not required. Codex login or API configuration is still required. See the [Codex CLI docs](https://developers.openai.com/codex/cli) | Session resume, sandbox, image input |
+| Codex CLI | Uses the platform native binary provided by `@openai/codex-sdk` by default, so a globally installed `codex` command is not required. Native Codex mode still requires Codex login or API configuration; when **Responses compatibility layer** is enabled, Codex uses AnyBot's local compatibility service configuration and model mapping | Session resume, sandbox, image input |
 | Claude Code | Uses the platform native binary provided by `@anthropic-ai/claude-agent-sdk` by default, so a global Claude Code install is not required. Configure an external executable from advanced settings only when needed. See the [Claude Code docs](https://code.claude.com/docs/en/overview) | Session resume, sandbox mapping, streamed Agent events |
 
 ### 3. Run From Source
@@ -104,6 +131,19 @@ npm run bot:stop
 | `claude-code` | Available | Not currently supported | Claude Agent SDK with session resume, permission modes, and context compaction |
 
 Provider and model choices are saved from the Web UI. Each Provider remembers its last selected model.
+
+## DeepSeek Support
+
+AnyBot can connect Codex to DeepSeek-compatible services through the Codex Responses compatibility layer. When enabled, the Codex Provider uses AnyBot's local compatibility service configuration and model mapping with an isolated `CODEX_HOME`, so it does not affect the user's global `~/.codex` configuration.
+
+Common use cases:
+
+- Use DeepSeek-compatible models to drive the local Codex Agent.
+- Select stable model aliases from the Web UI.
+- Remotely call the local Agent from Feishu, QQ, Telegram, or personal Weixin.
+- Combine project workspaces, skills, and automations for code analysis, scheduled checks, document generation, and similar local Agent tasks.
+
+After enabling **Responses compatibility layer** under **Settings -> Providers -> Codex**, the chat box shows only the stable aliases `gpt-5.5`, `gpt-mini`, and `gpt-codex`. The actual upstream models are controlled by the mapping in settings.
 
 ---
 
@@ -183,7 +223,7 @@ Skills are isolated by Provider:
 
 | Provider | Skill directory |
 |----------|-----------------|
-| `codex` | `$CODEX_HOME/skills/`, defaulting to `~/.codex/skills/` |
+| `codex` | Native Codex mode uses `$CODEX_HOME/skills/`, defaulting to `~/.codex/skills/`; with Responses compatibility layer enabled, it uses `codex/skills/` under AnyBot's runtime data directory |
 | `claude-code` | `$CLAUDE_CONFIG_DIR/skills/`, defaulting to `~/.claude/skills/` |
 
 The Web UI `/` picker shows skills, projects, and commands for the current Provider. Selected skills inject only skill names for the current turn. Selected projects inject project names and absolute paths for the current turn.
@@ -225,6 +265,7 @@ Common files:
 - `.data/channels.json`: channel config.
 - `.data/disabled-skills.json`: skill enabled state.
 - `.data/change-reviews/`: change review snapshots.
+- `.data/codex/`: isolated `CODEX_HOME` used by the Codex Responses compatibility layer, including Codex sessions and skills.
 
 ---
 
