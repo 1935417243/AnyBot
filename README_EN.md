@@ -2,7 +2,7 @@
 
 # AnyBot
 
-AnyBot is an AI Agent workspace that runs on your own computer. It connects local Agent backends such as Codex CLI and Claude Code to a desktop app, Web UI, and everyday chat channels. From the built-in **Web UI**, you can chat, manage projects, inspect Agent activity, review file changes, and configure automations. You can also use **Feishu Bot**, **QQ Bot**, **Telegram Bot**, or **personal Weixin** to remotely reach the Agent running on that machine.
+AnyBot is an open-source Agent project, fully compatible with Claude Code and Codex, and supports DeepSeek V4 and other mainstream LLMs. It runs on your own computer and connects local Agent backends such as Codex CLI and Claude Code to a desktop app, Web UI, and everyday chat channels. From the built-in **Web UI**, you can chat, manage projects, inspect Agent activity, review file changes, and configure automations. You can also use **Feishu Bot**, **QQ Bot**, **Telegram Bot**, or **personal Weixin** to remotely reach the Agent running on that machine.
 
 Current Providers are [OpenAI Codex CLI](https://developers.openai.com/codex/cli) and [Claude Code](https://code.claude.com/docs/en/overview). The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
 
