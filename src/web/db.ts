@@ -29,6 +29,18 @@ export type SessionSummary = {
   updatedAt: number;
 };
 
+export type SessionListCursor = {
+  updatedAt: number;
+  createdAt: number;
+  id: string;
+};
+
+export type SessionListPageOptions = {
+  limit?: number;
+  cursor?: SessionListCursor | null;
+  projectId?: string | null;
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -92,6 +104,7 @@ db.exec(`
     source     TEXT NOT NULL DEFAULT 'web',
     chat_id    TEXT,
     project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    message_count INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
@@ -148,13 +161,38 @@ try {
 try {
   db.exec(`ALTER TABLE sessions ADD COLUMN provider TEXT`);
 } catch (_) {}
+let didAddSessionMessageCount = false;
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0`);
+  didAddSessionMessageCount = true;
+} catch (_) {}
 try {
   db.exec(`ALTER TABLE messages ADD COLUMN metadata TEXT`);
 } catch (_) {}
 
+if (didAddSessionMessageCount) {
+  db.exec(`
+    UPDATE sessions
+    SET message_count = (
+          SELECT COUNT(*) FROM messages WHERE messages.session_id = sessions.id
+        ),
+        updated_at = CASE
+          WHEN COALESCE((
+            SELECT MAX(created_at) FROM messages WHERE messages.session_id = sessions.id
+          ), updated_at) > updated_at
+          THEN COALESCE((
+            SELECT MAX(created_at) FROM messages WHERE messages.session_id = sessions.id
+          ), updated_at)
+          ELSE updated_at
+        END
+  `);
+}
+
 db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_source_chat ON sessions(source, chat_id)`);;
 db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_provider ON sessions(provider)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_list ON sessions(updated_at DESC, created_at DESC, id DESC)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_project_list ON sessions(project_id, updated_at DESC, created_at DESC, id DESC)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_automations_enabled_next ON automations(enabled, next_run_at)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_automation_runs_automation_created ON automation_runs(automation_id, created_at DESC)`);
 
@@ -185,14 +223,54 @@ const stmts = {
   `),
 
   listSessions: db.prepare(`
-    SELECT s.id, s.title, s.provider, s.source, s.project_id AS projectId,
-           s.created_at AS createdAt,
-           MAX(s.updated_at, COALESCE(MAX(m.created_at), s.updated_at)) AS updatedAt,
-           COUNT(m.id) AS messageCount
-    FROM sessions s
-    LEFT JOIN messages m ON m.session_id = s.id
-    GROUP BY s.id
-    ORDER BY updatedAt DESC, s.created_at DESC, s.id DESC
+    SELECT id, title, provider, source, project_id AS projectId,
+           message_count AS messageCount, created_at AS createdAt, updated_at AS updatedAt
+    FROM sessions
+    ORDER BY updated_at DESC, created_at DESC, id DESC
+  `),
+
+  listSessionsPage: db.prepare(`
+    SELECT id, title, provider, source, project_id AS projectId,
+           message_count AS messageCount, created_at AS createdAt, updated_at AS updatedAt
+    FROM sessions
+    WHERE (
+      @cursorUpdatedAt IS NULL
+      OR updated_at < @cursorUpdatedAt
+      OR (updated_at = @cursorUpdatedAt AND created_at < @cursorCreatedAt)
+      OR (updated_at = @cursorUpdatedAt AND created_at = @cursorCreatedAt AND id < @cursorId)
+    )
+    ORDER BY updated_at DESC, created_at DESC, id DESC
+    LIMIT @limit
+  `),
+
+  listGlobalSessionsPage: db.prepare(`
+    SELECT id, title, provider, source, project_id AS projectId,
+           message_count AS messageCount, created_at AS createdAt, updated_at AS updatedAt
+    FROM sessions
+    WHERE project_id IS NULL
+      AND (
+        @cursorUpdatedAt IS NULL
+        OR updated_at < @cursorUpdatedAt
+        OR (updated_at = @cursorUpdatedAt AND created_at < @cursorCreatedAt)
+        OR (updated_at = @cursorUpdatedAt AND created_at = @cursorCreatedAt AND id < @cursorId)
+      )
+    ORDER BY updated_at DESC, created_at DESC, id DESC
+    LIMIT @limit
+  `),
+
+  listProjectSessionsPage: db.prepare(`
+    SELECT id, title, provider, source, project_id AS projectId,
+           message_count AS messageCount, created_at AS createdAt, updated_at AS updatedAt
+    FROM sessions
+    WHERE project_id = @projectId
+      AND (
+        @cursorUpdatedAt IS NULL
+        OR updated_at < @cursorUpdatedAt
+        OR (updated_at = @cursorUpdatedAt AND created_at < @cursorCreatedAt)
+        OR (updated_at = @cursorUpdatedAt AND created_at = @cursorCreatedAt AND id < @cursorId)
+      )
+    ORDER BY updated_at DESC, created_at DESC, id DESC
+    LIMIT @limit
   `),
 
   getSession: db.prepare(`
@@ -231,8 +309,8 @@ const stmts = {
   `),
 
   insertSession: db.prepare(`
-    INSERT INTO sessions (id, title, session_id, provider, source, chat_id, project_id, created_at, updated_at)
-    VALUES (@id, @title, @sessionId, @provider, @source, @chatId, @projectId, @createdAt, @updatedAt)
+    INSERT INTO sessions (id, title, session_id, provider, source, chat_id, project_id, message_count, created_at, updated_at)
+    VALUES (@id, @title, @sessionId, @provider, @source, @chatId, @projectId, @messageCount, @createdAt, @updatedAt)
   `),
 
   updateSession: db.prepare(`
@@ -245,6 +323,10 @@ const stmts = {
 
   insertMessage: db.prepare(`
     INSERT INTO messages (session_id, role, content, metadata) VALUES (?, ?, ?, ?)
+  `),
+
+  incrementSessionMessageCount: db.prepare(`
+    UPDATE sessions SET message_count = message_count + 1 WHERE id = ?
   `),
 
   findBySourceChat: db.prepare(`
@@ -397,6 +479,30 @@ export function listSessions(): SessionSummary[] {
   return stmts.listSessions.all() as SessionSummary[];
 }
 
+export function listSessionsPage(
+  opts: SessionListPageOptions = {},
+): { items: SessionSummary[]; hasMore: boolean } {
+  const limit = Math.max(1, Math.min(100, Math.floor(opts.limit || 40)));
+  const cursor = opts.cursor || null;
+  const params = {
+    cursorUpdatedAt: cursor?.updatedAt ?? null,
+    cursorCreatedAt: cursor?.createdAt ?? null,
+    cursorId: cursor?.id ?? null,
+    limit: limit + 1,
+    projectId: opts.projectId || null,
+  };
+  const stmt = Object.prototype.hasOwnProperty.call(opts, "projectId")
+    ? opts.projectId
+      ? stmts.listProjectSessionsPage
+      : stmts.listGlobalSessionsPage
+    : stmts.listSessionsPage;
+  const rows = stmt.all(params) as SessionSummary[];
+  return {
+    items: rows.slice(0, limit),
+    hasMore: rows.length > limit,
+  };
+}
+
 export function getSession(id: string): ChatSession | null {
   const row = stmts.getSession.get(id) as
     | {
@@ -465,6 +571,7 @@ export function createSession(session: ChatSession): void {
     source: session.source || "web",
     chatId: session.chatId || null,
     projectId: session.projectId || null,
+    messageCount: session.messages.length,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
   });
@@ -522,6 +629,7 @@ export function deleteAllSessions(): void {
 
 export function addMessage(sessionId: string, role: "user" | "assistant", content: string, metadata?: string | null): number {
   const result = stmts.insertMessage.run(sessionId, role, content, metadata || null);
+  stmts.incrementSessionMessageCount.run(sessionId);
   return Number(result.lastInsertRowid);
 }
 

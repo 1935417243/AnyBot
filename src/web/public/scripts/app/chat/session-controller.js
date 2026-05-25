@@ -339,6 +339,7 @@ export function createSessionController(config) {
     async function deleteSession(id) {
         try {
             await fetch('/api/sessions/' + id, {method: 'DELETE'});
+            if (config.removeSessionSummary) config.removeSessionSummary(id);
             if (currentSessionId === id) {
                 currentSessionId = null;
                 currentSessionProjectId = null;

@@ -8,12 +8,80 @@ import * as db from "../db.js";
 import { emitSessionsChanged } from "../events.js";
 import { prepareMessagesForClient, readMessagePageQuery } from "../services/messages.js";
 
+const DEFAULT_SESSION_LIST_LIMIT = 40;
+
+function readStringQuery(value: Request["query"][string]): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return typeof raw === "string" ? raw : "";
+}
+
+function encodeSessionCursor(session: db.SessionSummary): string {
+  return Buffer.from(
+    JSON.stringify({
+      updatedAt: Number(session.updatedAt || 0),
+      createdAt: Number(session.createdAt || 0),
+      id: session.id,
+    }),
+    "utf8",
+  ).toString("base64url");
+}
+
+function decodeSessionCursor(value: string): db.SessionListCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as Partial<db.SessionListCursor>;
+    const updatedAt = Number(parsed.updatedAt);
+    const createdAt = Number(parsed.createdAt);
+    const id = typeof parsed.id === "string" ? parsed.id : "";
+    if (!Number.isFinite(updatedAt) || !Number.isFinite(createdAt) || !id) return null;
+    return { updatedAt, createdAt, id };
+  } catch {
+    return null;
+  }
+}
+
 export function createSessionsRouter(): Router {
   const router = Router();
 
-  router.get("/sessions", (_req: Request, res: Response) => {
-    const list = db.listSessions();
-    res.json(list);
+  router.get("/sessions", (req: Request, res: Response) => {
+    const limitRaw = readStringQuery(req.query.limit);
+    if (!limitRaw) {
+      const list = db.listSessions();
+      res.json(list);
+      return;
+    }
+
+    const limit = Number(limitRaw);
+    if (!Number.isFinite(limit) || limit <= 0) {
+      res.status(400).json({ error: "分页大小无效" });
+      return;
+    }
+
+    const scope = readStringQuery(req.query.scope);
+    const projectId = readStringQuery(req.query.projectId);
+    if (projectId && !db.getProject(projectId)) {
+      res.status(404).json({ error: "项目不存在" });
+      return;
+    }
+
+    const cursorRaw = readStringQuery(req.query.cursor);
+    const cursor = cursorRaw ? decodeSessionCursor(cursorRaw) : null;
+    if (cursorRaw && !cursor) {
+      res.status(400).json({ error: "分页游标无效" });
+      return;
+    }
+
+    const page = db.listSessionsPage({
+      limit: Math.floor(limit || DEFAULT_SESSION_LIST_LIMIT),
+      cursor,
+      ...(scope === "global" ? { projectId: null } : projectId ? { projectId } : {}),
+    });
+    const last = page.items[page.items.length - 1] || null;
+    res.json({
+      items: page.items,
+      hasMore: page.hasMore,
+      nextCursor: page.hasMore && last ? encodeSessionCursor(last) : null,
+    });
   });
 
   router.post("/sessions", (req: Request, res: Response) => {
@@ -42,6 +110,8 @@ export function createSessionsRouter(): Router {
       title: session.title,
       projectId: session.projectId,
       provider: session.provider,
+      source: session.source,
+      messageCount: 0,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
     });

@@ -74,10 +74,14 @@ export function createSidebarController(options) {
     var currentSessionRefreshIntervalMs = options.currentSessionRefreshIntervalMs;
     var realtimeRefreshDebounceMs = options.realtimeRefreshDebounceMs;
     var realtimeReconnectMs = options.realtimeReconnectMs;
+    var sessionPageSize = options.sessionPageSize || 40;
 
     var activeProjectId = null;
     var sessions = [];
     var projects = [];
+    var allSessionsPage = createSessionPageState();
+    var globalSessionPage = createSessionPageState();
+    var projectSessionPages = new Map();
     var isProjectsCollapsed = localStorage.getItem("projectsCollapsed") === "true";
     var isHistoryCollapsed = localStorage.getItem("historyCollapsed") === "true";
     var expandedProjectIds = readStoredSet("expandedProjectIds");
@@ -93,6 +97,115 @@ export function createSidebarController(options) {
     var isRealtimeLifecycleBound = false;
     var sidebarTooltipEl = null;
     var sidebarTooltipTarget = null;
+
+    function createSessionPageState() {
+        return {
+            cursor: null,
+            hasMore: true,
+            initialized: false,
+            isLoading: false,
+        };
+    }
+
+    function resetSessionPageState(page) {
+        page.cursor = null;
+        page.hasMore = true;
+        page.initialized = false;
+        page.isLoading = false;
+    }
+
+    function getProjectSessionPage(projectId) {
+        if (!projectSessionPages.has(projectId)) {
+            projectSessionPages.set(projectId, createSessionPageState());
+        }
+        return projectSessionPages.get(projectId);
+    }
+
+    function mergeSessions(items) {
+        var byId = new Map();
+        sessions.forEach(function (session) {
+            byId.set(session.id, session);
+        });
+        items.forEach(function (session) {
+            byId.set(session.id, session);
+        });
+        sessions = sortSessionsByUpdatedAt(Array.from(byId.values()));
+    }
+
+    function removeSessionSummary(id) {
+        if (!id) return;
+        sessions = sessions.filter(function (session) { return session.id !== id; });
+        renderHistory();
+        renderProjects();
+        updateSelection();
+    }
+
+    async function fetchSessionPage(params) {
+        var query = new URLSearchParams();
+        query.set("limit", String(sessionPageSize));
+        if (params.cursor) query.set("cursor", params.cursor);
+        if (params.scope) query.set("scope", params.scope);
+        if (params.projectId) query.set("projectId", params.projectId);
+
+        var res = await fetch("/api/sessions?" + query.toString());
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || "加载会话失败");
+        if (Array.isArray(data)) {
+            return {
+                items: data,
+                hasMore: false,
+                nextCursor: null,
+            };
+        }
+        return data;
+    }
+
+    async function loadSessionPage(page, params) {
+        if (page.isLoading) return;
+        if (params.append && !page.hasMore) return;
+
+        page.isLoading = true;
+        try {
+            var data = await fetchSessionPage({
+                scope: params.scope || "",
+                projectId: params.projectId || "",
+                cursor: params.append ? page.cursor : "",
+            });
+            mergeSessions(data.items || []);
+            page.cursor = data.nextCursor || null;
+            page.hasMore = !!data.hasMore;
+            page.initialized = true;
+        } finally {
+            page.isLoading = false;
+        }
+    }
+
+    function loadAllSessionsPage(append) {
+        return loadSessionPage(allSessionsPage, { append: !!append });
+    }
+
+    function loadGlobalSessionsPage(append) {
+        return loadSessionPage(globalSessionPage, { append: !!append, scope: "global" });
+    }
+
+    async function loadProjectSessionsPage(projectId, append) {
+        var page = getProjectSessionPage(projectId);
+        await loadSessionPage(page, { append: !!append, projectId: projectId });
+    }
+
+    function ensureProjectSessionsLoaded(projectId) {
+        var page = getProjectSessionPage(projectId);
+        if (page.initialized || page.isLoading) return;
+        page.isLoading = true;
+        renderProjects();
+        page.isLoading = false;
+        loadProjectSessionsPage(projectId, false).then(function () {
+            renderProjects();
+            updateSelection();
+        }).catch(function (e) {
+            console.error("Failed to fetch project sessions:", e);
+        });
+    }
 
     function ensureSidebarTooltip() {
         if (sidebarTooltipEl) return sidebarTooltipEl;
@@ -257,17 +370,30 @@ export function createSidebarController(options) {
             historyList.appendChild(createHistoryItem(session));
         });
 
-        if (sortedGlobalSessions.length > historySessionPreviewLimit) {
+        if (sortedGlobalSessions.length > historySessionPreviewLimit || globalSessionPage.hasMore || isHistorySessionsExpanded) {
             var moreBtn = document.createElement("button");
             moreBtn.className = "history-sessions-more";
             moreBtn.type = "button";
             moreBtn.setAttribute("aria-expanded", String(isHistorySessionsExpanded));
-            moreBtn.textContent = isHistorySessionsExpanded
-                ? "收起"
-                : "查看更多 " + (sortedGlobalSessions.length - historySessionPreviewLimit) + " 条";
-            moreBtn.addEventListener("click", function () {
-                isHistorySessionsExpanded = !isHistorySessionsExpanded;
+            moreBtn.disabled = globalSessionPage.isLoading;
+            moreBtn.textContent = globalSessionPage.isLoading
+                ? "加载中..."
+                : isHistorySessionsExpanded
+                    ? (globalSessionPage.hasMore ? "继续加载" : "收起")
+                    : "查看更多";
+            moreBtn.addEventListener("click", async function () {
+                if (!isHistorySessionsExpanded) {
+                    isHistorySessionsExpanded = true;
+                    renderHistory();
+                    return;
+                }
+                if (globalSessionPage.hasMore) {
+                    await loadGlobalSessionsPage(true);
+                } else {
+                    isHistorySessionsExpanded = false;
+                }
                 renderHistory();
+                await syncCurrentSessionFromSummary();
             });
             historyList.appendChild(moreBtn);
         }
@@ -279,18 +405,20 @@ export function createSidebarController(options) {
         saveStoredSet("expandedProjectIds", expandedProjectIds);
         if (options.getCurrentView() !== "chat") options.showChatView();
         renderProjects();
+        ensureProjectSessionsLoaded(projectId);
     }
 
     function renderProjectSessions(projectId) {
         var list = document.createElement("div");
         list.className = "project-session-list";
+        var page = getProjectSessionPage(projectId);
         var projectSessions = sortSessionsByUpdatedAt(
             sessions.filter(function (session) { return session.projectId === projectId; })
         );
         if (projectSessions.length === 0) {
             var empty = document.createElement("div");
             empty.className = "project-empty";
-            empty.textContent = "暂无对话";
+            empty.textContent = page.isLoading ? "加载中..." : "暂无对话";
             list.appendChild(empty);
             return list;
         }
@@ -333,22 +461,31 @@ export function createSidebarController(options) {
             list.appendChild(btn);
         });
 
-        if (projectSessions.length > projectSessionPreviewLimit) {
+        if (projectSessions.length > projectSessionPreviewLimit || page.hasMore || isShowingAll) {
             var moreBtn = document.createElement("button");
             moreBtn.className = "project-sessions-more";
             moreBtn.type = "button";
+            moreBtn.disabled = page.isLoading;
             moreBtn.setAttribute("aria-expanded", String(isShowingAll));
-            moreBtn.textContent = isShowingAll
-                ? "收起"
-                : "查看更多 " + (projectSessions.length - projectSessionPreviewLimit) + " 条";
-            moreBtn.addEventListener("click", function (e) {
+            moreBtn.textContent = page.isLoading
+                ? "加载中..."
+                : isShowingAll
+                    ? (page.hasMore ? "继续加载" : "收起")
+                    : "查看更多";
+            moreBtn.addEventListener("click", async function (e) {
                 e.stopPropagation();
-                if (isShowingAll) {
-                    expandedProjectSessionIds.delete(projectId);
-                } else {
+                if (!isShowingAll) {
                     expandedProjectSessionIds.add(projectId);
+                    renderProjects();
+                    return;
+                }
+                if (page.hasMore) {
+                    await loadProjectSessionsPage(projectId, true);
+                } else {
+                    expandedProjectSessionIds.delete(projectId);
                 }
                 renderProjects();
+                updateSelection();
             });
             list.appendChild(moreBtn);
         }
@@ -384,6 +521,7 @@ export function createSidebarController(options) {
                     }
                     saveStoredSet("expandedProjectIds", expandedProjectIds);
                     renderProjects();
+                    if (!isExpanded) ensureProjectSessionsLoaded(project.id);
                     return;
                 }
                 selectProject(project.id);
@@ -525,8 +663,19 @@ export function createSidebarController(options) {
 
     async function fetchSessions() {
         try {
-            var res = await fetch("/api/sessions");
-            sessions = sortSessionsByUpdatedAt(await res.json());
+            sessions = [];
+            resetSessionPageState(allSessionsPage);
+            resetSessionPageState(globalSessionPage);
+            projectSessionPages = new Map();
+
+            var tasks = [
+                loadAllSessionsPage(false),
+                loadGlobalSessionsPage(false),
+            ];
+            expandedProjectIds.forEach(function (projectId) {
+                tasks.push(loadProjectSessionsPage(projectId, false));
+            });
+            await Promise.all(tasks);
             var currentSessionId = options.getCurrentSessionId();
             var currentSummary = currentSessionId ? findSessionSummary(currentSessionId) : null;
             if (currentSummary) options.updateConversationHeaderTitle(currentSummary.title);
@@ -618,6 +767,19 @@ export function createSidebarController(options) {
     function handleRealtimeChange(event) {
         var payload = parseRealtimeEvent(event);
         if (!payload) return;
+        if (payload.type === "history_cleared") {
+            sessions = [];
+            resetSessionPageState(allSessionsPage);
+            resetSessionPageState(globalSessionPage);
+            projectSessionPages = new Map();
+            renderHistory();
+            renderProjects();
+            updateSelection();
+            return;
+        }
+        if (payload.type === "sessions_changed" && payload.reason === "session_deleted") {
+            removeSessionSummary(payload.sessionId);
+        }
         scheduleRealtimeRefresh();
     }
 
@@ -720,6 +882,7 @@ export function createSidebarController(options) {
         refreshDirectory: refreshDirectory,
         renderHistory: renderHistory,
         renderProjects: renderProjects,
+        removeSessionSummary: removeSessionSummary,
         revealActiveSession: revealActiveSession,
         revealSessionContainer: revealSessionContainer,
         selectProject: selectProject,

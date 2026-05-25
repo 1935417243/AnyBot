@@ -26,6 +26,7 @@ import { createToastController } from '../ui/toast.js';
 import { createViewRouter } from './view-router.js';
 
 const SESSION_MESSAGE_PAGE_SIZE = 40;
+const SESSION_LIST_PAGE_SIZE = 40;
 const HISTORY_SESSION_PREVIEW_LIMIT = 4;
 const PROJECT_SESSION_PREVIEW_LIMIT = 4;
 const LARGE_MESSAGE_PREVIEW_CHARS = 20000;
@@ -448,6 +449,7 @@ export function createAnyBotApp(dom, deps) {
         },
         showChatView: showChatView,
         showError: showError,
+        sessionPageSize: SESSION_LIST_PAGE_SIZE,
         sidebar: sidebar,
         sidebarRefreshIntervalMs: SIDEBAR_REFRESH_INTERVAL_MS,
         updateConversationHeaderTitle: function (title) {
@@ -541,6 +543,9 @@ export function createAnyBotApp(dom, deps) {
         },
         renderProjects: function () {
             sidebarController.renderProjects();
+        },
+        removeSessionSummary: function (id) {
+            sidebarController.removeSessionSummary(id);
         },
         renderSessionMessages: function (messages, hasMoreMessages) {
             return messageListController.renderSessionMessages(messages, hasMoreMessages);
