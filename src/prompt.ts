@@ -4,17 +4,6 @@ import { join } from "node:path";
 const WORKSPACE_CONTEXT_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md"] as const;
 const MAX_WORKSPACE_CONTEXT_FILE_CHARS = 80_000;
 
-function readBootstrap(workdir: string): string | null {
-  const file = join(workdir, "BOOTSTRAP.md");
-  if (!existsSync(file)) return null;
-  try {
-    const content = readFileSync(file, "utf8").trim();
-    return content || null;
-  } catch {
-    return null;
-  }
-}
-
 function readWorkspaceContextFile(workdir: string, filename: string): string | null {
   const file = join(workdir, filename);
   if (!existsSync(file)) return null;
@@ -70,13 +59,6 @@ export function buildSystemPrompt(options: {
   ].join("\n");
 
   if (options.isFirstTurn !== false && includeWorkspaceMemory) {
-    const bootstrap = readBootstrap(options.workdir);
-    if (bootstrap) {
-      const parts = [env, launchRule, bootstrap];
-      if (options.extraPrompt?.trim()) parts.push(options.extraPrompt.trim());
-      return parts.join("\n\n");
-    }
-
     const workspaceContext = buildWorkspaceContext(options.workdir);
     if (workspaceContext) {
       const parts = [env, launchRule, workspaceContext];

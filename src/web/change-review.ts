@@ -62,7 +62,6 @@ const SNAPSHOT_SKIP_DIRS = new Set([".git", "node_modules", ".data", ".run", "tm
 const ALWAYS_SNAPSHOT_FILES = ["CLAUDE.md"];
 const DESKTOP_USER_DATA_REVIEW_FILES = new Set([
   "agents.md",
-  "bootstrap.md",
   "claude.md",
   "memory.md",
   "profile.md",

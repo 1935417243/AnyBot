@@ -64,7 +64,7 @@ const MAX_PROVIDER_TIMEOUT_MS = 2_147_000_000;
 const DESKTOP_DEFAULT_WORKDIR_NAME = "AnyBotData";
 const WINDOWS_HOME_WORKDIR_NAME = "AnyBotWorkspace";
 const WINDOWS_INSTALL_WORKDIR_NAME = "anybotworkspace";
-const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md", "BOOTSTRAP.md"];
+const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md"];
 
 function isDesktopRuntime(): boolean {
   return process.env.ANYBOT_DESKTOP === "1";

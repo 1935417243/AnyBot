@@ -8,7 +8,7 @@ import * as db from "../db.js";
 import { emitProjectsChanged } from "../events.js";
 
 const execFile = promisify(execFileCallback);
-const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md", "BOOTSTRAP.md"] as const;
+const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md"] as const;
 
 export function normalizeProjectPath(inputPath: string): string {
   if (!inputPath || typeof inputPath !== "string") {

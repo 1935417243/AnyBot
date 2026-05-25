@@ -100,7 +100,7 @@ function prepareUserData() {
 
   const appRoot = getAppRoot();
   const mdSource = path.join(appRoot, "dist", "agent", "md_files");
-  for (const file of ["AGENTS.md", "MEMORY.md", "PROFILE.md", "BOOTSTRAP.md"]) {
+  for (const file of ["AGENTS.md", "MEMORY.md", "PROFILE.md"]) {
     copyIfMissing(path.join(mdSource, file), path.join(userData, file));
   }
 }
