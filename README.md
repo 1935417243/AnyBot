@@ -70,7 +70,7 @@ sudo xattr -rd com.apple.quarantine "/Applications/AnyBot.app"
 
 | Provider | 运行方式 | 说明 |
 |----------|---------|------|
-| Codex CLI | 默认使用随 `@openai/codex-sdk` 提供的平台 native binary，不要求全局安装 `codex` 命令；仍需要完成 Codex 登录或 API 配置，使用说明见 [Codex CLI 文档](https://developers.openai.com/codex/cli) | 支持会话续聊、Sandbox、图片输入 |
+| Codex | 默认使用随 `@openai/codex-sdk` 提供的平台 native binary，不要求全局安装 `codex` 命令；启用 **Responses 适配层** 后，只使用 AnyBot 内的兼容服务配置和模型映射 | 支持会话续聊、Sandbox、图片输入 |
 | Claude Code | 默认使用随 `@anthropic-ai/claude-agent-sdk` 提供的平台 native binary，不要求全局安装 Claude Code；需要外部 CLI 时可在高级设置中指定，使用说明见 [Claude Code 文档](https://code.claude.com/docs/en/overview) | 支持会话续聊、Sandbox 映射、Agent 流式事件 |
 
 ### 3. 源码运行
@@ -104,6 +104,10 @@ npm run bot:stop
 | `claude-code` | 可用 | 暂不支持 | 使用 Claude Agent SDK，支持会话续聊、权限模式和上下文压缩 |
 
 Provider 和模型选择会在 Web UI 中保存；每个 Provider 会记住上次选择的模型。
+
+### Codex Responses 适配层
+
+在 **设置 -> 提供商 -> Codex** 中开启 **Responses 适配层** 后，Codex 会在 AnyBot 内映射到 DeepSeek 等 Anthropic 兼容服务，并使用独立 `CODEX_HOME`，不影响全局 `~/.codex` 配置。聊天框只展示 `gpt-5.5`、`gpt-mini`、`gpt-codex` 三个稳定别名，实际上游模型由设置页映射决定。
 
 ---
 
@@ -199,7 +203,7 @@ Web UI 是当前推荐入口，主要能力包括：
 
 | Provider | 技能目录 |
 |----------|---------|
-| `codex` | `$CODEX_HOME/skills/`，未设置时为 `~/.codex/skills/` |
+| `codex` | 原生 Codex 模式使用 `$CODEX_HOME/skills/`，未设置时为 `~/.codex/skills/`；开启 Responses 适配层后使用 AnyBot 运行数据目录下的 `codex/skills/` |
 | `claude-code` | `$CLAUDE_CONFIG_DIR/skills/`，未设置时为 `~/.claude/skills/` |
 
 Web UI 的 `/` 入口会按当前 Provider 展示可用技能、项目和命令。技能只注入本轮选择的技能名，不注入技能描述或文件内容；项目选择会按项目名和绝对路径写入本轮提示词。
@@ -241,6 +245,7 @@ curl -X POST http://localhost:19981/api/send \
 - `.data/channels.json`：频道配置。
 - `.data/disabled-skills.json`：技能启用状态。
 - `.data/change-reviews/`：变更审核快照。
+- `.data/codex/`：开启 Codex Responses 适配层后的隔离 `CODEX_HOME`，包含 Codex 会话和技能数据。
 
 ---
 
