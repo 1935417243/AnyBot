@@ -72,15 +72,11 @@ export function createViewRouter(options) {
     }
 
     async function openChannelsPage() {
-        if (currentView === 'channels') return;
-        if (!options.hasChannelsData || !options.hasChannelsData()) {
-            if (options.fetchChannels) await options.fetchChannels();
-        }
+        if (options.fetchChannels) await options.fetchChannels();
         showChannelsPage();
     }
 
     async function openSkillsPage() {
-        if (currentView === 'skills') return;
         if (options.fetchSkills) await options.fetchSkills();
         showSkillsPage();
     }

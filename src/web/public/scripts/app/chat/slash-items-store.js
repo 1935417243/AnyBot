@@ -14,6 +14,12 @@ export function createSlashItemsStore(options) {
         return currentProvider || (providerData && providerData.current) || (modelConfig && modelConfig.provider) || '';
     }
 
+    function getConfiguredProviderType() {
+        var providerData = options.getProviderData ? options.getProviderData() : null;
+        var modelConfig = options.getModelConfig ? options.getModelConfig() : null;
+        return (providerData && providerData.current) || (modelConfig && modelConfig.provider) || '';
+    }
+
     function getProviderQuery(providerType) {
         return providerType ? '?provider=' + encodeURIComponent(providerType) : '';
     }
@@ -66,6 +72,7 @@ export function createSlashItemsStore(options) {
     return {
         fetchItems: fetchItems,
         getActiveProviderType: getActiveProviderType,
+        getConfiguredProviderType: getConfiguredProviderType,
         getProviderQuery: getProviderQuery,
         getState: getState,
         invalidate: invalidate,

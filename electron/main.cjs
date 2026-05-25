@@ -718,6 +718,7 @@ async function startBackend() {
     ANYBOT_DESKTOP: "1",
     ANYBOT_DESKTOP_PARENT_PID: String(process.pid),
     ANYBOT_DESKTOP_APP_VERSION: app.getVersion(),
+    ANYBOT_INSTALL_DIR: app.isPackaged ? path.dirname(process.execPath) : "",
     ANYBOT_DESKTOP_UPDATE_URL: desktopUpdateUrl,
     ANYBOT_DESKTOP_UPDATE_TOKEN: desktopUpdateToken,
     DATA_DIR: dataDir,

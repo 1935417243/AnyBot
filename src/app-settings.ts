@@ -62,6 +62,8 @@ export interface AppSettings {
 export const DEFAULT_PROVIDER_TIMEOUT_MS = 15 * 60 * 1000;
 const MAX_PROVIDER_TIMEOUT_MS = 2_147_000_000;
 const DESKTOP_DEFAULT_WORKDIR_NAME = "AnyBotData";
+const WINDOWS_HOME_WORKDIR_NAME = "AnyBotWorkspace";
+const WINDOWS_INSTALL_WORKDIR_NAME = "anybotworkspace";
 const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md", "BOOTSTRAP.md"];
 
 function isDesktopRuntime(): boolean {
@@ -73,11 +75,18 @@ function getDesktopUserDataDir(): string {
 }
 
 function getDefaultWorkdir(): string {
-  return isDesktopRuntime() ? path.join(os.homedir(), DESKTOP_DEFAULT_WORKDIR_NAME) : process.cwd();
-}
+  if (!isDesktopRuntime()) return process.cwd();
 
-function isDesktopUserDataWorkdir(workdir: string): boolean {
-  return isDesktopRuntime() && path.resolve(workdir) === getDesktopUserDataDir();
+  const installDir = process.env.ANYBOT_INSTALL_DIR?.trim();
+  if (process.platform === "win32" && installDir) {
+    const root = path.win32.parse(path.win32.resolve(installDir)).root;
+    if (root.toLowerCase() === "c:\\") {
+      return path.win32.join(os.homedir(), WINDOWS_HOME_WORKDIR_NAME);
+    }
+    return path.win32.join(root, WINDOWS_INSTALL_WORKDIR_NAME);
+  }
+
+  return path.join(os.homedir(), DESKTOP_DEFAULT_WORKDIR_NAME);
 }
 
 function createDefaultSettings(): AppSettings {
@@ -221,9 +230,6 @@ function mergeSettings(value: unknown): AppSettings {
     typeof workspace.defaultWorkdir === "string" && workspace.defaultWorkdir.trim()
       ? path.resolve(workspace.defaultWorkdir.trim())
       : DEFAULT_SETTINGS.workspace.defaultWorkdir;
-  const defaultWorkdir = isDesktopUserDataWorkdir(requestedWorkdir)
-    ? DEFAULT_SETTINGS.workspace.defaultWorkdir
-    : requestedWorkdir;
 
   return {
     general: {
@@ -243,7 +249,7 @@ function mergeSettings(value: unknown): AppSettings {
       Object.entries(providers).map(([provider, config]) => [provider, normalizeProviderSettings(config)]),
     ),
     workspace: {
-      defaultWorkdir,
+      defaultWorkdir: requestedWorkdir,
     },
     permissions: {
       requireDangerousConfirmation:

@@ -704,7 +704,7 @@ export function createAnyBotApp(dom, deps) {
 
     skillsPageController = createSkillsPageController({
         getActiveSlashProviderType: function () {
-            return slashItemsStore ? slashItemsStore.getActiveProviderType() : '';
+            return slashItemsStore ? slashItemsStore.getConfiguredProviderType() : '';
         },
         getProviderQuery: function (providerType) {
             return slashItemsStore ? slashItemsStore.getProviderQuery(providerType) : (providerType ? '?provider=' + encodeURIComponent(providerType) : '');

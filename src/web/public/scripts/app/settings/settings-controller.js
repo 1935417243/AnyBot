@@ -758,8 +758,12 @@ export function createSettingsController(options) {
     }
 
     settingsNavItems.forEach(function (item) {
-        item.addEventListener('click', function () {
-            setSettingsTab(item.dataset.settingsTab);
+        item.addEventListener('click', async function () {
+            var tab = item.dataset.settingsTab;
+            setSettingsTab(tab);
+            if (tab === 'workspace') {
+                await fetchAppSettings();
+            }
         });
     });
 
