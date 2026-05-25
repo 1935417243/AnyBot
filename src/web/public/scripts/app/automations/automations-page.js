@@ -74,8 +74,9 @@ export function createAutomationsPageController(options) {
 
     function getAutomationChannels() {
         var registered = channelsData && channelsData.registered ? channelsData.registered : [];
+        var config = channelsData && channelsData.config ? channelsData.config : {};
         return [LOCAL_CHANNEL_TYPE].concat(registered.filter(function (type) {
-            return type !== LOCAL_CHANNEL_TYPE;
+            return type !== LOCAL_CHANNEL_TYPE && config[type] && config[type].enabled;
         }));
     }
 

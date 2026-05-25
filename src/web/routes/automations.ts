@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { getRegisteredChannelTypes } from "../../channels/index.js";
+import { getRegisteredChannelTypes, readChannelsConfig } from "../../channels/index.js";
 import { logger } from "../../logger.js";
 import { getRegisteredProviderTypes } from "../../providers/index.js";
 import * as db from "../db.js";
@@ -22,6 +22,10 @@ function validateAutomationInput(input: AutomationInput): string | null {
   if (!input.channelType || typeof input.channelType !== "string") return "缺少交付方式";
   if (input.channelType !== LOCAL_CHANNEL_TYPE && !getRegisteredChannelTypes().includes(input.channelType)) {
     return `不支持的交付方式: ${input.channelType}`;
+  }
+  if (input.channelType !== LOCAL_CHANNEL_TYPE) {
+    const channelsConfig = readChannelsConfig();
+    if (!channelsConfig[input.channelType]?.enabled) return "交付方式未开启";
   }
   if (input.projectId && !db.getProject(input.projectId)) return "项目不存在";
   return null;
