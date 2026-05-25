@@ -3,7 +3,7 @@ import type { IProvider } from "./types.js";
 import { CodexProvider, resolveCodexExecutable } from "./codex.js";
 import { ClaudeCodeProvider } from "./claude-code.js";
 import { resolveExecutable } from "../utils/process.js";
-import { getProviderRuntimeSettings } from "../app-settings.js";
+import { getConfiguredWebPort, getProviderRuntimeSettings } from "../app-settings.js";
 
 type ProviderFactory = (config?: Record<string, unknown>) => IProvider;
 
@@ -33,6 +33,10 @@ function preferSettingWhenEnabled(
   const setting = cleanString(settingValue);
   const env = cleanString(envValue);
   return useSettingsFirst ? setting || env : env || setting;
+}
+
+function getLocalCodexAdapterBaseUrl(): string {
+  return `http://127.0.0.1:${getConfiguredWebPort()}/api/codex-openai/v1`;
 }
 
 function getClaudeCodeBin(): string | undefined {
@@ -65,6 +69,12 @@ export function getProviderConfig(type: string): Record<string, unknown> {
       return dropUndefined({
         bin: process.env.CODEX_BIN || settings.bin,
         timeoutMs: settings.timeoutMs,
+        codexCompatEnabled: settings.codexCompatEnabled,
+        codexAdapterBaseUrl: settings.codexCompatEnabled ? getLocalCodexAdapterBaseUrl() : undefined,
+        codexAnthropicBaseUrl: settings.codexAnthropicBaseUrl,
+        codexDefaultModel: settings.codexDefaultModel,
+        codexFastModel: settings.codexFastModel,
+        codexCodeModel: settings.codexCodeModel,
       });
     case "claude-code":
       return dropUndefined({
@@ -112,6 +122,12 @@ const providerFactories: Record<string, ProviderFactory> = {
     new CodexProvider({
       bin: config?.bin as string | undefined,
       timeoutMs: config?.timeoutMs as number | undefined,
+      codexCompatEnabled: config?.codexCompatEnabled as boolean | undefined,
+      codexAdapterBaseUrl: config?.codexAdapterBaseUrl as string | undefined,
+      codexAnthropicBaseUrl: config?.codexAnthropicBaseUrl as string | undefined,
+      codexDefaultModel: config?.codexDefaultModel as string | undefined,
+      codexFastModel: config?.codexFastModel as string | undefined,
+      codexCodeModel: config?.codexCodeModel as string | undefined,
     }),
   "claude-code": (config) =>
     new ClaudeCodeProvider({

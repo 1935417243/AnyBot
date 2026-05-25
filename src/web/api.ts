@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createAutomationsRouter } from "./routes/automations.js";
 import { createChangeReviewsRouter } from "./routes/change-reviews.js";
 import { createChannelsRouter } from "./routes/channels.js";
+import { createCodexOpenAIRouter } from "./routes/codex-openai.js";
 import { createDataRouter } from "./routes/data.js";
 import { createDesktopUpdateRouter } from "./routes/desktop-update.js";
 import { createEventsRouter } from "./routes/events.js";
@@ -28,6 +29,7 @@ export function createApiRouter(): Router {
   router.use(createSettingsRouter());
   router.use(createDesktopUpdateRouter());
   router.use(createProvidersRouter());
+  router.use(createCodexOpenAIRouter());
   router.use(createChannelsRouter());
   router.use(createSkillsRouter());
   router.use(createProxyRouter());

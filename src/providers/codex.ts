@@ -1,12 +1,13 @@
 import {
   Codex,
+  type CodexOptions,
   type Input,
   type ThreadEvent,
   type ThreadItem,
   type ThreadOptions,
   type Usage,
 } from "@openai/codex-sdk";
-import { accessSync, constants } from "fs";
+import { accessSync, constants, mkdirSync } from "fs";
 import fs from "fs/promises";
 import { createRequire } from "module";
 import os from "os";
@@ -26,7 +27,7 @@ import {
 } from "./claude-code-agent-events.js";
 import { logger } from "../logger.js";
 import { DEFAULT_SANDBOX } from "../sandbox-config.js";
-import { DEFAULT_PROVIDER_TIMEOUT_MS } from "../app-settings.js";
+import { DEFAULT_PROVIDER_TIMEOUT_MS, getDataDir } from "../app-settings.js";
 import { resolveExecutable } from "../utils/process.js";
 
 export class ProviderTimeoutError extends Error {
@@ -332,8 +333,8 @@ function isCodexTokenCountEvent(event: unknown): event is CodexTokenCountEvent {
   return (payload as Record<string, unknown>).type === "token_count";
 }
 
-async function findCodexSessionFile(sessionId: string): Promise<string | null> {
-  const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+async function findCodexSessionFile(sessionId: string, codexHomeOverride?: string): Promise<string | null> {
+  const codexHome = codexHomeOverride || process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
   const sessionsDir = path.join(codexHome, "sessions");
   const stack = [sessionsDir];
 
@@ -361,10 +362,13 @@ async function findCodexSessionFile(sessionId: string): Promise<string | null> {
   return null;
 }
 
-async function readLatestCodexTokenCountInfo(sessionId: string | null): Promise<CodexTokenCountInfo | null> {
+async function readLatestCodexTokenCountInfo(
+  sessionId: string | null,
+  codexHomeOverride?: string,
+): Promise<CodexTokenCountInfo | null> {
   if (!sessionId) return null;
 
-  const sessionFile = await findCodexSessionFile(sessionId);
+  const sessionFile = await findCodexSessionFile(sessionId, codexHomeOverride);
   if (!sessionFile) return null;
 
   let content: string;
@@ -489,12 +493,50 @@ export class CodexProvider implements IProvider {
   private readonly codexPathOverride: string | undefined;
   private readonly timeoutMs: number;
   private readonly codex: Codex;
+  private readonly codexHome: string | undefined;
+  private readonly codexCompatEnabled: boolean;
+  private readonly codexAnthropicBaseUrl: string | undefined;
+  private readonly codexDefaultModel: string | undefined;
+  private readonly codexFastModel: string | undefined;
+  private readonly codexCodeModel: string | undefined;
 
-  constructor(opts?: { bin?: string; timeoutMs?: number }) {
+  constructor(opts?: {
+    bin?: string;
+    timeoutMs?: number;
+    codexCompatEnabled?: boolean;
+    codexAdapterBaseUrl?: string;
+    codexAnthropicBaseUrl?: string;
+    codexDefaultModel?: string;
+    codexFastModel?: string;
+    codexCodeModel?: string;
+  }) {
     const executable = resolveCodexExecutable(opts?.bin);
-    const codexOptions = executable.codexPathOverride
+    const codexOptions: CodexOptions = executable.codexPathOverride
       ? { codexPathOverride: executable.codexPathOverride }
       : {};
+    this.codexCompatEnabled = opts?.codexCompatEnabled === true;
+    this.codexAnthropicBaseUrl = cleanString(opts?.codexAnthropicBaseUrl);
+    this.codexDefaultModel = cleanString(opts?.codexDefaultModel);
+    this.codexFastModel = cleanString(opts?.codexFastModel);
+    this.codexCodeModel = cleanString(opts?.codexCodeModel);
+    if (this.codexCompatEnabled && opts?.codexAdapterBaseUrl) {
+      this.codexHome = path.join(getDataDir(), "codex");
+      mkdirSync(this.codexHome, { recursive: true });
+      const env = this.buildIsolatedCodexEnv();
+      codexOptions.env = env;
+      codexOptions.apiKey = "anybot-local-codex-adapter";
+      codexOptions.baseUrl = opts.codexAdapterBaseUrl;
+      codexOptions.config = {
+        model_provider: "anybot",
+        model_providers: {
+          anybot: {
+            name: "AnyBot Codex Adapter",
+            base_url: opts.codexAdapterBaseUrl,
+            wire_api: "responses",
+          },
+        },
+      };
+    }
     this.bin = executable.bin;
     this.executablePath = executable.executablePath;
     this.codexPathOverride = executable.codexPathOverride;
@@ -503,6 +545,18 @@ export class CodexProvider implements IProvider {
   }
 
   listModels(): ProviderModel[] {
+    if (this.codexCompatEnabled) {
+      const describeMapping = (fallback: string, mapped?: string) =>
+        mapped ? `映射到 ${mapped}` : fallback;
+
+      return [
+        { id: "gpt-5.5", name: "GPT-5.5", description: describeMapping("默认通用模型", this.codexDefaultModel) },
+        { id: "gpt-5.4", name: "GPT-5.4", description: describeMapping("通用模型", this.codexDefaultModel) },
+        { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", description: describeMapping("轻量快速模型", this.codexFastModel || this.codexDefaultModel) },
+        { id: "gpt-5.3-codex", name: "GPT-5.3 Codex", description: describeMapping("编程模型", this.codexCodeModel || this.codexDefaultModel) },
+      ];
+    }
+
     return [
       { id: "gpt-5.5", name: "GPT-5.5", description: "最新通用模型" },
       { id: "gpt-5.4", name: "GPT-5.4", description: "通用模型" },
@@ -646,7 +700,7 @@ export class CodexProvider implements IProvider {
         throw new ProviderEmptyOutputError();
       }
 
-      tokenCountInfo = tokenCountInfo || (await readLatestCodexTokenCountInfo(providerSessionId));
+      tokenCountInfo = tokenCountInfo || (await readLatestCodexTokenCountInfo(providerSessionId, this.codexHome));
       const contextUsage = extractContextUsage(usage, tokenCountInfo);
 
       logger.info("provider.exec.success", {
@@ -728,6 +782,19 @@ export class CodexProvider implements IProvider {
       clearTimeout(timer);
       signal?.removeEventListener("abort", abortFromSignal);
     }
+  }
+
+  private buildIsolatedCodexEnv(): Record<string, string> {
+    const env: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value === undefined) continue;
+      env[key] = value;
+    }
+    if (this.codexHome) env.CODEX_HOME = this.codexHome;
+    delete env.OPENAI_API_KEY;
+    delete env.OPENAI_BASE_URL;
+    delete env.CODEX_API_KEY;
+    return env;
   }
 
   private async handleItemEvent(

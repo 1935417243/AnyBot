@@ -27,6 +27,12 @@ export interface ProviderRuntimeSettings {
   anthropicSonnetModel?: string;
   anthropicHaikuModel?: string;
   claudeCodeSubagentModel?: string;
+  codexCompatEnabled?: boolean;
+  codexAnthropicBaseUrl?: string;
+  codexApiKey?: string;
+  codexDefaultModel?: string;
+  codexFastModel?: string;
+  codexCodeModel?: string;
 }
 
 export interface AppSettings {
@@ -139,6 +145,14 @@ function normalizeProviderSettings(value: unknown): ProviderRuntimeSettings {
   if (typeof raw.claudeCodeSubagentModel === "string") {
     settings.claudeCodeSubagentModel = raw.claudeCodeSubagentModel;
   }
+  if (typeof raw.codexCompatEnabled === "boolean") {
+    settings.codexCompatEnabled = raw.codexCompatEnabled;
+  }
+  if (typeof raw.codexAnthropicBaseUrl === "string") settings.codexAnthropicBaseUrl = raw.codexAnthropicBaseUrl;
+  if (typeof raw.codexApiKey === "string") settings.codexApiKey = raw.codexApiKey;
+  if (typeof raw.codexDefaultModel === "string") settings.codexDefaultModel = raw.codexDefaultModel;
+  if (typeof raw.codexFastModel === "string") settings.codexFastModel = raw.codexFastModel;
+  if (typeof raw.codexCodeModel === "string") settings.codexCodeModel = raw.codexCodeModel;
   if (typeof raw.pathToClaudeCodeExecutable === "string") {
     settings.pathToClaudeCodeExecutable = raw.pathToClaudeCodeExecutable;
   }

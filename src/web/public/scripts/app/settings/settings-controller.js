@@ -780,6 +780,18 @@ export function createSettingsController(options) {
     }
 
     var PROVIDER_SETTINGS_DEFINITIONS = {
+        'codex': {
+            isExpanded: function (cfg) {
+                return cfg.codexCompatEnabled === true;
+            },
+            buildToggle: buildCodexCompatToggle,
+            bindToggle: bindCodexCompatToggle,
+            buildFields: buildCodexCompatFields,
+            collect: collectCodexCompatSettings,
+            validate: validateCodexSettings,
+            refreshProviderOnSave: true,
+            showModelSelect: true,
+        },
         'claude-code': {
             isExpanded: function (cfg) {
                 return cfg.anthropicCompatEnabled === true;
@@ -1191,6 +1203,48 @@ export function createSettingsController(options) {
         });
     }
 
+    function buildCodexCompatToggle(cfg) {
+        var checked = cfg.codexCompatEnabled === true;
+        return '<div class="settings-row compat-toggle-row"><span><strong>Responses 适配层</strong><small>开启后 Codex 仅在 AnyBot 内映射到兼容服务</small></span>' +
+            '<label class="settings-switch" aria-label="Responses 适配层">' +
+            '<input id="settings-provider-codex-compat-enabled" type="checkbox"' + (checked ? ' checked' : '') + '>' +
+            '<span class="settings-switch-slider"></span>' +
+            '</label></div>';
+    }
+
+    function bindCodexCompatToggle() {
+        var compatToggle = document.getElementById('settings-provider-codex-compat-enabled');
+        if (compatToggle) compatToggle.addEventListener('change', handleCodexCompatToggle);
+    }
+
+    async function handleCodexCompatToggle(e) {
+        var cfg = getProviderSettings('codex');
+        var enabled = e.currentTarget.checked === true;
+        cfg.codexCompatEnabled = enabled;
+        if (enabled) {
+            renderSettingsProviderDetails();
+            return;
+        }
+        await persistAppSettingsPatch({ providers: { 'codex': Object.assign({}, cfg, { codexCompatEnabled: false }) } }, '已关闭');
+        if (providerData && providerData.current === 'codex') {
+            await switchProviderTo('codex', { force: true, closeOnSuccess: false });
+        }
+        renderSettingsProviderDetails();
+    }
+
+    function buildCodexCompatFields(cfg) {
+        return '<div class="settings-row"><span><strong>Anthropic Base URL</strong><small>DeepSeek 等 Anthropic 兼容服务地址</small></span>' +
+            buildProviderBaseUrlInput(cfg.codexAnthropicBaseUrl || '', 'Anthropic Base URL') + '</div>' +
+            '<div class="settings-row"><span><strong>API Key</strong><small>访问兼容服务所需的密钥</small></span>' +
+            buildProviderSecretInput('settings-provider-api-key', cfg.codexApiKey || '', 'API Key') + '</div>' +
+            '<div class="settings-row"><span><strong>默认模型</strong><small>用于 GPT-5.5 / GPT-5.4</small></span>' +
+            buildProviderModelInput('settings-provider-codex-default-model', cfg.codexDefaultModel || '', '默认模型') + '</div>' +
+            '<div class="settings-row"><span><strong>快速模型</strong><small>用于 GPT-5.4 Mini</small></span>' +
+            buildProviderModelInput('settings-provider-codex-fast-model', cfg.codexFastModel || '', '快速模型') + '</div>' +
+            '<div class="settings-row"><span><strong>Code 模型</strong><small>用于 GPT-5.3 Codex</small></span>' +
+            buildProviderModelInput('settings-provider-codex-code-model', cfg.codexCodeModel || '', 'Code 模型') + '</div>';
+    }
+
     function buildClaudeCodeCompatToggle(cfg) {
         var checked = cfg.anthropicCompatEnabled === true;
         return '<div class="settings-row compat-toggle-row"><span><strong>Anthropic 兼容接口</strong><small>开启后使用下方 URL、密钥和模型映射</small></span>' +
@@ -1280,6 +1334,24 @@ export function createSettingsController(options) {
         return next;
     }
 
+    function collectCodexCompatSettings(current) {
+        var next = Object.assign({}, current, { codexCompatEnabled: true });
+        var apiKeyInput = document.getElementById('settings-provider-api-key');
+        var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
+        var defaultModelInput = document.getElementById('settings-provider-codex-default-model');
+        var fastModelInput = document.getElementById('settings-provider-codex-fast-model');
+        var codeModelInput = document.getElementById('settings-provider-codex-code-model');
+        if (apiKeyInput) next.codexApiKey = apiKeyInput.value;
+        if (baseUrlInput) next.codexAnthropicBaseUrl = baseUrlInput.value.trim();
+        if (defaultModelInput) next.codexDefaultModel = defaultModelInput.value.trim();
+        if (fastModelInput) next.codexFastModel = fastModelInput.value.trim();
+        if (codeModelInput) next.codexCodeModel = codeModelInput.value.trim();
+        Object.keys(next).forEach(function (key) {
+            if (next[key] === '') delete next[key];
+        });
+        return next;
+    }
+
     function validateClaudeCodeSettings() {
         var fields = [
             ['Anthropic Base URL', document.getElementById('settings-provider-anthropic-base-url')],
@@ -1296,6 +1368,26 @@ export function createSettingsController(options) {
             if (!input) return false;
             var value = input.value.trim();
             return !value;
+        }).map(function (entry) {
+            return entry[0];
+        });
+        if (missing.length > 0) {
+            showSettingsStatus('请先填写：' + missing.join('、'), 'error');
+            return false;
+        }
+        return true;
+    }
+
+    function validateCodexSettings() {
+        var fields = [
+            ['Anthropic Base URL', document.getElementById('settings-provider-anthropic-base-url')],
+            ['API Key', document.getElementById('settings-provider-api-key')],
+            ['默认模型', document.getElementById('settings-provider-codex-default-model')],
+        ];
+        var missing = fields.filter(function (entry) {
+            var input = entry[1];
+            if (!input) return false;
+            return !input.value.trim();
         }).map(function (entry) {
             return entry[0];
         });
