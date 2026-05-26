@@ -6,8 +6,10 @@
 | Windows | `AnyBot-Setup-*.exe` |
 
 ### 本次更新
-- 优化 Web 会话输入拼接：普通文本消息不再自动包裹为“任务目标”，避免闲聊或简短问句被误导成任务。
-- 选择项目或技能时，将正文提示从“任务目标”调整为更中性的“用户消息”。
+- Anthropic Base URL 下拉新增 Kimi Coding，固定地址 `https://api.kimi.com/coding`，模型固定为 `kimi-for-coding`。
+- Anthropic Base URL 下拉新增 MiniMax，支持通过 `https://api.minimaxi.com/anthropic/v1/models` 拉取模型列表并缓存 30 分钟。
+- DeepSeek、Kimi、MiniMax、VibeAPI 等下拉项会记住上次保存的 API Key 和模型配置，切换时自动回填。
+- Provider API Key 输入框新增显示/隐藏密钥按钮，便于核对已填写的密钥。
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
