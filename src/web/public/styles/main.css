@@ -1630,6 +1630,33 @@
             min-width: 0;
         }
 
+        .provider-secret-input-control .settings-inline-input {
+            padding-right: 42px;
+        }
+
+        .provider-secret-toggle {
+            position: absolute;
+            top: 50%;
+            right: 4px;
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translateY(-50%);
+        }
+
+        .provider-secret-toggle:hover,
+        .provider-secret-toggle[aria-pressed="true"] {
+            background: var(--sidebar-hover);
+            color: var(--text);
+        }
+
         .provider-model-suggest-menu {
             position: absolute;
             left: 0;

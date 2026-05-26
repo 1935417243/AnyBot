@@ -12,6 +12,25 @@ export type AppLanguage = "auto" | "zh" | "en";
 export type AppLogLevel = "debug" | "info" | "warn" | "error";
 export type AppTheme = "light" | "dark" | "system";
 
+export interface AnthropicBaseUrlPreset {
+  apiKey?: string;
+  anthropicBaseUrl?: string;
+  anthropicAutoModel?: string;
+  defaultModel?: string;
+  anthropicOpusModel?: string;
+  anthropicSonnetModel?: string;
+  anthropicHaikuModel?: string;
+  claudeCodeSubagentModel?: string;
+}
+
+export interface CodexBaseUrlPreset {
+  codexAnthropicBaseUrl?: string;
+  codexApiKey?: string;
+  codexDefaultModel?: string;
+  codexFastModel?: string;
+  codexCodeModel?: string;
+}
+
 export interface ProviderRuntimeSettings {
   bin?: string;
   maxTurns?: number;
@@ -28,12 +47,14 @@ export interface ProviderRuntimeSettings {
   anthropicSonnetModel?: string;
   anthropicHaikuModel?: string;
   claudeCodeSubagentModel?: string;
+  anthropicBaseUrlPresets?: Record<string, AnthropicBaseUrlPreset>;
   codexCompatEnabled?: boolean;
   codexAnthropicBaseUrl?: string;
   codexApiKey?: string;
   codexDefaultModel?: string;
   codexFastModel?: string;
   codexCodeModel?: string;
+  codexBaseUrlPresets?: Record<string, CodexBaseUrlPreset>;
 }
 
 export interface AppSettings {
@@ -173,6 +194,28 @@ function normalizeLogRetentionDays(value: unknown): number {
   return DEFAULT_SETTINGS.privacy.logRetentionDays;
 }
 
+function addStringValue(target: Record<string, string>, raw: Record<string, unknown>, key: string): void {
+  if (typeof raw[key] === "string") target[key] = raw[key];
+}
+
+function normalizeStringPresetMap(
+  value: unknown,
+  allowedKeys: string[],
+): Record<string, Record<string, string>> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const presets: Record<string, Record<string, string>> = {};
+  for (const [presetKey, presetValue] of Object.entries(value)) {
+    if (!presetValue || typeof presetValue !== "object" || Array.isArray(presetValue)) continue;
+    const rawPreset = presetValue as Record<string, unknown>;
+    const preset: Record<string, string> = {};
+    for (const allowedKey of allowedKeys) {
+      addStringValue(preset, rawPreset, allowedKey);
+    }
+    if (Object.keys(preset).length > 0) presets[presetKey] = preset;
+  }
+  return Object.keys(presets).length > 0 ? presets : undefined;
+}
+
 function normalizeProviderSettings(value: unknown): ProviderRuntimeSettings {
   if (!value || typeof value !== "object") return {};
   const raw = value as Record<string, unknown>;
@@ -202,6 +245,19 @@ function normalizeProviderSettings(value: unknown): ProviderRuntimeSettings {
   if (typeof raw.claudeCodeSubagentModel === "string") {
     settings.claudeCodeSubagentModel = raw.claudeCodeSubagentModel;
   }
+  const anthropicBaseUrlPresets = normalizeStringPresetMap(raw.anthropicBaseUrlPresets, [
+    "apiKey",
+    "anthropicBaseUrl",
+    "anthropicAutoModel",
+    "defaultModel",
+    "anthropicOpusModel",
+    "anthropicSonnetModel",
+    "anthropicHaikuModel",
+    "claudeCodeSubagentModel",
+  ]);
+  if (anthropicBaseUrlPresets) {
+    settings.anthropicBaseUrlPresets = anthropicBaseUrlPresets;
+  }
   if (typeof raw.codexCompatEnabled === "boolean") {
     settings.codexCompatEnabled = raw.codexCompatEnabled;
   }
@@ -210,6 +266,16 @@ function normalizeProviderSettings(value: unknown): ProviderRuntimeSettings {
   if (typeof raw.codexDefaultModel === "string") settings.codexDefaultModel = raw.codexDefaultModel;
   if (typeof raw.codexFastModel === "string") settings.codexFastModel = raw.codexFastModel;
   if (typeof raw.codexCodeModel === "string") settings.codexCodeModel = raw.codexCodeModel;
+  const codexBaseUrlPresets = normalizeStringPresetMap(raw.codexBaseUrlPresets, [
+    "codexAnthropicBaseUrl",
+    "codexApiKey",
+    "codexDefaultModel",
+    "codexFastModel",
+    "codexCodeModel",
+  ]);
+  if (codexBaseUrlPresets) {
+    settings.codexBaseUrlPresets = codexBaseUrlPresets;
+  }
   if (typeof raw.pathToClaudeCodeExecutable === "string") {
     settings.pathToClaudeCodeExecutable = raw.pathToClaudeCodeExecutable;
   }

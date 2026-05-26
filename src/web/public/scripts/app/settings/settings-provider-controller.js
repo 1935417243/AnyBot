@@ -199,6 +199,18 @@ export function createSettingsProviderController(options) {
         return String(baseUrl || '').trim().replace(/\/+$/, '').toLowerCase();
     }
 
+    function getProviderBaseUrlSuggestion(baseUrl) {
+        var normalized = normalizeProviderBaseUrl(baseUrl);
+        return PROVIDER_BASE_URL_SUGGESTIONS.find(function (suggestion) {
+            return normalizeProviderBaseUrl(suggestion.value) === normalized;
+        }) || null;
+    }
+
+    function getProviderBaseUrlPresetKey(baseUrl) {
+        var suggestion = getProviderBaseUrlSuggestion(baseUrl);
+        return suggestion ? suggestion.id : '';
+    }
+
     function isKimiCodingBaseUrl(baseUrl) {
         return normalizeProviderBaseUrl(baseUrl) === KIMI_CODING_BASE_URL;
     }
@@ -247,6 +259,56 @@ export function createSettingsProviderController(options) {
         });
     }
 
+    function setProviderInputValue(id, value) {
+        var input = document.getElementById(id);
+        if (!input) return;
+        input.value = value || '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function applyClaudeCodeBaseUrlPreset(preset) {
+        setProviderInputValue('settings-provider-api-key', preset && preset.apiKey);
+        setProviderInputValue('settings-provider-anthropic-auto-model', preset && (preset.anthropicAutoModel || preset.defaultModel));
+        setProviderInputValue('settings-provider-anthropic-opus-model', preset && preset.anthropicOpusModel);
+        setProviderInputValue('settings-provider-anthropic-sonnet-model', preset && preset.anthropicSonnetModel);
+        setProviderInputValue('settings-provider-anthropic-haiku-model', preset && preset.anthropicHaikuModel);
+        setProviderInputValue('settings-provider-subagent-model', preset && preset.claudeCodeSubagentModel);
+    }
+
+    function applyCodexBaseUrlPreset(preset) {
+        setProviderInputValue('settings-provider-api-key', preset && preset.codexApiKey);
+        setProviderInputValue('settings-provider-codex-default-model', preset && preset.codexDefaultModel);
+        setProviderInputValue('settings-provider-codex-fast-model', preset && preset.codexFastModel);
+        setProviderInputValue('settings-provider-codex-code-model', preset && preset.codexCodeModel);
+    }
+
+    function applySavedProviderBaseUrlSettings(baseUrl) {
+        var presetKey = getProviderBaseUrlPresetKey(baseUrl);
+        var provider = getSelectedSettingsProvider();
+        if (!presetKey || !provider) {
+            applyFixedProviderModel(baseUrl);
+            return;
+        }
+        var cfg = getProviderSettings(provider.type);
+        if (provider.type === 'claude-code') {
+            var anthropicPresets = cfg.anthropicBaseUrlPresets || {};
+            applyClaudeCodeBaseUrlPreset(anthropicPresets[presetKey] || null);
+        } else if (provider.type === 'codex') {
+            var codexPresets = cfg.codexBaseUrlPresets || {};
+            applyCodexBaseUrlPreset(codexPresets[presetKey] || null);
+        }
+        applyFixedProviderModel(baseUrl);
+    }
+
+    function cleanProviderPreset(preset) {
+        var clean = {};
+        Object.keys(preset).forEach(function (key) {
+            if (preset[key] !== '') clean[key] = preset[key];
+        });
+        return clean;
+    }
+
     function buildProviderModelInput(id, value, label) {
         return '<div class="provider-settings-input-control provider-model-input-control">' +
             '<input class="settings-inline-input provider-model-input" id="' + escapeAttr(id) + '"' +
@@ -268,11 +330,32 @@ export function createSettingsProviderController(options) {
     }
 
     function buildProviderSecretInput(id, value, label) {
-        return '<div class="provider-settings-input-control">' +
+        return '<div class="provider-settings-input-control provider-secret-input-control">' +
             '<input class="settings-inline-input" id="' + escapeAttr(id) + '" type="password"' +
             ' aria-label="' + escapeAttr(label || '') + '"' +
             ' value="' + escapeAttr(value || '') + '" autocomplete="off" spellcheck="false">' +
+            '<button class="provider-secret-toggle" type="button" aria-label="显示密钥" aria-pressed="false"' +
+            ' data-provider-secret-toggle="' + escapeAttr(id) + '">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+            '<path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>' +
+            '</svg>' +
+            '</button>' +
             '</div>';
+    }
+
+    function bindProviderSecretToggles() {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-provider-secret-toggle]'), function (button) {
+            button.addEventListener('click', function () {
+                var input = document.getElementById(button.dataset.providerSecretToggle || '');
+                if (!input) return;
+                var shouldShow = input.type === 'password';
+                input.type = shouldShow ? 'text' : 'password';
+                button.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+                button.setAttribute('aria-label', shouldShow ? '隐藏密钥' : '显示密钥');
+                button.title = shouldShow ? '隐藏密钥' : '显示密钥';
+            });
+        });
     }
 
     function closeProviderModelSuggestionMenus() {
@@ -486,6 +569,9 @@ export function createSettingsProviderController(options) {
                 var openInput = document.querySelector('.provider-model-input-control.open [data-provider-model-suggestion-input="true"]');
                 if (openInput) showProviderModelSuggestionMenu(openInput);
             });
+            baseUrlInput.addEventListener('change', function () {
+                applySavedProviderBaseUrlSettings(baseUrlInput.value);
+            });
             baseUrlInput.setAttribute('aria-haspopup', 'listbox');
             baseUrlInput.setAttribute('aria-expanded', 'false');
             baseUrlInput.addEventListener('focus', function () {
@@ -554,7 +640,10 @@ export function createSettingsProviderController(options) {
         if (settingsProviderExtraFields) {
             settingsProviderExtraFields.style.display = showProviderFields ? '' : 'none';
             settingsProviderExtraFields.innerHTML = showProviderFields ? definition.buildFields(cfg) : '';
-            if (showProviderFields) bindProviderModelSuggestionInputs();
+            if (showProviderFields) {
+                bindProviderModelSuggestionInputs();
+                bindProviderSecretToggles();
+            }
         }
         if (showModelSelect) fetchSettingsModelConfig(provider.type);
     }
@@ -722,6 +811,7 @@ export function createSettingsProviderController(options) {
         var subagentModelInput = document.getElementById('settings-provider-subagent-model');
         var anthropicBaseUrl = anthropicBaseUrlInput ? anthropicBaseUrlInput.value.trim() : '';
         var fixedModel = getFixedProviderModel(anthropicBaseUrl);
+        var presetKey = getProviderBaseUrlPresetKey(anthropicBaseUrl);
         if (binInput) {
             next.pathToClaudeCodeExecutable = binInput.value.trim();
             delete next.bin;
@@ -736,6 +826,19 @@ export function createSettingsProviderController(options) {
         if (anthropicSonnetModelInput) next.anthropicSonnetModel = fixedModel || anthropicSonnetModelInput.value.trim();
         if (anthropicHaikuModelInput) next.anthropicHaikuModel = fixedModel || anthropicHaikuModelInput.value.trim();
         if (subagentModelInput) next.claudeCodeSubagentModel = fixedModel || subagentModelInput.value.trim();
+        if (presetKey) {
+            next.anthropicBaseUrlPresets = Object.assign({}, current.anthropicBaseUrlPresets || {});
+            next.anthropicBaseUrlPresets[presetKey] = cleanProviderPreset({
+                apiKey: next.apiKey || '',
+                anthropicBaseUrl: next.anthropicBaseUrl || '',
+                anthropicAutoModel: next.anthropicAutoModel || '',
+                defaultModel: next.defaultModel || '',
+                anthropicOpusModel: next.anthropicOpusModel || '',
+                anthropicSonnetModel: next.anthropicSonnetModel || '',
+                anthropicHaikuModel: next.anthropicHaikuModel || '',
+                claudeCodeSubagentModel: next.claudeCodeSubagentModel || '',
+            });
+        }
         Object.keys(next).forEach(function (key) {
             if (next[key] === '') delete next[key];
         });
@@ -751,11 +854,22 @@ export function createSettingsProviderController(options) {
         var codeModelInput = document.getElementById('settings-provider-codex-code-model');
         var baseUrl = baseUrlInput ? baseUrlInput.value.trim() : '';
         var fixedModel = getFixedProviderModel(baseUrl);
+        var presetKey = getProviderBaseUrlPresetKey(baseUrl);
         if (apiKeyInput) next.codexApiKey = apiKeyInput.value;
         if (baseUrlInput) next.codexAnthropicBaseUrl = baseUrl;
         if (defaultModelInput) next.codexDefaultModel = fixedModel || defaultModelInput.value.trim();
         if (fastModelInput) next.codexFastModel = fixedModel || fastModelInput.value.trim();
         if (codeModelInput) next.codexCodeModel = fixedModel || codeModelInput.value.trim();
+        if (presetKey) {
+            next.codexBaseUrlPresets = Object.assign({}, current.codexBaseUrlPresets || {});
+            next.codexBaseUrlPresets[presetKey] = cleanProviderPreset({
+                codexAnthropicBaseUrl: next.codexAnthropicBaseUrl || '',
+                codexApiKey: next.codexApiKey || '',
+                codexDefaultModel: next.codexDefaultModel || '',
+                codexFastModel: next.codexFastModel || '',
+                codexCodeModel: next.codexCodeModel || '',
+            });
+        }
         Object.keys(next).forEach(function (key) {
             if (next[key] === '') delete next[key];
         });
