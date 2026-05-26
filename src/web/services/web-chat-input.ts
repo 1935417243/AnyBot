@@ -95,7 +95,7 @@ export function prepareWebChatInput(
   }
 
   if (userText) {
-    promptParts.push(`任务目标：\n${userText}`);
+    promptParts.push(promptParts.length > 0 ? `用户消息：\n${userText}` : userText);
   }
 
   if (promptParts.length > 0) {
