@@ -26,6 +26,8 @@ export function createSettingsProviderController(options) {
     let remoteProviderModelFetchSeq = 0;
 
     const DEFAULT_PROVIDER_TIMEOUT_MINUTES = 15;
+    const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
+    const KIMI_CODING_MODEL = 'kimi-for-coding';
     const PROVIDER_BASE_URL_SUGGESTIONS = [
         {
             id: 'deepseek',
@@ -33,12 +35,24 @@ export function createSettingsProviderController(options) {
             value: 'https://api.deepseek.com/anthropic',
         },
         {
+            id: 'kimi',
+            label: 'Kimi',
+            value: KIMI_CODING_BASE_URL,
+        },
+        {
             id: 'vibeapi',
             label: 'VibeAPI',
             value: 'https://vibeapi.cc',
         },
     ];
-    const PROVIDER_MODEL_SUGGESTION_STRATEGIES = [];
+    const PROVIDER_MODEL_SUGGESTION_STRATEGIES = [
+        {
+            label: 'Kimi',
+            models: [KIMI_CODING_MODEL],
+            fixedModel: KIMI_CODING_MODEL,
+            matchUrl: isKimiCodingBaseUrl,
+        },
+    ];
 
     const PROVIDER_SETTINGS_DEFINITIONS = {
         'codex': {
@@ -181,10 +195,23 @@ export function createSettingsProviderController(options) {
         return '';
     }
 
+    function normalizeProviderBaseUrl(baseUrl) {
+        return String(baseUrl || '').trim().replace(/\/+$/, '').toLowerCase();
+    }
+
+    function isKimiCodingBaseUrl(baseUrl) {
+        return normalizeProviderBaseUrl(baseUrl) === KIMI_CODING_BASE_URL;
+    }
+
     function getProviderModelSuggestionStrategy(baseUrl) {
         return PROVIDER_MODEL_SUGGESTION_STRATEGIES.find(function (strategy) {
             return strategy.matchUrl(baseUrl);
         }) || null;
+    }
+
+    function getFixedProviderModel(baseUrl) {
+        var strategy = getProviderModelSuggestionStrategy(baseUrl);
+        return strategy && strategy.fixedModel ? strategy.fixedModel : '';
     }
 
     function getProviderModelSuggestions(baseUrl) {
@@ -205,6 +232,19 @@ export function createSettingsProviderController(options) {
             });
         }
         return suggestions;
+    }
+
+    function applyFixedProviderModel(baseUrl) {
+        var fixedModel = getFixedProviderModel(baseUrl);
+        Array.prototype.forEach.call(document.querySelectorAll('[data-provider-model-suggestion-input="true"]'), function (input) {
+            input.readOnly = Boolean(fixedModel);
+            if (!fixedModel) return;
+            if (input.value !== fixedModel) {
+                input.value = fixedModel;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
     }
 
     function buildProviderModelInput(id, value, label) {
@@ -436,6 +476,7 @@ export function createSettingsProviderController(options) {
         var modelInputs = Array.prototype.slice.call(document.querySelectorAll('[data-provider-model-suggestion-input="true"]'));
         if (baseUrlInput) {
             baseUrlInput.addEventListener('input', function () {
+                applyFixedProviderModel(baseUrlInput.value);
                 if (!getRemoteProviderModelSource(baseUrlInput.value)) {
                     clearRemoteProviderModelSuggestions();
                 } else {
@@ -455,6 +496,7 @@ export function createSettingsProviderController(options) {
                 showProviderBaseUrlSuggestionMenu(baseUrlInput);
             });
             baseUrlInput.addEventListener('keydown', handleProviderModelSuggestionInputKeydown);
+            applyFixedProviderModel(baseUrlInput.value);
         }
         if (apiKeyInput) {
             apiKeyInput.addEventListener('input', function () {
@@ -678,20 +720,22 @@ export function createSettingsProviderController(options) {
         var anthropicSonnetModelInput = document.getElementById('settings-provider-anthropic-sonnet-model');
         var anthropicHaikuModelInput = document.getElementById('settings-provider-anthropic-haiku-model');
         var subagentModelInput = document.getElementById('settings-provider-subagent-model');
+        var anthropicBaseUrl = anthropicBaseUrlInput ? anthropicBaseUrlInput.value.trim() : '';
+        var fixedModel = getFixedProviderModel(anthropicBaseUrl);
         if (binInput) {
             next.pathToClaudeCodeExecutable = binInput.value.trim();
             delete next.bin;
         }
         if (apiKeyInput) next.apiKey = apiKeyInput.value;
-        if (anthropicBaseUrlInput) next.anthropicBaseUrl = anthropicBaseUrlInput.value.trim();
+        if (anthropicBaseUrlInput) next.anthropicBaseUrl = anthropicBaseUrl;
         if (anthropicAutoModelInput) {
-            next.anthropicAutoModel = anthropicAutoModelInput.value.trim();
+            next.anthropicAutoModel = fixedModel || anthropicAutoModelInput.value.trim();
             next.defaultModel = next.anthropicAutoModel;
         }
-        if (anthropicOpusModelInput) next.anthropicOpusModel = anthropicOpusModelInput.value.trim();
-        if (anthropicSonnetModelInput) next.anthropicSonnetModel = anthropicSonnetModelInput.value.trim();
-        if (anthropicHaikuModelInput) next.anthropicHaikuModel = anthropicHaikuModelInput.value.trim();
-        if (subagentModelInput) next.claudeCodeSubagentModel = subagentModelInput.value.trim();
+        if (anthropicOpusModelInput) next.anthropicOpusModel = fixedModel || anthropicOpusModelInput.value.trim();
+        if (anthropicSonnetModelInput) next.anthropicSonnetModel = fixedModel || anthropicSonnetModelInput.value.trim();
+        if (anthropicHaikuModelInput) next.anthropicHaikuModel = fixedModel || anthropicHaikuModelInput.value.trim();
+        if (subagentModelInput) next.claudeCodeSubagentModel = fixedModel || subagentModelInput.value.trim();
         Object.keys(next).forEach(function (key) {
             if (next[key] === '') delete next[key];
         });
@@ -705,11 +749,13 @@ export function createSettingsProviderController(options) {
         var defaultModelInput = document.getElementById('settings-provider-codex-default-model');
         var fastModelInput = document.getElementById('settings-provider-codex-fast-model');
         var codeModelInput = document.getElementById('settings-provider-codex-code-model');
+        var baseUrl = baseUrlInput ? baseUrlInput.value.trim() : '';
+        var fixedModel = getFixedProviderModel(baseUrl);
         if (apiKeyInput) next.codexApiKey = apiKeyInput.value;
-        if (baseUrlInput) next.codexAnthropicBaseUrl = baseUrlInput.value.trim();
-        if (defaultModelInput) next.codexDefaultModel = defaultModelInput.value.trim();
-        if (fastModelInput) next.codexFastModel = fastModelInput.value.trim();
-        if (codeModelInput) next.codexCodeModel = codeModelInput.value.trim();
+        if (baseUrlInput) next.codexAnthropicBaseUrl = baseUrl;
+        if (defaultModelInput) next.codexDefaultModel = fixedModel || defaultModelInput.value.trim();
+        if (fastModelInput) next.codexFastModel = fixedModel || fastModelInput.value.trim();
+        if (codeModelInput) next.codexCodeModel = fixedModel || codeModelInput.value.trim();
         Object.keys(next).forEach(function (key) {
             if (next[key] === '') delete next[key];
         });
