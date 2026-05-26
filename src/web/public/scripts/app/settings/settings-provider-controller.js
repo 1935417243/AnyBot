@@ -40,6 +40,11 @@ export function createSettingsProviderController(options) {
             value: KIMI_CODING_BASE_URL,
         },
         {
+            id: 'minimax',
+            label: 'MiniMax',
+            value: 'https://api.minimaxi.com/anthropic',
+        },
+        {
             id: 'vibeapi',
             label: 'VibeAPI',
             value: 'https://vibeapi.cc',
@@ -192,6 +197,7 @@ export function createSettingsProviderController(options) {
         var lower = String(baseUrl || '').toLowerCase();
         if (lower.indexOf('vibeapi') !== -1) return 'VibeAPI';
         if (lower.indexOf('api.deepseek.com') !== -1) return 'DeepSeek';
+        if (lower.indexOf('api.minimaxi.com') !== -1) return 'MiniMax';
         return '';
     }
 

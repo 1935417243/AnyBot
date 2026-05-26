@@ -34,7 +34,10 @@ function buildProviderModelsRequest(baseUrl: string): { modelsUrl: string; provi
   if (lower.includes("api.deepseek.com")) {
     return { modelsUrl: new URL("/models", parsed.origin).toString(), provider: "DeepSeek" };
   }
-  throw new Error("仅支持 VibeAPI 或 DeepSeek Base URL 自动获取模型");
+  if (lower.includes("api.minimaxi.com")) {
+    return { modelsUrl: new URL("/anthropic/v1/models", parsed.origin).toString(), provider: "MiniMax" };
+  }
+  throw new Error("仅支持 VibeAPI、DeepSeek 或 MiniMax Base URL 自动获取模型");
 }
 
 function getProviderModelCacheKey(modelsUrl: string, apiKey: string): string {
@@ -70,7 +73,11 @@ export async function fetchProviderModels(baseUrl: string, apiKey: string): Prom
     modelsUrl = request.modelsUrl;
     provider = request.provider;
   } catch (error) {
-    const msg = error instanceof Error && (error.message.includes("VibeAPI") || error.message.includes("DeepSeek"))
+    const msg = error instanceof Error && (
+      error.message.includes("VibeAPI") ||
+      error.message.includes("DeepSeek") ||
+      error.message.includes("MiniMax")
+    )
       ? error.message
       : "Base URL 无效";
     throw new ProviderModelFetchError(msg, 400);
