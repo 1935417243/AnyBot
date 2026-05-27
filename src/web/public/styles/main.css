@@ -3120,7 +3120,7 @@
         }
 
         #input-area {
-            padding: 12px 24px 20px;
+            padding: 12px 24px;
             position: relative;
             z-index: 1;
         }
@@ -3473,23 +3473,6 @@
         #send-btn.is-stop:disabled {
             background: #b91c1c;
             opacity: 0.72;
-        }
-
-        .input-hint {
-            text-align: center;
-            font-size: 11px;
-            color: var(--text-dim);
-            margin-top: 10px;
-            letter-spacing: 0.03em;
-        }
-
-        .input-hint kbd {
-            font-family: 'JetBrains Mono', monospace;
-            background: var(--sidebar);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 1px 5px;
-            font-size: 10px;
         }
 
         .error-toast {

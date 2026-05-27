@@ -1,8 +1,9 @@
 const DEFAULT_PLACEHOLDERS = [
-    '发送消息... 输入 / 使用技能或项目',
+    'Enter 发送 · Shift+Enter 换行',
+    '输入 @ 引用项目文件',
+    '输入 / 使用技能或项目',
     '按 ↑ / ↓ 切换历史消息',
     '可粘贴图片或拖拽文件',
-    'Enter 发送，Shift+Enter 换行',
 ];
 
 const DEFAULT_PLACEHOLDER_INTERVAL_MS = 10000;

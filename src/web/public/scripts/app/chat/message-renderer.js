@@ -66,7 +66,7 @@ export function createMessageRenderer(config) {
             '<div id="empty-state">' +
             '<div class="empty-icon">Ab</div>' +
             '<div class="empty-title">AnyBot 已就绪</div>' +
-            '<div class="empty-sub">发送消息，开始你的对话</div>' +
+            '<div class="empty-sub">输入你的需求，我来帮你处理</div>' +
             '</div>';
     }
 
