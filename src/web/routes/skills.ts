@@ -5,8 +5,8 @@ import { normalizeProviderType } from "../../providers/index.js";
 import { deleteSkill, listSkillMentions, listSkills, openSkillsFolder, toggleSkill } from "../skills.js";
 import { listWebSlashItems } from "../slash-items.js";
 import {
-  downloadOfficialClaudeSkills,
-  listOfficialClaudeSkills,
+  downloadOfficialSkills,
+  listOfficialSkills,
   type OfficialSkillDownloadEvent,
 } from "../services/official-skills.js";
 
@@ -46,13 +46,13 @@ export function createSkillsRouter(): Router {
 
   router.get("/skills/official", async (req: Request, res: Response) => {
     const provider = typeof req.query.provider === "string" ? normalizeProviderType(req.query.provider) : "";
-    if (provider !== "claude-code") {
-      res.status(400).json({ error: "官方技能包仅支持 Claude Code 技能目录" });
+    if (provider !== "claude-code" && provider !== "codex") {
+      res.status(400).json({ error: "当前 Provider 不支持官方技能包" });
       return;
     }
 
     try {
-      res.json(await listOfficialClaudeSkills());
+      res.json(await listOfficialSkills(provider));
     } catch (error) {
       const message = error instanceof Error ? error.message : "读取官方技能列表失败";
       logger.warn("official_skills.list_failed", { error: message });
@@ -106,8 +106,8 @@ export function createSkillsRouter(): Router {
 
   router.post("/skills/download-official", async (req: Request, res: Response) => {
     const provider = typeof req.body?.provider === "string" ? normalizeProviderType(req.body.provider) : "";
-    if (provider !== "claude-code") {
-      res.status(400).json({ error: "官方技能包仅支持 Claude Code 技能目录" });
+    if (provider !== "claude-code" && provider !== "codex") {
+      res.status(400).json({ error: "当前 Provider 不支持官方技能包" });
       return;
     }
     const skills = Array.isArray(req.body?.skills)
@@ -124,7 +124,7 @@ export function createSkillsRouter(): Router {
     res.flushHeaders?.();
 
     try {
-      const result = await downloadOfficialClaudeSkills((event) => writeDownloadProgress(res, event), {
+      const result = await downloadOfficialSkills(provider, (event) => writeDownloadProgress(res, event), {
         skillNames: skills,
         replaceExisting: true,
       });

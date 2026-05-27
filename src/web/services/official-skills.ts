@@ -4,14 +4,44 @@ import os from "node:os";
 import path from "node:path";
 import { fetch as undiciFetch } from "undici";
 import { logger } from "../../logger.js";
-import { getClaudeSkillsDir } from "../skills.js";
+import { getClaudeSkillsDir, getCodexSkillsDir } from "../skills.js";
 
-const GITHUB_TREE_API_URL = "https://api.github.com/repos/anthropics/skills/git/trees/main?recursive=1";
-const GITHUB_RAW_BASE_URL = "https://raw.githubusercontent.com/anthropics/skills/main";
-const GITHUB_SKILL_TREE_BASE_URL = "https://github.com/anthropics/skills/tree/main/skills";
-const OFFICIAL_SKILLS_PREFIX = "skills/";
 const DOWNLOAD_TIMEOUT_MS = 30000;
 const SAFE_SKILL_DIR_RE = /^[A-Za-z0-9._-]+$/;
+
+interface OfficialSkillSource {
+  provider: "claude-code" | "codex";
+  displayName: string;
+  treeApiUrl: string;
+  rawBaseUrl: string;
+  skillTreeBaseUrl: string;
+  skillsPrefix: string;
+  folderNameIndex: number;
+  targetDir: () => string;
+}
+
+const OFFICIAL_SKILL_SOURCES: Record<string, OfficialSkillSource> = {
+  "claude-code": {
+    provider: "claude-code",
+    displayName: "Anthropic 官方技能包",
+    treeApiUrl: "https://api.github.com/repos/anthropics/skills/git/trees/main?recursive=1",
+    rawBaseUrl: "https://raw.githubusercontent.com/anthropics/skills/main",
+    skillTreeBaseUrl: "https://github.com/anthropics/skills/tree/main/skills",
+    skillsPrefix: "skills/",
+    folderNameIndex: 1,
+    targetDir: getClaudeSkillsDir,
+  },
+  codex: {
+    provider: "codex",
+    displayName: "OpenAI 官方技能包",
+    treeApiUrl: "https://api.github.com/repos/openai/skills/git/trees/main?recursive=1",
+    rawBaseUrl: "https://raw.githubusercontent.com/openai/skills/main",
+    skillTreeBaseUrl: "https://github.com/openai/skills/tree/main/skills/.curated",
+    skillsPrefix: "skills/.curated/",
+    folderNameIndex: 2,
+    targetDir: getCodexSkillsDir,
+  },
+};
 
 export interface OfficialSkillDownloadFailedItem {
   name: string;
@@ -40,6 +70,7 @@ export interface OfficialSkillListItem {
 }
 
 export interface OfficialSkillListResult {
+  sourceName: string;
   targetDir: string;
   skills: OfficialSkillListItem[];
 }
@@ -69,10 +100,17 @@ interface OfficialSkillDownloadState {
 }
 
 type ProgressReporter = (event: OfficialSkillDownloadEvent) => void;
+type FileDownloadProgressReporter = (file: RemoteSkillFile, fraction: number) => void;
 
-interface DownloadOfficialClaudeSkillsOptions {
+interface DownloadOfficialSkillsOptions {
   skillNames?: string[];
   replaceExisting?: boolean;
+}
+
+function getOfficialSkillSource(providerType: string): OfficialSkillSource {
+  const source = OFFICIAL_SKILL_SOURCES[providerType];
+  if (!source) throw new Error("当前 Provider 不支持官方技能包");
+  return source;
 }
 
 function makeUserAgent(): string {
@@ -95,9 +133,9 @@ function emitProgress(state: OfficialSkillDownloadState, report: ProgressReporte
   });
 }
 
-function updatePercent(state: OfficialSkillDownloadState): void {
+function updatePercent(state: OfficialSkillDownloadState, partialUnit = 0): void {
   state.percent = state.total > 0
-    ? Math.max(0, Math.min(100, (state.completed / state.total) * 100))
+    ? Math.max(0, Math.min(100, ((state.completed + partialUnit) / state.total) * 100))
     : null;
 }
 
@@ -118,8 +156,8 @@ function ensureInsideDir(root: string, target: string): void {
   throw new Error("目标路径不在技能目录内");
 }
 
-function rawFileUrl(repoPath: string): string {
-  return `${GITHUB_RAW_BASE_URL}/${repoPath.split("/").map(encodeURIComponent).join("/")}`;
+function rawFileUrl(source: OfficialSkillSource, repoPath: string): string {
+  return `${source.rawBaseUrl}/${repoPath.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 function parseGitTreeEntries(payload: unknown): GitTreeEntry[] {
@@ -153,8 +191,8 @@ async function fetchWithTimeout(url: string) {
   }
 }
 
-async function fetchGitTree(): Promise<GitTreeEntry[]> {
-  const response = await fetchWithTimeout(GITHUB_TREE_API_URL);
+async function fetchGitTree(source: OfficialSkillSource): Promise<GitTreeEntry[]> {
+  const response = await fetchWithTimeout(source.treeApiUrl);
   const text = await response.text();
   let payload: unknown = {};
   try {
@@ -171,14 +209,14 @@ async function fetchGitTree(): Promise<GitTreeEntry[]> {
   return parseGitTreeEntries(payload);
 }
 
-function collectRemoteSkillFiles(entries: GitTreeEntry[]): Map<string, RemoteSkillFile[]> {
+function collectRemoteSkillFiles(entries: GitTreeEntry[], source: OfficialSkillSource): Map<string, RemoteSkillFile[]> {
   const skills = new Map<string, RemoteSkillFile[]>();
   for (const entry of entries) {
-    if (entry.type !== "blob" || !entry.path.startsWith(OFFICIAL_SKILLS_PREFIX)) continue;
+    if (entry.type !== "blob" || !entry.path.startsWith(source.skillsPrefix)) continue;
     const parts = entry.path.split("/");
-    if (parts.length < 3) continue;
-    const folderName = parts[1];
-    const relativePath = parts.slice(2).join("/");
+    if (parts.length <= source.folderNameIndex + 1) continue;
+    const folderName = parts[source.folderNameIndex];
+    const relativePath = parts.slice(source.folderNameIndex + 1).join("/");
     if (!isSafeSkillFolderName(folderName) || !isSafeRelativePath(relativePath)) continue;
     const files = skills.get(folderName) || [];
     files.push({ repoPath: entry.path, relativePath });
@@ -194,25 +232,53 @@ function collectRemoteSkillFiles(entries: GitTreeEntry[]): Map<string, RemoteSki
   return new Map([...skills.entries()].sort(([left], [right]) => left.localeCompare(right)));
 }
 
-async function downloadRemoteFile(file: RemoteSkillFile, targetDir: string): Promise<void> {
+async function downloadRemoteFile(
+  source: OfficialSkillSource,
+  file: RemoteSkillFile,
+  targetDir: string,
+  onProgress?: FileDownloadProgressReporter,
+): Promise<void> {
   const targetPath = path.resolve(targetDir, file.relativePath);
   ensureInsideDir(targetDir, targetPath);
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
 
-  const response = await fetchWithTimeout(rawFileUrl(file.repoPath));
+  const response = await fetchWithTimeout(rawFileUrl(source, file.repoPath));
   if (!response.ok) {
     throw new Error(`${file.relativePath} 下载失败：${response.status}`);
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(targetPath, buffer);
+  const contentLength = Number(response.headers.get("content-length"));
+  if (response.body && Number.isFinite(contentLength) && contentLength > 0) {
+    const reader = response.body.getReader();
+    const chunks: Buffer[] = [];
+    let received = 0;
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      const bufferChunk = Buffer.from(chunk.value);
+      chunks.push(bufferChunk);
+      received += bufferChunk.length;
+      onProgress?.(file, Math.max(0, Math.min(0.98, received / contentLength)));
+    }
+    fs.writeFileSync(targetPath, Buffer.concat(chunks));
+  } else {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(targetPath, buffer);
+  }
+  onProgress?.(file, 1);
 }
 
-async function downloadSkillToTemp(folderName: string, files: RemoteSkillFile[], tempRoot: string): Promise<string> {
+async function downloadSkillToTemp(
+  source: OfficialSkillSource,
+  folderName: string,
+  files: RemoteSkillFile[],
+  tempRoot: string,
+  onProgress?: FileDownloadProgressReporter,
+): Promise<string> {
   const tempSkillDir = path.join(tempRoot, folderName);
   fs.mkdirSync(tempSkillDir, { recursive: true });
   for (const file of files) {
-    await downloadRemoteFile(file, tempSkillDir);
+    await downloadRemoteFile(source, file, tempSkillDir, onProgress);
   }
   return tempSkillDir;
 }
@@ -267,18 +333,36 @@ function normalizeRequestedSkillNames(skillNames: string[] | undefined, remoteSk
   return Array.from(new Set(requested.map((name) => name.trim()).filter(Boolean)));
 }
 
-export async function listOfficialClaudeSkills(): Promise<OfficialSkillListResult> {
-  const targetDir = getClaudeSkillsDir();
-  const remoteSkills = collectRemoteSkillFiles(await fetchGitTree());
+function getSkillDownloadUnitCount(files: RemoteSkillFile[] | undefined): number {
+  return files && files.length > 0 ? files.length + 1 : 1;
+}
+
+function countDownloadUnits(skillNames: string[], remoteSkills: Map<string, RemoteSkillFile[]>): number {
+  return skillNames.reduce((total, folderName) => total + getSkillDownloadUnitCount(remoteSkills.get(folderName)), 0);
+}
+
+function completeRemainingSkillUnits(
+  state: OfficialSkillDownloadState,
+  skillStartCompleted: number,
+  skillUnitCount: number,
+): void {
+  state.completed = Math.max(state.completed, skillStartCompleted + skillUnitCount);
+  updatePercent(state);
+}
+
+export async function listOfficialSkills(providerType: string): Promise<OfficialSkillListResult> {
+  const source = getOfficialSkillSource(providerType);
+  const targetDir = source.targetDir();
+  const remoteSkills = collectRemoteSkillFiles(await fetchGitTree(source), source);
   const statusRank = { missing: 0, directory: 1, other: 2 } as const;
   const skills = [...remoteSkills.keys()].map((name) => {
     const localStatus = getLocalSkillStatus(targetDir, name);
-      return {
-        name,
-        url: `${GITHUB_SKILL_TREE_BASE_URL}/${encodeURIComponent(name)}`,
-        installed: localStatus === "directory",
-        localStatus,
-      };
+    return {
+      name,
+      url: `${source.skillTreeBaseUrl}/${encodeURIComponent(name)}`,
+      installed: localStatus === "directory",
+      localStatus,
+    };
   });
   skills.sort((left, right) => {
     const leftRank = statusRank[left.localStatus];
@@ -287,19 +371,22 @@ export async function listOfficialClaudeSkills(): Promise<OfficialSkillListResul
     return left.name.localeCompare(right.name);
   });
   return {
+    sourceName: source.displayName,
     targetDir,
     skills,
   };
 }
 
-export async function downloadOfficialClaudeSkills(
+export async function downloadOfficialSkills(
+  providerType: string,
   report: ProgressReporter,
-  opts: DownloadOfficialClaudeSkillsOptions = {},
+  opts: DownloadOfficialSkillsOptions = {},
 ): Promise<OfficialSkillDownloadEvent> {
-  const targetDir = getClaudeSkillsDir();
+  const source = getOfficialSkillSource(providerType);
+  const targetDir = source.targetDir();
   const state: OfficialSkillDownloadState = {
     phase: "discovering",
-    message: "正在读取 Anthropic 官方技能包...",
+    message: `正在读取 ${source.displayName}...`,
     percent: null,
     completed: 0,
     total: 0,
@@ -312,8 +399,8 @@ export async function downloadOfficialClaudeSkills(
 
   emitProgress(state, report);
 
-  const entries = await fetchGitTree();
-  const remoteSkills = collectRemoteSkillFiles(entries);
+  const entries = await fetchGitTree(source);
+  const remoteSkills = collectRemoteSkillFiles(entries, source);
   if (remoteSkills.size === 0) {
     throw new Error("未找到可下载的官方技能");
   }
@@ -321,31 +408,31 @@ export async function downloadOfficialClaudeSkills(
   const skillNames = normalizeRequestedSkillNames(opts.skillNames, remoteSkills);
   fs.mkdirSync(targetDir, { recursive: true });
   state.phase = "downloading";
-  state.total = skillNames.length;
+  state.total = countDownloadUnits(skillNames, remoteSkills);
   updatePercent(state);
-  state.message = `准备处理 ${state.total} 个官方技能...`;
+  state.message = `准备处理 ${skillNames.length} 个官方技能...`;
   emitProgress(state, report);
 
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "anybot-official-skills-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `anybot-${source.provider}-official-skills-`));
   try {
     for (const folderName of skillNames) {
+      const files = remoteSkills.get(folderName);
+      const skillStartCompleted = state.completed;
+      const skillUnitCount = getSkillDownloadUnitCount(files);
       state.current = folderName;
       state.message = `正在处理 ${folderName}...`;
       emitProgress(state, report);
 
       if (!isSafeSkillFolderName(folderName)) {
         state.failed.push({ name: folderName, error: "技能文件夹名不合法" });
-        state.completed += 1;
-        updatePercent(state);
+        completeRemainingSkillUnits(state, skillStartCompleted, skillUnitCount);
         emitProgress(state, report);
         continue;
       }
 
-      const files = remoteSkills.get(folderName);
       if (!files) {
         state.failed.push({ name: folderName, error: "官方技能不存在" });
-        state.completed += 1;
-        updatePercent(state);
+        completeRemainingSkillUnits(state, skillStartCompleted, skillUnitCount);
         emitProgress(state, report);
         continue;
       }
@@ -356,29 +443,42 @@ export async function downloadOfficialClaudeSkills(
         try {
           if (!fs.statSync(targetSkillDir).isDirectory()) {
             state.failed.push({ name: folderName, error: "同名路径已存在但不是文件夹" });
-            state.completed += 1;
-            updatePercent(state);
+            completeRemainingSkillUnits(state, skillStartCompleted, skillUnitCount);
             emitProgress(state, report);
             continue;
           }
           if (!opts.replaceExisting) {
             state.skipped.push(folderName);
-            state.completed += 1;
-            updatePercent(state);
+            completeRemainingSkillUnits(state, skillStartCompleted, skillUnitCount);
             emitProgress(state, report);
             continue;
           }
         } catch (error) {
           state.failed.push({ name: folderName, error: error instanceof Error ? error.message : "读取本地路径失败" });
-          state.completed += 1;
-          updatePercent(state);
+          completeRemainingSkillUnits(state, skillStartCompleted, skillUnitCount);
           emitProgress(state, report);
           continue;
         }
       }
 
       try {
-        const tempSkillDir = await downloadSkillToTemp(folderName, files, tempRoot);
+        let lastReportedPercent = typeof state.percent === "number" ? state.percent : -1;
+        const tempSkillDir = await downloadSkillToTemp(source, folderName, files, tempRoot, (file, fraction) => {
+          const safeFraction = Math.max(0, Math.min(1, fraction));
+          state.current = `${folderName}/${file.relativePath}`;
+          state.message = `正在下载 ${state.current}...`;
+          if (safeFraction >= 1) {
+            state.completed += 1;
+            updatePercent(state);
+          } else {
+            updatePercent(state, safeFraction);
+          }
+          if (state.percent !== null && (state.percent - lastReportedPercent >= 1 || safeFraction >= 1)) {
+            lastReportedPercent = state.percent;
+            emitProgress(state, report);
+          }
+        });
+        state.current = folderName;
         const finalLocalStatus = getLocalSkillStatus(targetDir, folderName);
         if (finalLocalStatus === "directory" && opts.replaceExisting) {
           replaceTempSkill(tempSkillDir, targetSkillDir);
@@ -391,14 +491,15 @@ export async function downloadOfficialClaudeSkills(
           installTempSkill(tempSkillDir, targetSkillDir);
           state.installed.push(folderName);
         }
+        state.completed += 1;
+        updatePercent(state);
       } catch (error) {
         const message = error instanceof Error ? error.message : "下载失败";
         logger.warn("official_skills.download_skill_failed", { skill: folderName, error: message });
         state.failed.push({ name: folderName, error: message });
+        completeRemainingSkillUnits(state, skillStartCompleted, skillUnitCount);
       }
 
-      state.completed += 1;
-      updatePercent(state);
       emitProgress(state, report);
     }
   } finally {

@@ -5376,13 +5376,6 @@
             margin-top: 2px;
         }
 
-        .skills-download-message {
-            color: var(--text-muted);
-            font-size: 13px;
-            line-height: 1.6;
-            overflow-wrap: anywhere;
-        }
-
         .skills-download-list-view {
             min-height: 0;
             display: flex;
@@ -5557,29 +5550,9 @@
             opacity: 1;
         }
 
-        .skills-download-progress {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: 14px;
-            padding-top: 14px;
-            border-top: 1px solid var(--border);
-        }
-
-        .skills-download-progress[hidden],
-        .skills-download-confirm[hidden],
         .skills-download-target[hidden],
         .skills-download-actions button[hidden] {
             display: none;
-        }
-
-        .skills-download-progress-meta {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            color: var(--text-dim);
-            font-size: 12px;
         }
 
         .skills-download-target {

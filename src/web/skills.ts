@@ -50,9 +50,13 @@ function getCodexHome(): string {
   return path.resolve(expandHomeDir(codexHome || path.join(os.homedir(), ".codex"))).normalize("NFC");
 }
 
+export function getCodexSkillsDir(): string {
+  return path.join(getCodexHome(), "skills");
+}
+
 const PROVIDER_SKILL_DIRS: Record<string, () => SkillSource[]> = {
   codex: () => {
-    return [{ label: "Codex 技能", dir: path.join(getCodexHome(), "skills") }];
+    return [{ label: "Codex 技能", dir: getCodexSkillsDir() }];
   },
   "claude-code": () => {
     return [{ label: "Claude Code 技能", dir: getClaudeSkillsDir() }];
