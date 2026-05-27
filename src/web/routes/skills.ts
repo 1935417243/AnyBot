@@ -6,6 +6,7 @@ import { deleteSkill, listSkillMentions, listSkills, openSkillsFolder, toggleSki
 import { listWebSlashItems } from "../slash-items.js";
 import {
   downloadOfficialClaudeSkills,
+  listOfficialClaudeSkills,
   type OfficialSkillDownloadEvent,
 } from "../services/official-skills.js";
 
@@ -40,6 +41,22 @@ export function createSkillsRouter(): Router {
       res.json({ skills: listSkillMentions(provider) });
     } catch (error) {
       res.status(500).json({ error: "读取技能列表失败" });
+    }
+  });
+
+  router.get("/skills/official", async (req: Request, res: Response) => {
+    const provider = typeof req.query.provider === "string" ? normalizeProviderType(req.query.provider) : "";
+    if (provider !== "claude-code") {
+      res.status(400).json({ error: "官方技能包仅支持 Claude Code 技能目录" });
+      return;
+    }
+
+    try {
+      res.json(await listOfficialClaudeSkills());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "读取官方技能列表失败";
+      logger.warn("official_skills.list_failed", { error: message });
+      res.status(502).json({ error: message });
     }
   });
 
@@ -93,6 +110,13 @@ export function createSkillsRouter(): Router {
       res.status(400).json({ error: "官方技能包仅支持 Claude Code 技能目录" });
       return;
     }
+    const skills = Array.isArray(req.body?.skills)
+      ? req.body.skills.filter((skill: unknown): skill is string => typeof skill === "string")
+      : [];
+    if (skills.length === 0) {
+      res.status(400).json({ error: "请选择要下载的官方技能" });
+      return;
+    }
 
     res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -100,9 +124,13 @@ export function createSkillsRouter(): Router {
     res.flushHeaders?.();
 
     try {
-      const result = await downloadOfficialClaudeSkills((event) => writeDownloadProgress(res, event));
+      const result = await downloadOfficialClaudeSkills((event) => writeDownloadProgress(res, event), {
+        skillNames: skills,
+        replaceExisting: true,
+      });
       logger.info("official_skills.downloaded", {
         installed: result.installed.length,
+        reinstalled: result.reinstalled.length,
         skipped: result.skipped.length,
         failed: result.failed.length,
       });
@@ -117,6 +145,7 @@ export function createSkillsRouter(): Router {
         total: 0,
         targetDir: "",
         installed: [],
+        reinstalled: [],
         skipped: [],
         failed: [{ name: "official-skills", error: message }],
       });

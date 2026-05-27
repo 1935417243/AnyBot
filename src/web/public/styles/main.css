@@ -5332,12 +5332,16 @@
         }
 
         .skills-download-modal {
-            width: min(440px, 100%);
+            width: min(680px, 100%);
+            max-height: min(720px, calc(100vh - 48px));
             border: 1px solid var(--border);
             border-radius: 12px;
             background: var(--sidebar);
             box-shadow: 0 22px 70px rgba(0, 0, 0, 0.34);
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         .skills-download-header {
@@ -5379,10 +5383,187 @@
             overflow-wrap: anywhere;
         }
 
+        .skills-download-list-view {
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .skills-download-search {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            color: var(--text);
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            padding: 9px 12px;
+            outline: none;
+            transition: border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .skills-download-search:focus {
+            border-color: rgba(124, 111, 247, 0.4);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .skills-official-list {
+            min-height: 120px;
+            max-height: min(420px, calc(100vh - 300px));
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 2px;
+        }
+
+        .skills-official-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .skills-official-list::-webkit-scrollbar-thumb {
+            background: var(--scrollbar);
+            border-radius: 99px;
+        }
+
+        .skills-download-loading {
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            color: var(--text-muted);
+            font-size: 13px;
+            padding: 22px 14px;
+            text-align: center;
+        }
+
+        .skills-official-item {
+            min-height: 70px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 12px;
+        }
+
+        .skills-official-info {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .skills-official-name-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        .skills-official-name {
+            min-width: 0;
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 700;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .skills-official-status {
+            flex-shrink: 0;
+            border-radius: 999px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+            padding: 4px 7px;
+        }
+
+        .skills-official-item.installed .skills-official-status {
+            background: rgba(74, 222, 128, 0.12);
+            color: #22c55e;
+        }
+
+        .skills-official-item.conflict .skills-official-status {
+            background: rgba(248, 113, 113, 0.12);
+            color: #f87171;
+        }
+
+        .skills-official-detail {
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.45;
+            text-decoration: none;
+        }
+
+        .skills-official-detail:hover {
+            color: #8f84f9;
+            text-decoration: underline;
+        }
+
+        .skills-official-action {
+            position: relative;
+            min-width: 104px;
+            height: 34px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: var(--input-bg);
+            color: var(--text);
+            font-family: 'Sora', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+            overflow: hidden;
+            transition: all 0.15s ease;
+        }
+
+        .skills-official-action.running {
+            border-color: rgba(124, 111, 247, 0.35);
+            color: var(--text);
+        }
+
+        .skills-official-action.running::before {
+            content: '';
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: var(--download-progress, 0%);
+            border-radius: inherit;
+            background: linear-gradient(90deg, rgba(124, 111, 247, 0.18), rgba(124, 111, 247, 0.34));
+            transition: width 0.18s ease;
+        }
+
+        .skills-official-action-label {
+            position: relative;
+            z-index: 1;
+            white-space: nowrap;
+        }
+
+        .skills-official-action:hover:not(:disabled) {
+            background: var(--sidebar-hover);
+            border-color: rgba(124, 111, 247, 0.25);
+            color: var(--accent);
+        }
+
+        .skills-official-action:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .skills-official-action.running:disabled {
+            opacity: 1;
+        }
+
         .skills-download-progress {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
         }
 
         .skills-download-progress[hidden],
@@ -5390,22 +5571,6 @@
         .skills-download-target[hidden],
         .skills-download-actions button[hidden] {
             display: none;
-        }
-
-        .skills-download-progress-bar {
-            height: 8px;
-            border-radius: 999px;
-            background: rgba(148, 163, 184, 0.2);
-            overflow: hidden;
-        }
-
-        .skills-download-progress-bar span {
-            display: block;
-            width: 0%;
-            height: 100%;
-            border-radius: inherit;
-            background: var(--accent);
-            transition: width 0.18s ease;
         }
 
         .skills-download-progress-meta {

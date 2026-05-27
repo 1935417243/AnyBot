@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { fetch as undiciFetch } from "undici";
@@ -7,6 +8,7 @@ import { getClaudeSkillsDir } from "../skills.js";
 
 const GITHUB_TREE_API_URL = "https://api.github.com/repos/anthropics/skills/git/trees/main?recursive=1";
 const GITHUB_RAW_BASE_URL = "https://raw.githubusercontent.com/anthropics/skills/main";
+const GITHUB_SKILL_TREE_BASE_URL = "https://github.com/anthropics/skills/tree/main/skills";
 const OFFICIAL_SKILLS_PREFIX = "skills/";
 const DOWNLOAD_TIMEOUT_MS = 30000;
 const SAFE_SKILL_DIR_RE = /^[A-Za-z0-9._-]+$/;
@@ -25,8 +27,21 @@ export interface OfficialSkillDownloadEvent {
   targetDir: string;
   current?: string;
   installed: string[];
+  reinstalled: string[];
   skipped: string[];
   failed: OfficialSkillDownloadFailedItem[];
+}
+
+export interface OfficialSkillListItem {
+  name: string;
+  url: string;
+  installed: boolean;
+  localStatus: "missing" | "directory" | "other";
+}
+
+export interface OfficialSkillListResult {
+  targetDir: string;
+  skills: OfficialSkillListItem[];
 }
 
 interface GitTreeEntry {
@@ -48,11 +63,17 @@ interface OfficialSkillDownloadState {
   targetDir: string;
   current?: string;
   installed: string[];
+  reinstalled: string[];
   skipped: string[];
   failed: OfficialSkillDownloadFailedItem[];
 }
 
 type ProgressReporter = (event: OfficialSkillDownloadEvent) => void;
+
+interface DownloadOfficialClaudeSkillsOptions {
+  skillNames?: string[];
+  replaceExisting?: boolean;
+}
 
 function makeUserAgent(): string {
   return `AnyBot/${process.env.npm_package_version || "dev"}`;
@@ -68,6 +89,7 @@ function emitProgress(state: OfficialSkillDownloadState, report: ProgressReporte
     targetDir: state.targetDir,
     current: state.current,
     installed: [...state.installed],
+    reinstalled: [...state.reinstalled],
     skipped: [...state.skipped],
     failed: [...state.failed],
   });
@@ -195,16 +217,85 @@ async function downloadSkillToTemp(folderName: string, files: RemoteSkillFile[],
   return tempSkillDir;
 }
 
-function installTempSkill(tempSkillDir: string, targetSkillDir: string): void {
+function createStagingSkill(tempSkillDir: string, targetSkillDir: string): string {
+  const parentDir = path.dirname(targetSkillDir);
+  const stagingDir = path.join(parentDir, `.${path.basename(targetSkillDir)}.anybot-${randomUUID()}`);
+  ensureInsideDir(parentDir, stagingDir);
   try {
-    fs.cpSync(tempSkillDir, targetSkillDir, { recursive: true, force: false, errorOnExist: true });
+    fs.cpSync(tempSkillDir, stagingDir, { recursive: true, force: false, errorOnExist: true });
+    return stagingDir;
   } catch (error) {
-    fs.rmSync(targetSkillDir, { recursive: true, force: true });
+    fs.rmSync(stagingDir, { recursive: true, force: true });
     throw error;
   }
 }
 
-export async function downloadOfficialClaudeSkills(report: ProgressReporter): Promise<OfficialSkillDownloadEvent> {
+function installTempSkill(tempSkillDir: string, targetSkillDir: string): void {
+  const stagingDir = createStagingSkill(tempSkillDir, targetSkillDir);
+  try {
+    fs.renameSync(stagingDir, targetSkillDir);
+  } catch (error) {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function replaceTempSkill(tempSkillDir: string, targetSkillDir: string): void {
+  const stagingDir = createStagingSkill(tempSkillDir, targetSkillDir);
+  try {
+    fs.rmSync(targetSkillDir, { recursive: true, force: true });
+    fs.renameSync(stagingDir, targetSkillDir);
+  } catch (error) {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function getLocalSkillStatus(targetDir: string, folderName: string): "missing" | "directory" | "other" {
+  const targetSkillDir = path.resolve(targetDir, folderName);
+  ensureInsideDir(targetDir, targetSkillDir);
+  if (!fs.existsSync(targetSkillDir)) return "missing";
+  try {
+    return fs.statSync(targetSkillDir).isDirectory() ? "directory" : "other";
+  } catch {
+    return "other";
+  }
+}
+
+function normalizeRequestedSkillNames(skillNames: string[] | undefined, remoteSkills: Map<string, RemoteSkillFile[]>): string[] {
+  const requested = skillNames && skillNames.length > 0 ? skillNames : [...remoteSkills.keys()];
+  return Array.from(new Set(requested.map((name) => name.trim()).filter(Boolean)));
+}
+
+export async function listOfficialClaudeSkills(): Promise<OfficialSkillListResult> {
+  const targetDir = getClaudeSkillsDir();
+  const remoteSkills = collectRemoteSkillFiles(await fetchGitTree());
+  const statusRank = { missing: 0, directory: 1, other: 2 } as const;
+  const skills = [...remoteSkills.keys()].map((name) => {
+    const localStatus = getLocalSkillStatus(targetDir, name);
+      return {
+        name,
+        url: `${GITHUB_SKILL_TREE_BASE_URL}/${encodeURIComponent(name)}`,
+        installed: localStatus === "directory",
+        localStatus,
+      };
+  });
+  skills.sort((left, right) => {
+    const leftRank = statusRank[left.localStatus];
+    const rightRank = statusRank[right.localStatus];
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    return left.name.localeCompare(right.name);
+  });
+  return {
+    targetDir,
+    skills,
+  };
+}
+
+export async function downloadOfficialClaudeSkills(
+  report: ProgressReporter,
+  opts: DownloadOfficialClaudeSkillsOptions = {},
+): Promise<OfficialSkillDownloadEvent> {
   const targetDir = getClaudeSkillsDir();
   const state: OfficialSkillDownloadState = {
     phase: "discovering",
@@ -214,6 +305,7 @@ export async function downloadOfficialClaudeSkills(report: ProgressReporter): Pr
     total: 0,
     targetDir,
     installed: [],
+    reinstalled: [],
     skipped: [],
     failed: [],
   };
@@ -226,42 +318,75 @@ export async function downloadOfficialClaudeSkills(report: ProgressReporter): Pr
     throw new Error("未找到可下载的官方技能");
   }
 
+  const skillNames = normalizeRequestedSkillNames(opts.skillNames, remoteSkills);
   fs.mkdirSync(targetDir, { recursive: true });
   state.phase = "downloading";
-  state.total = remoteSkills.size;
+  state.total = skillNames.length;
   updatePercent(state);
-  state.message = `发现 ${state.total} 个官方技能，开始下载...`;
+  state.message = `准备处理 ${state.total} 个官方技能...`;
   emitProgress(state, report);
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "anybot-official-skills-"));
   try {
-    for (const [folderName, files] of remoteSkills) {
+    for (const folderName of skillNames) {
       state.current = folderName;
       state.message = `正在处理 ${folderName}...`;
       emitProgress(state, report);
 
-      const targetSkillDir = path.resolve(targetDir, folderName);
-      ensureInsideDir(targetDir, targetSkillDir);
-      if (fs.existsSync(targetSkillDir)) {
-        try {
-          if (fs.statSync(targetSkillDir).isDirectory()) {
-            state.skipped.push(folderName);
-          } else {
-            state.failed.push({ name: folderName, error: "同名路径已存在但不是文件夹" });
-          }
-        } catch (error) {
-          state.failed.push({ name: folderName, error: error instanceof Error ? error.message : "读取本地路径失败" });
-        }
+      if (!isSafeSkillFolderName(folderName)) {
+        state.failed.push({ name: folderName, error: "技能文件夹名不合法" });
         state.completed += 1;
         updatePercent(state);
         emitProgress(state, report);
         continue;
       }
 
+      const files = remoteSkills.get(folderName);
+      if (!files) {
+        state.failed.push({ name: folderName, error: "官方技能不存在" });
+        state.completed += 1;
+        updatePercent(state);
+        emitProgress(state, report);
+        continue;
+      }
+
+      const targetSkillDir = path.resolve(targetDir, folderName);
+      ensureInsideDir(targetDir, targetSkillDir);
+      if (fs.existsSync(targetSkillDir)) {
+        try {
+          if (!fs.statSync(targetSkillDir).isDirectory()) {
+            state.failed.push({ name: folderName, error: "同名路径已存在但不是文件夹" });
+            state.completed += 1;
+            updatePercent(state);
+            emitProgress(state, report);
+            continue;
+          }
+          if (!opts.replaceExisting) {
+            state.skipped.push(folderName);
+            state.completed += 1;
+            updatePercent(state);
+            emitProgress(state, report);
+            continue;
+          }
+        } catch (error) {
+          state.failed.push({ name: folderName, error: error instanceof Error ? error.message : "读取本地路径失败" });
+          state.completed += 1;
+          updatePercent(state);
+          emitProgress(state, report);
+          continue;
+        }
+      }
+
       try {
         const tempSkillDir = await downloadSkillToTemp(folderName, files, tempRoot);
-        if (fs.existsSync(targetSkillDir)) {
+        const finalLocalStatus = getLocalSkillStatus(targetDir, folderName);
+        if (finalLocalStatus === "directory" && opts.replaceExisting) {
+          replaceTempSkill(tempSkillDir, targetSkillDir);
+          state.reinstalled.push(folderName);
+        } else if (finalLocalStatus === "directory") {
           state.skipped.push(folderName);
+        } else if (finalLocalStatus === "other") {
+          state.failed.push({ name: folderName, error: "同名路径已存在但不是文件夹" });
         } else {
           installTempSkill(tempSkillDir, targetSkillDir);
           state.installed.push(folderName);
@@ -295,6 +420,7 @@ export async function downloadOfficialClaudeSkills(report: ProgressReporter): Pr
     total: state.total,
     targetDir: state.targetDir,
     installed: [...state.installed],
+    reinstalled: [...state.reinstalled],
     skipped: [...state.skipped],
     failed: [...state.failed],
   };
