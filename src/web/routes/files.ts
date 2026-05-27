@@ -4,7 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import multer from "multer";
 import { logger } from "../../logger.js";
-import { getUploadDir, isImageFile } from "../services/files.js";
+import * as db from "../db.js";
+import { getUploadDir, isImageFile, listMentionableFiles } from "../services/files.js";
+import { getSessionWorkdir } from "../services/projects.js";
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -56,6 +58,26 @@ export function createFilesRouter(): Router {
       return;
     }
     res.sendFile(resolved);
+  });
+
+  router.get("/sessions/:id/files/mentions", async (req: Request, res: Response) => {
+    const session = db.getSessionMetadata(req.params.id as string);
+    if (!session) {
+      res.json({ files: [] });
+      return;
+    }
+
+    try {
+      const workdir = getSessionWorkdir(session);
+      const files = await listMentionableFiles(workdir, {
+        allowWorkspaceScan: !session.projectId,
+        excludeDefaultWorkspaceDirs: !session.projectId,
+      });
+      res.json({ files });
+    } catch (error) {
+      logger.warn("web.files.mention_list_failed", { sessionId: session.id, error });
+      res.json({ files: [] });
+    }
   });
 
   return router;

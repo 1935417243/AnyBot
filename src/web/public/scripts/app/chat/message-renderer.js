@@ -1,9 +1,11 @@
 import { escapeHtml } from '../utils/html.js';
 import {
+    createMessageFileRefs,
     createMessageProjectRefs,
     createMessageSkillRefs,
     getSelectionFallbackText,
     isSelectionOnlyFallback,
+    normalizeMessageFileReferences,
     normalizeMessageProjects,
     normalizeMessageSkills,
 } from './message-selection.js';
@@ -75,19 +77,20 @@ export function createMessageRenderer(config) {
         row.className = 'message-row ' + role;
         var messageSkills = role === 'user' ? normalizeMessageSkills(opts.skills) : [];
         var messageProjects = role === 'user' ? normalizeMessageProjects(opts.projects) : [];
+        var messageFileReferences = role === 'user' ? normalizeMessageFileReferences(opts.fileReferences) : [];
         var rawText = String(text || '');
-        var visibleText = isSelectionOnlyFallback(rawText, messageSkills, messageProjects) ? '' : rawText;
+        var visibleText = isSelectionOnlyFallback(rawText, messageSkills, messageProjects, messageFileReferences) ? '' : rawText;
 
         if (role === 'ai') {
             row.appendChild(createAssistantBubble(text, changeReview, opts));
         } else {
-            row.appendChild(createUserBubble(visibleText, attachments, opts, messageSkills, messageProjects));
+            row.appendChild(createUserBubble(visibleText, attachments, opts, messageSkills, messageProjects, messageFileReferences));
         }
 
         config.attachMessageMeta(row, {
             createdAt: opts.createdAt,
-            copyText: role === 'user' && (messageSkills.length > 0 || messageProjects.length > 0)
-                ? (visibleText ? getSelectionFallbackText(messageSkills, messageProjects) + '\n' + visibleText : getSelectionFallbackText(messageSkills, messageProjects))
+            copyText: role === 'user' && (messageSkills.length > 0 || messageProjects.length > 0 || messageFileReferences.length > 0)
+                ? (visibleText ? getSelectionFallbackText(messageSkills, messageProjects, messageFileReferences) + '\n' + visibleText : getSelectionFallbackText(messageSkills, messageProjects, messageFileReferences))
                 : rawText,
         });
         config.messagesEl.appendChild(row);
@@ -237,13 +240,13 @@ export function createMessageRenderer(config) {
         return bubble;
     }
 
-    function createUserBubble(visibleText, attachments, opts, messageSkills, messageProjects) {
+    function createUserBubble(visibleText, attachments, opts, messageSkills, messageProjects, messageFileReferences) {
         var bubble = document.createElement('div');
         bubble.className = 'bubble';
 
         var content = document.createElement('div');
         content.className = 'message-content';
-        var userLine = createUserMessageLine(visibleText, opts, messageSkills, messageProjects);
+        var userLine = createUserMessageLine(visibleText, opts, messageSkills, messageProjects, messageFileReferences);
         if (userLine) content.appendChild(userLine.line);
         if (opts && opts.contentTruncated && opts.messageId) {
             content.appendChild(createUserExpandButton(userLine ? userLine.textEl : null, opts));
@@ -254,7 +257,7 @@ export function createMessageRenderer(config) {
         return bubble;
     }
 
-    function createUserMessageLine(visibleText, opts, messageSkills, messageProjects) {
+    function createUserMessageLine(visibleText, opts, messageSkills, messageProjects, messageFileReferences) {
         var userLine = document.createElement('div');
         userLine.className = 'message-user-line';
         if (messageSkills.length > 0) {
@@ -262,6 +265,9 @@ export function createMessageRenderer(config) {
         }
         if (messageProjects.length > 0) {
             userLine.appendChild(createMessageProjectRefs(messageProjects));
+        }
+        if (messageFileReferences.length > 0) {
+            userLine.appendChild(createMessageFileRefs(messageFileReferences));
         }
 
         var userText = document.createElement('span');

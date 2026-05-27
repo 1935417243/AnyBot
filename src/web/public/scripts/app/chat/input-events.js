@@ -20,16 +20,21 @@ function bindTextInput(config) {
     config.inputEl.addEventListener('input', function () {
         config.resetInputHistoryNavigation();
         if (config.inputEl.value.length > 0) config.clearPromptSkillDeleteTarget();
+        if (config.inputEl.value.length > 0 && config.clearFileDeleteTarget) config.clearFileDeleteTarget();
         config.resizeChatInput();
         config.updateSendBtnState();
         config.syncSkillPickerFromInput();
+        config.syncFilePickerFromInput();
     });
 
     config.inputEl.addEventListener('keydown', function (event) {
+        if (config.handleFilePickerKeydown(event)) return;
         if (config.handleSkillPickerKeydown(event)) return;
+        if (config.handleFileReferenceDelete && config.handleFileReferenceDelete(event)) return;
         if (config.handlePromptSkillBackspace(event)) return;
         if (event.key === '/' && config.canOpenSkillPickerFromSlash(event)) {
             event.preventDefault();
+            if (config.closeFilePicker) config.closeFilePicker();
             config.insertSkillSlashTrigger();
             return;
         }

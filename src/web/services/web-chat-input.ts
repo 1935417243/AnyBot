@@ -1,9 +1,11 @@
 import path from "node:path";
+import fs from "node:fs";
 import * as db from "../db.js";
-import { isImageFile } from "./files.js";
+import { isImageFile, isMentionableRelativeFilePath } from "./files.js";
 import { normalizeProjectPath } from "./projects.js";
 
 export type ChatAttachment = { path: string; name: string };
+export type ChatFileReference = { path: string; name?: string };
 export type ChatPromptSkill = { id?: string; name?: string };
 export type ChatPromptProject = { id?: string; name?: string; path?: string };
 
@@ -51,9 +53,64 @@ function normalizeWebChatProjects(projects: ChatPromptProject[] = []): Array<{ i
   return normalized;
 }
 
+function normalizeRelativeFilePath(root: string, filePath: string): string | null {
+  const absolutePath = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : path.resolve(root, filePath);
+  if (absolutePath !== root && !absolutePath.startsWith(root + path.sep)) return null;
+
+  const relativePath = path.relative(root, absolutePath);
+  if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) return null;
+
+  return relativePath.split(path.sep).join(path.posix.sep);
+}
+
+function normalizeWebChatFileReferences(
+  files: ChatFileReference[] = [],
+  options: { sessionProjectId?: string | null; workdir?: string } = {},
+): Array<{ name: string; path: string; absolutePath: string }> {
+  if (!options.workdir) return [];
+
+  const root = path.resolve(options.workdir);
+  const seen = new Set<string>();
+  const normalized: Array<{ name: string; path: string; absolutePath: string }> = [];
+
+  for (const file of files) {
+    const rawPath = String(file?.path || "").trim();
+    if (!rawPath) continue;
+
+    const relativePath = normalizeRelativeFilePath(root, rawPath);
+    if (!relativePath || seen.has(relativePath)) continue;
+    if (!isMentionableRelativeFilePath(relativePath, {
+      excludeDefaultWorkspaceDirs: !options.sessionProjectId,
+    })) {
+      continue;
+    }
+
+    const absolutePath = path.resolve(root, relativePath);
+    try {
+      const stat = fs.statSync(absolutePath);
+      if (!stat.isFile()) continue;
+    } catch {
+      continue;
+    }
+
+    seen.add(relativePath);
+    normalized.push({
+      name: String(file?.name || "").trim() || path.posix.basename(relativePath),
+      path: relativePath,
+      absolutePath,
+    });
+    if (normalized.length >= 20) break;
+  }
+
+  return normalized;
+}
+
 function getWebChatSelectionFallback(
   skills: Array<{ id?: string; name: string }>,
   projects: Array<{ id: string; name: string; path: string }>,
+  fileReferences: Array<{ name: string; path: string; absolutePath: string }>,
   options: { hasSessionProject?: boolean } = {},
 ): string {
   const parts: string[] = [];
@@ -64,6 +121,9 @@ function getWebChatSelectionFallback(
     const projectLabel = options.hasSessionProject ? "额外项目" : "选择项目";
     parts.push(`${projectLabel}：${projects.map((project) => project.name).join("、")}`);
   }
+  if (fileReferences.length > 0) {
+    parts.push(`引用文件：${fileReferences.map((file) => file.path).join("、")}`);
+  }
   return parts.join("\n");
 }
 
@@ -72,7 +132,8 @@ export function prepareWebChatInput(
   attachments: ChatAttachment[] = [],
   skills: ChatPromptSkill[] = [],
   projects: ChatPromptProject[] = [],
-  options: { sessionProjectId?: string | null } = {},
+  fileReferences: ChatFileReference[] = [],
+  options: { sessionProjectId?: string | null; workdir?: string } = {},
 ) {
   let userText = (content || "").trim();
   const imagePaths: string[] = [];
@@ -81,6 +142,10 @@ export function prepareWebChatInput(
   const sessionProjectId = options.sessionProjectId || "";
   const projectInfo = normalizeWebChatProjects(projects)
     .filter((project) => project.id !== sessionProjectId);
+  const fileReferenceInfo = normalizeWebChatFileReferences(fileReferences, {
+    sessionProjectId,
+    workdir: options.workdir,
+  });
   const promptParts: string[] = [];
 
   if (projectInfo.length > 0) {
@@ -92,6 +157,11 @@ export function prepareWebChatInput(
   if (skillInfo.length > 0) {
     const skillList = skillInfo.map((skill) => `- ${skill.name}`).join("\n");
     promptParts.push(`用户本轮选择的技能：\n${skillList}`);
+  }
+
+  if (fileReferenceInfo.length > 0) {
+    const fileList = fileReferenceInfo.map((file) => `- ${file.path}: ${file.absolutePath}`).join("\n");
+    promptParts.push(`用户本轮引用了以下文件，请按需读取并处理：\n${fileList}`);
   }
 
   if (userText) {
@@ -124,8 +194,11 @@ export function prepareWebChatInput(
     ...(attachmentInfo.length > 0 ? { attachments: attachmentInfo } : {}),
     ...(skillInfo.length > 0 ? { skills: skillInfo } : {}),
     ...(projectInfo.length > 0 ? { projects: projectInfo } : {}),
+    ...(fileReferenceInfo.length > 0
+      ? { fileReferences: fileReferenceInfo.map((file) => ({ name: file.name, path: file.path })) }
+      : {}),
   };
-  const selectionFallback = getWebChatSelectionFallback(skillInfo, projectInfo, {
+  const selectionFallback = getWebChatSelectionFallback(skillInfo, projectInfo, fileReferenceInfo, {
     hasSessionProject: !!sessionProjectId,
   });
   const storedFallback = selectionFallback
@@ -135,6 +208,7 @@ export function prepareWebChatInput(
     userText,
     imagePaths,
     fileCount: filePaths.length,
+    fileReferenceCount: fileReferenceInfo.length,
     skillCount: skillInfo.length,
     projectCount: projectInfo.length,
     storedUserContent: content?.trim() || storedFallback,

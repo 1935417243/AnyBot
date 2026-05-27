@@ -294,17 +294,21 @@ export function createSettingsProviderController(options) {
         var provider = getSelectedSettingsProvider();
         if (!presetKey || !provider) {
             applyFixedProviderModel(baseUrl);
-            return;
+            return false;
         }
         var cfg = getProviderSettings(provider.type);
+        var preset = null;
         if (provider.type === 'claude-code') {
             var anthropicPresets = cfg.anthropicBaseUrlPresets || {};
-            applyClaudeCodeBaseUrlPreset(anthropicPresets[presetKey] || null);
+            preset = anthropicPresets[presetKey] || null;
+            applyClaudeCodeBaseUrlPreset(preset);
         } else if (provider.type === 'codex') {
             var codexPresets = cfg.codexBaseUrlPresets || {};
-            applyCodexBaseUrlPreset(codexPresets[presetKey] || null);
+            preset = codexPresets[presetKey] || null;
+            applyCodexBaseUrlPreset(preset);
         }
         applyFixedProviderModel(baseUrl);
+        return Boolean(preset);
     }
 
     function cleanProviderPreset(preset) {
@@ -500,9 +504,11 @@ export function createSettingsProviderController(options) {
             });
             option.addEventListener('click', function (e) {
                 e.stopPropagation();
+                input.dataset.providerBaseUrlSelectedSuggestion = suggestion.id;
                 input.value = suggestion.value;
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 input.dispatchEvent(new Event('change', { bubbles: true }));
+                delete input.dataset.providerBaseUrlSelectedSuggestion;
                 closeProviderModelSuggestionMenus();
                 input.focus();
             });
@@ -576,7 +582,11 @@ export function createSettingsProviderController(options) {
                 if (openInput) showProviderModelSuggestionMenu(openInput);
             });
             baseUrlInput.addEventListener('change', function () {
-                applySavedProviderBaseUrlSettings(baseUrlInput.value);
+                var selectedSuggestion = baseUrlInput.dataset.providerBaseUrlSelectedSuggestion || '';
+                var appliedPreset = applySavedProviderBaseUrlSettings(baseUrlInput.value);
+                if (selectedSuggestion && appliedPreset) {
+                    saveSettingsProviderSettings('已切换');
+                }
             });
             baseUrlInput.setAttribute('aria-haspopup', 'listbox');
             baseUrlInput.setAttribute('aria-expanded', 'false');
@@ -1178,9 +1188,10 @@ export function createSettingsProviderController(options) {
         return true;
     }
 
-    async function saveSettingsProviderSettings() {
+    async function saveSettingsProviderSettings(successMessage) {
         var provider = getSelectedSettingsProvider();
         if (!provider || !isSettingsProviderSelectable(provider.type)) return false;
+        var savedMessage = typeof successMessage === 'string' ? successMessage : '已保存';
         var currentSettings = getProviderSettings(provider.type);
         var definition = getProviderSettingsDefinition(provider.type);
         if (!definition || !definition.isExpanded(currentSettings)) return false;
@@ -1194,7 +1205,7 @@ export function createSettingsProviderController(options) {
                 providers[provider.type] = nextSettings;
                 return providers;
             })(),
-        }, '已保存');
+        }, savedMessage);
         if (!saved) return false;
 
         if (definition.refreshProviderOnSave && providerData && providerData.current === provider.type) {

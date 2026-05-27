@@ -84,7 +84,9 @@ export function getAppDom(documentRef) {
         attachBtn: byId(documentRef, 'attach-btn'),
         attachmentPreview: byId(documentRef, 'attachment-preview'),
         skillPickerEl: byId(documentRef, 'skill-picker'),
+        filePickerEl: byId(documentRef, 'file-picker'),
         selectedSkillsEl: byId(documentRef, 'selected-skills'),
+        selectedFilesEl: byId(documentRef, 'selected-files'),
         dropOverlay: byId(documentRef, 'drop-overlay'),
 
         chatView: byId(documentRef, 'chat-view'),

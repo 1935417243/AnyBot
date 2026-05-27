@@ -4,6 +4,7 @@ export function createInputHistoryController(config) {
     var draft = '';
     var draftSkills = [];
     var draftProjects = [];
+    var draftFiles = [];
     var oldestFetchedMessageId = null;
     var hasMore = false;
     var fetchPromise = null;
@@ -23,13 +24,14 @@ export function createInputHistoryController(config) {
         draft = '';
         draftSkills = [];
         draftProjects = [];
+        draftFiles = [];
         navigationPromise = null;
         navigationVersion += 1;
     }
 
-    function getHistoryVisibleContent(content, skills, projects) {
+    function getHistoryVisibleContent(content, skills, projects, files) {
         var value = String(content || '').trim();
-        return config.isSelectionOnlyFallback(value, skills, projects) ? '' : value;
+        return config.isSelectionOnlyFallback(value, skills, projects, files) ? '' : value;
     }
 
     function createItem(message) {
@@ -37,11 +39,13 @@ export function createInputHistoryController(config) {
         var meta = config.parseMessageMetadata(message.metadata);
         var skills = config.normalizeMessageSkills(meta.skills);
         var projects = config.normalizeMessageProjects(meta.projects);
-        var content = getHistoryVisibleContent(message.content, skills, projects);
-        if ((!content && skills.length === 0 && projects.length === 0) || (content === '[附件]' && skills.length === 0 && projects.length === 0)) return null;
+        var files = config.normalizeMessageFileReferences(meta.fileReferences);
+        var content = getHistoryVisibleContent(message.content, skills, projects, files);
+        if ((!content && skills.length === 0 && projects.length === 0 && files.length === 0) || (content === '[附件]' && skills.length === 0 && projects.length === 0 && files.length === 0)) return null;
         return {
             id: Number(message.id || 0) || null,
             content: content,
+            files: files,
             skills: skills,
             projects: projects,
             contentTruncated: !!message.contentTruncated,
@@ -87,14 +91,16 @@ export function createInputHistoryController(config) {
         return addedCount;
     }
 
-    function rememberSentUserMessage(text, skills, projects) {
+    function rememberSentUserMessage(text, skills, projects, files) {
         var content = String(text || '').trim();
         var itemSkills = config.normalizeMessageSkills(skills);
         var itemProjects = config.normalizeMessageProjects(projects);
-        if (!content && itemSkills.length === 0 && itemProjects.length === 0) return;
+        var itemFiles = config.normalizeMessageFileReferences(files);
+        if (!content && itemSkills.length === 0 && itemProjects.length === 0 && itemFiles.length === 0) return;
         items.push({
             id: null,
             content: content,
+            files: itemFiles,
             skills: itemSkills,
             projects: itemProjects,
             contentTruncated: false,
@@ -162,7 +168,7 @@ export function createInputHistoryController(config) {
             if (!res.ok) return item.content;
             var data = await res.json();
             if (config.getCurrentSessionId() !== requestSessionId || typeof data.content !== 'string') return item.content;
-            item.content = getHistoryVisibleContent(data.content, item.skills, item.projects);
+            item.content = getHistoryVisibleContent(data.content, item.skills, item.projects, item.files);
             item.contentTruncated = false;
         } catch (_) {
         }
@@ -175,7 +181,7 @@ export function createInputHistoryController(config) {
         var content = await getItemContent(item);
         if (expectedNavigationVersion !== navigationVersion) return false;
         cursor = index;
-        config.applyDraft(content, item.skills, item.projects);
+        config.applyDraft(content, item.skills, item.projects, item.files);
         return true;
     }
 
@@ -191,6 +197,7 @@ export function createInputHistoryController(config) {
                     draft = config.inputEl.value;
                     draftSkills = promptSelection.skills.slice();
                     draftProjects = promptSelection.projects.slice();
+                    draftFiles = (promptSelection.files || []).slice();
                 }
                 if (items.length === 0) await fetchOlderPage();
 
@@ -217,10 +224,11 @@ export function createInputHistoryController(config) {
 
             if (expectedNavigationVersion !== navigationVersion) return;
             cursor = null;
-            config.applyDraft(draft, draftSkills, draftProjects);
+            config.applyDraft(draft, draftSkills, draftProjects, draftFiles);
             draft = '';
             draftSkills = [];
             draftProjects = [];
+            draftFiles = [];
         })().catch(function (error) {
             console.warn('Failed to navigate input history:', error);
         }).finally(function () {

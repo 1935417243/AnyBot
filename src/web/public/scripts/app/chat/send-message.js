@@ -112,7 +112,7 @@ export function createSendMessageController(config) {
 
         var outgoing = collectOutgoingMessage({ text: normalizedCommand });
         if (!outgoing) return true;
-        if (outgoing.attachments.length > 0 || outgoing.skills.length > 0 || outgoing.projects.length > 0) {
+        if (outgoing.attachments.length > 0 || outgoing.skills.length > 0 || outgoing.projects.length > 0 || outgoing.fileReferences.length > 0) {
             config.showError('执行命令时不能同时附加文件、技能或项目');
             return true;
         }
@@ -121,7 +121,7 @@ export function createSendMessageController(config) {
     }
 
     async function compactContext(outgoing) {
-        if (outgoing.attachments.length > 0 || outgoing.skills.length > 0 || outgoing.projects.length > 0) {
+        if (outgoing.attachments.length > 0 || outgoing.skills.length > 0 || outgoing.projects.length > 0 || outgoing.fileReferences.length > 0) {
             config.showError('压缩上下文时不能同时附加文件、技能或项目');
             return;
         }
@@ -212,12 +212,13 @@ export function createSendMessageController(config) {
             : config.inputEl.value.trim();
         var messageSkills = state.promptSkills.slice();
         var messageProjects = state.promptProjects.slice();
+        var messageFileReferences = state.fileReferences.slice();
         var readyAttachments = state.pendingAttachments.filter(function (attachment) {
             return !attachment.uploading && attachment.path;
         });
 
         if (
-            (!text && readyAttachments.length === 0 && messageSkills.length === 0 && messageProjects.length === 0) ||
+            (!text && readyAttachments.length === 0 && messageSkills.length === 0 && messageProjects.length === 0 && messageFileReferences.length === 0) ||
             state.isTyping ||
             !state.currentSessionId
         ) {
@@ -229,6 +230,7 @@ export function createSendMessageController(config) {
             text: text,
             skills: messageSkills,
             projects: messageProjects,
+            fileReferences: messageFileReferences,
             attachments: readyAttachments,
         };
     }
@@ -239,8 +241,10 @@ export function createSendMessageController(config) {
         });
         var displayText = outgoing.text || (outgoing.attachments.length > 0 ? '[附件]' : '');
 
+        if (config.closeFilePicker) config.closeFilePicker();
         config.inputEl.value = '';
         config.clearPromptSkills();
+        if (config.clearFileReferences) config.clearFileReferences();
         config.resizeChatInput();
         config.setSendButtonDisabled(true);
         config.setTyping(true);
@@ -252,10 +256,11 @@ export function createSendMessageController(config) {
 
         config.appendMessage('user', displayText, attachmentInfos, null, {
             createdAt: Date.now(),
+            fileReferences: outgoing.fileReferences,
             skills: outgoing.skills,
             projects: outgoing.projects,
         });
-        config.rememberSentUserMessage(outgoing.text, outgoing.skills, outgoing.projects);
+        config.rememberSentUserMessage(outgoing.text, outgoing.skills, outgoing.projects, outgoing.fileReferences);
         config.showTyping();
     }
 
@@ -269,6 +274,11 @@ export function createSendMessageController(config) {
         if (outgoing.projects.length > 0) {
             body.projects = outgoing.projects.map(function (project) {
                 return { id: project.id, name: project.name, path: project.path };
+            });
+        }
+        if (outgoing.fileReferences.length > 0) {
+            body.fileReferences = outgoing.fileReferences.map(function (file) {
+                return { name: file.name, path: file.path };
             });
         }
         if (modelConfig && modelConfig.currentModel) {

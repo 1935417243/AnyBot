@@ -63,6 +63,7 @@ export function createSessionController(config) {
             config.showEmptyState();
             config.inputEl.value = '';
             config.clearPromptSkills();
+            if (config.clearFileReferences) config.clearFileReferences();
             config.resizeChatInput();
             config.setSendButtonDisabled(true);
             config.inputEl.focus();
@@ -314,6 +315,7 @@ export function createSessionController(config) {
             currentSessionUpdatedAt = Number(data.updatedAt || config.findSessionSummary(id)?.updatedAt || currentSessionUpdatedAt || 0);
             config.setActiveProjectId(data.projectId || null);
             config.resetInputHistoryFromMessages(data.messages || [], !!data.hasMoreMessages);
+            if (config.clearFileReferences) config.clearFileReferences();
             config.updateContextUsage(null);
             var didExpandProject = config.expandProject(data.projectId || null);
 
@@ -349,6 +351,7 @@ export function createSessionController(config) {
                 config.updateConversationHeaderTitle('新对话');
                 config.resetInputHistoryFromMessages([], false);
                 config.clearPromptSkills();
+                if (config.clearFileReferences) config.clearFileReferences();
                 config.updateContextUsage(null);
                 config.showEmptyState();
             }

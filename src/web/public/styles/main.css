@@ -2795,6 +2795,11 @@
             border-bottom-color: rgba(34, 197, 94, 0.32);
         }
 
+        .message-skill-ref.file-ref {
+            color: #3370ff;
+            border-bottom-color: rgba(51, 112, 255, 0.32);
+        }
+
         .message-skill-icon {
             width: 14px;
             height: 14px;
@@ -3269,6 +3274,21 @@
             text-overflow: ellipsis;
         }
 
+        .file-picker-item .skill-picker-copy {
+            grid-template-columns: max-content minmax(0, 1fr);
+        }
+
+        .file-picker-item .skill-picker-name {
+            min-width: max-content;
+            white-space: nowrap;
+            overflow: visible;
+            text-overflow: clip;
+        }
+
+        .file-picker-item .skill-picker-desc {
+            min-width: 0;
+        }
+
         .skill-picker-source {
             color: var(--text-dim);
             font-size: 11px;
@@ -3330,6 +3350,17 @@
         .selected-project-chip:hover {
             background: rgba(34, 197, 94, 0.14);
             border-color: rgba(34, 197, 94, 0.38);
+        }
+
+        .selected-file-chip {
+            border-color: rgba(51, 112, 255, 0.24);
+            background: rgba(51, 112, 255, 0.1);
+            color: #3370ff;
+        }
+
+        .selected-file-chip:hover {
+            background: rgba(51, 112, 255, 0.14);
+            border-color: rgba(51, 112, 255, 0.38);
         }
 
         .selected-skill-chip.pending-delete {

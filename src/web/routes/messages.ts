@@ -29,6 +29,7 @@ import { getSessionWorkdir } from "../services/projects.js";
 import {
   prepareWebChatInput,
   type ChatAttachment,
+  type ChatFileReference,
   type ChatPromptProject,
   type ChatPromptSkill,
 } from "../services/web-chat-input.js";
@@ -58,6 +59,7 @@ function getAutomaticProviderCommand(
 type WebMessageRequestBody = {
   content?: string;
   attachments?: ChatAttachment[];
+  fileReferences?: ChatFileReference[];
   skills?: ChatPromptSkill[];
   projects?: ChatPromptProject[];
   modelId?: string;
@@ -78,16 +80,19 @@ type WebMessageRequestError = {
 function prepareWebMessageRequest(
   body: WebMessageRequestBody,
   session: db.ChatSessionMetadata,
+  workdir: string,
 ): PreparedWebMessageRequest | WebMessageRequestError {
-  const { content, attachments, skills, projects, modelId, providerCommand } = body;
+  const { content, attachments, fileReferences, skills, projects, modelId, providerCommand } = body;
   const explicitProviderCommand = cleanProviderCommand(providerCommand);
   const requestAttachments = Array.isArray(attachments) ? attachments : [];
+  const requestFileReferences = Array.isArray(fileReferences) ? fileReferences : [];
   const requestSkills = Array.isArray(skills) ? skills : [];
   const requestProjects = Array.isArray(projects) ? projects : [];
-  const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects, {
+  const input = prepareWebChatInput(content, requestAttachments, requestSkills, requestProjects, requestFileReferences, {
     sessionProjectId: session.projectId,
+    workdir,
   });
-  if (!input.userText && requestAttachments.length === 0 && !explicitProviderCommand) {
+  if (!input.userText && requestAttachments.length === 0 && input.fileReferenceCount === 0 && !explicitProviderCommand) {
     return { statusCode: 400, error: "消息不能为空" };
   }
 
@@ -96,14 +101,14 @@ function prepareWebMessageRequest(
     input.userText,
     requestAttachments.length,
     requestSkills.length,
-    requestProjects.length,
+    requestProjects.length + input.fileReferenceCount,
   );
   if (providerCommandText && isCompactCommand(providerCommandText)) {
     return { statusCode: 400, error: "请使用压缩上下文入口" };
   }
   if (
     explicitProviderCommand &&
-    (requestAttachments.length > 0 || requestSkills.length > 0 || requestProjects.length > 0)
+    (requestAttachments.length > 0 || requestFileReferences.length > 0 || requestSkills.length > 0 || requestProjects.length > 0)
   ) {
     return { statusCode: 400, error: "执行命令时不能同时附加文件、技能或项目" };
   }
@@ -227,13 +232,6 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    const request = prepareWebMessageRequest(req.body as WebMessageRequestBody, session);
-    if (isWebMessageRequestError(request)) {
-      res.status(request.statusCode).json({ error: request.error });
-      return;
-    }
-    const { input, modelId, providerCommandText } = request;
-
     let sessionWorkdir: string;
     try {
       sessionWorkdir = getSessionWorkdir(session);
@@ -241,6 +239,13 @@ export function createMessagesRouter(): Router {
       res.status(400).json({ error: error instanceof Error ? error.message : "项目目录不可用" });
       return;
     }
+
+    const request = prepareWebMessageRequest(req.body as WebMessageRequestBody, session, sessionWorkdir);
+    if (isWebMessageRequestError(request)) {
+      res.status(request.statusCode).json({ error: request.error });
+      return;
+    }
+    const { input, modelId, providerCommandText } = request;
 
     let prepared: PreparedChatTurn;
     try {
@@ -284,7 +289,7 @@ export function createMessagesRouter(): Router {
           signal: activeRun.controller.signal,
           stream: { emit },
           logPrefix: "web.chat.stream",
-          logFields: { fileCount: input.fileCount, skillCount: input.skillCount, projectCount: input.projectCount },
+          logFields: { fileCount: input.fileCount, fileReferenceCount: input.fileReferenceCount, skillCount: input.skillCount, projectCount: input.projectCount },
         });
       } catch {
         // runPreparedChatTurn 已记录日志并推送 error 事件，这里只负责收尾。
@@ -308,13 +313,6 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    const request = prepareWebMessageRequest(req.body as WebMessageRequestBody, session);
-    if (isWebMessageRequestError(request)) {
-      res.status(request.statusCode).json({ error: request.error });
-      return;
-    }
-    const { input, modelId, providerCommandText } = request;
-
     let sessionWorkdir: string;
     try {
       sessionWorkdir = getSessionWorkdir(session);
@@ -322,6 +320,13 @@ export function createMessagesRouter(): Router {
       res.status(400).json({ error: error instanceof Error ? error.message : "项目目录不可用" });
       return;
     }
+
+    const request = prepareWebMessageRequest(req.body as WebMessageRequestBody, session, sessionWorkdir);
+    if (isWebMessageRequestError(request)) {
+      res.status(request.statusCode).json({ error: request.error });
+      return;
+    }
+    const { input, modelId, providerCommandText } = request;
 
     try {
       const prepared = providerCommandText
@@ -344,7 +349,7 @@ export function createMessagesRouter(): Router {
           });
       const result = await runPreparedChatTurn(prepared, {
         logPrefix: providerCommandText ? "web.chat.provider_command" : "web.chat",
-        logFields: { fileCount: input.fileCount, skillCount: input.skillCount, projectCount: input.projectCount },
+        logFields: { fileCount: input.fileCount, fileReferenceCount: input.fileReferenceCount, skillCount: input.skillCount, projectCount: input.projectCount },
       });
 
       res.json({

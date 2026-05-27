@@ -191,6 +191,7 @@ export class AutomationScheduler {
         [],
         automation.skills.map((skill) => ({ id: skill.id, name: skill.name })),
         [],
+        [],
         { sessionProjectId: session.projectId },
       );
       const prepared = prepareChatTurn({

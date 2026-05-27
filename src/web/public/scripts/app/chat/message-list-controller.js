@@ -191,6 +191,7 @@ export function createMessageListController(config) {
                 contentTruncated: !!m.contentTruncated,
                 contentChars: m.contentChars,
                 createdAt: m.createdAt,
+                fileReferences: meta.fileReferences,
                 skills: meta.skills,
                 projects: meta.projects,
             });

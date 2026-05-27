@@ -1,6 +1,7 @@
 import { createAttachmentController } from '../chat/attachments.js';
 import { createAutomationsPageController } from '../automations/automations-page.js';
 import { createContextUsageController, formatTokenCount } from '../chat/context-usage.js';
+import { createFileReferencePickerController } from '../chat/file-reference-picker.js';
 import { bindChatInputEvents } from '../chat/input-events.js';
 import { createInputHistoryController } from '../chat/input-history.js';
 import { createChatInputUiController } from '../chat/input-ui.js';
@@ -12,6 +13,7 @@ import { createSlashItemsStore } from '../chat/slash-items-store.js';
 import { createSlashPickerController } from '../chat/slash-picker.js';
 import {
     isSelectionOnlyFallback,
+    normalizeMessageFileReferences,
     normalizeMessageProjects,
     normalizeMessageSkills,
 } from '../chat/message-selection.js';
@@ -115,7 +117,9 @@ export function createAnyBotApp(dom, deps) {
         attachBtn,
         attachmentPreview,
         skillPickerEl,
+        filePickerEl,
         selectedSkillsEl,
+        selectedFilesEl,
         dropOverlay,
         chatView,
         channelView,
@@ -127,6 +131,7 @@ export function createAnyBotApp(dom, deps) {
     } = dom;
 
     let contextUsageController = null;
+    let fileReferencePickerController = null;
     let slashItemsStore = null;
     let slashPickerController = null;
     let inputUiController = null;
@@ -158,9 +163,15 @@ export function createAnyBotApp(dom, deps) {
             return pendingAttachments;
         },
         getPromptSelection: function () {
-            return slashPickerController
+            var fileSelection = fileReferencePickerController
+                ? fileReferencePickerController.getSelection()
+                : [];
+            var promptSelection = slashPickerController
                 ? slashPickerController.getSelection()
                 : { skills: [], projects: [] };
+            return slashPickerController
+                ? Object.assign({}, promptSelection, { files: fileSelection })
+                : { skills: [], projects: [], files: fileSelection };
         },
     });
 
@@ -311,6 +322,20 @@ export function createAnyBotApp(dom, deps) {
         updateSendBtnState: updateSendBtnState,
     });
 
+    fileReferencePickerController = createFileReferencePickerController({
+        inputEl: inputEl,
+        filePickerEl: filePickerEl,
+        selectedFilesEl: selectedFilesEl,
+        getCurrentSessionId: function () {
+            return sessionController ? sessionController.getCurrentSessionId() : null;
+        },
+        getCurrentView: function () {
+            return getCurrentView();
+        },
+        resizeChatInput: resizeChatInput,
+        updateSendBtnState: updateSendBtnState,
+    });
+
     const inputHistoryController = createInputHistoryController({
         inputEl: inputEl,
         pageSize: SESSION_MESSAGE_PAGE_SIZE,
@@ -322,9 +347,13 @@ export function createAnyBotApp(dom, deps) {
             return messageListController ? messageListController.getOldestRenderedMessageId() : null;
         },
         getPromptSelection: function () {
-            return slashPickerController.getSelection();
+            var promptSelection = slashPickerController.getSelection();
+            return Object.assign({}, promptSelection, {
+                files: fileReferencePickerController ? fileReferencePickerController.getSelection() : [],
+            });
         },
         isSelectionOnlyFallback: isSelectionOnlyFallback,
+        normalizeMessageFileReferences: normalizeMessageFileReferences,
         normalizeMessageProjects: normalizeMessageProjects,
         normalizeMessageSkills: normalizeMessageSkills,
         parseMessageMetadata: function (raw) {
@@ -332,13 +361,22 @@ export function createAnyBotApp(dom, deps) {
         },
     });
 
-    function applyChatInputDraft(value, skills, projects) {
+    function applyChatInputDraft(value, skills, projects, files) {
         inputEl.value = value;
         slashPickerController.setSelection(skills, projects);
+        fileReferencePickerController.setSelection(files || []);
     }
 
     function closeSkillPicker(options) {
         return slashPickerController.close(options);
+    }
+
+    function closeFilePicker() {
+        if (fileReferencePickerController) fileReferencePickerController.close();
+    }
+
+    function clearFileReferences() {
+        if (fileReferencePickerController) fileReferencePickerController.clearSelection();
     }
 
     bindChatInputEvents({
@@ -353,6 +391,10 @@ export function createAnyBotApp(dom, deps) {
         clearPromptSkillDeleteTarget: function () {
             return slashPickerController.clearDeleteTarget();
         },
+        clearFileDeleteTarget: function () {
+            return fileReferencePickerController.clearDeleteTarget();
+        },
+        closeFilePicker: closeFilePicker,
         dropOverlay: dropOverlay,
         fileInput: fileInput,
         getIsTyping: function () {
@@ -360,6 +402,12 @@ export function createAnyBotApp(dom, deps) {
         },
         handlePromptSkillBackspace: function (e) {
             return slashPickerController.handlePromptBackspace(e);
+        },
+        handleFilePickerKeydown: function (e) {
+            return fileReferencePickerController.handleKeydown(e);
+        },
+        handleFileReferenceDelete: function (e) {
+            return fileReferencePickerController.handleSelectedFileDelete(e);
         },
         handleSkillPickerKeydown: function (e) {
             return slashPickerController.handleKeydown(e);
@@ -385,6 +433,9 @@ export function createAnyBotApp(dom, deps) {
         },
         syncSkillPickerFromInput: function () {
             return slashPickerController.syncFromInput();
+        },
+        syncFilePickerFromInput: function () {
+            return fileReferencePickerController.syncFromInput();
         },
         updateSendBtnState: updateSendBtnState,
         uploadFiles: function (files) {
@@ -514,6 +565,8 @@ export function createAnyBotApp(dom, deps) {
         clearPromptSkills: function () {
             return slashPickerController.clearPromptSelections();
         },
+        closeFilePicker: closeFilePicker,
+        clearFileReferences: clearFileReferences,
         clearSessionModelSelection: function (sessionId) {
             settingsController.clearSessionModelSelection(sessionId);
         },
@@ -601,6 +654,7 @@ export function createAnyBotApp(dom, deps) {
                 isTyping: sessionController.getIsTyping(),
                 modelConfig: settingsController.getModelConfig(),
                 pendingAttachments: pendingAttachments,
+                fileReferences: fileReferencePickerController ? fileReferencePickerController.getSelection() : [],
                 promptProjects: promptSelection.projects,
                 promptSkills: promptSelection.skills,
                 providerData: settingsController.getProviderData(),
@@ -654,8 +708,8 @@ export function createAnyBotApp(dom, deps) {
         fetchSessions: function () {
             return sidebarController.fetchSessions();
         },
-        rememberSentUserMessage: function (text, skills, projects) {
-            return inputHistoryController.rememberSentUserMessage(text, skills, projects);
+        rememberSentUserMessage: function (text, skills, projects, files) {
+            return inputHistoryController.rememberSentUserMessage(text, skills, projects, files);
         },
         removeTyping: function () {
             return messageListController.removeTyping();
@@ -682,11 +736,19 @@ export function createAnyBotApp(dom, deps) {
         if (slashPickerController.isOpen() && skillPickerEl && e.target !== inputEl && !skillPickerEl.contains(e.target)) {
             closeSkillPicker();
         }
+        if (fileReferencePickerController.isOpen() && filePickerEl && e.target !== inputEl && !filePickerEl.contains(e.target)) {
+            closeFilePicker();
+        }
         settingsController.handleDocumentClick(e);
     });
 
     documentRef.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
+            if (fileReferencePickerController.isOpen()) {
+                closeFilePicker();
+                if (documentRef.activeElement === inputEl) inputEl.focus();
+                return;
+            }
             if (slashPickerController.isOpen()) {
                 closeSkillPicker({ removeTrigger: documentRef.activeElement === inputEl });
                 if (documentRef.activeElement === inputEl) inputEl.focus();

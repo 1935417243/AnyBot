@@ -37,6 +37,7 @@ export function createChatInputUiController(options) {
         var promptSelection = getPromptSelection();
         var skills = promptSelection.skills || [];
         var projects = promptSelection.projects || [];
+        var files = promptSelection.files || [];
 
         sendBtn.classList.toggle('is-stop', isRunning);
         sendBtn.innerHTML = isRunning ? STOP_BUTTON_ICON : SEND_BUTTON_ICON;
@@ -48,7 +49,8 @@ export function createChatInputUiController(options) {
                 inputEl.value.trim() === '' &&
                 getPendingAttachments().length === 0 &&
                 skills.length === 0 &&
-                projects.length === 0
+                projects.length === 0 &&
+                files.length === 0
             );
     }
 
