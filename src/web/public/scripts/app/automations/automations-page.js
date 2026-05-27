@@ -87,7 +87,6 @@ export function createAutomationsPageController(options) {
         if (schedule.type === 'hourly') return '每小时';
         if (schedule.type === 'daily') return '每天 ' + (schedule.time || '09:00');
         if (schedule.type === 'weekly') return '每' + (WEEKDAY_LABELS[schedule.weekday] || '周一') + ' ' + (schedule.time || '09:00');
-        if (schedule.type === 'cron') return 'Cron: ' + (schedule.cron || '0 9 * * 1');
         return '未配置';
     }
 
@@ -129,7 +128,6 @@ export function createAutomationsPageController(options) {
             next.setDate(next.getDate() + daysAhead);
             return formatDateTime(next);
         }
-        if (schedule.type === 'cron') return '按 Cron 表达式计算';
         return '未配置';
     }
 
@@ -501,6 +499,7 @@ export function createAutomationsPageController(options) {
     function renderEditor(automation) {
         var editor = document.getElementById('automation-editor');
         var schedule = automation && automation.schedule ? automation.schedule : { type: 'minutes', intervalMinutes: 30 };
+        if (schedule.type === 'cron') schedule = { type: 'minutes', intervalMinutes: 30 };
         selectedScheduleType = schedule.type || 'minutes';
         selectedWeekday = Number(schedule.weekday ?? 1);
         editor.innerHTML =
@@ -617,7 +616,6 @@ export function createAutomationsPageController(options) {
             { value: 'hourly', label: '每小时' },
             { value: 'daily', label: '每天' },
             { value: 'weekly', label: '每周' },
-            { value: 'cron', label: 'Cron 表达式' },
         ];
     }
 
@@ -707,8 +705,6 @@ export function createAutomationsPageController(options) {
                 return { value: String(key), label: WEEKDAY_LABELS[key] };
             }), String(selectedWeekday), '选择星期')) +
                 formField('执行时间', '<input class="automation-input" id="automation-time-input" type="time" value="' + escapeHtml(current.time || '09:00') + '">');
-        } else if (type === 'cron') {
-            html = formField('Cron 表达式', '<input class="automation-input mono" id="automation-cron-input" value="' + escapeHtml(current.cron || '0 9 * * 1') + '" placeholder="0 9 * * 1"><span class="automation-hint">V1 使用 5 位 Cron：分 时 日 月 周</span>');
         }
         extra.innerHTML = html;
         Array.prototype.slice.call(extra.querySelectorAll('input, select')).forEach(function (input) {
@@ -728,7 +724,6 @@ export function createAutomationsPageController(options) {
         if (type === 'minutes') schedule.intervalMinutes = Number(document.getElementById('automation-minute-input').value || 30);
         if (type === 'daily' || type === 'weekly') schedule.time = document.getElementById('automation-time-input').value || '09:00';
         if (type === 'weekly') schedule.weekday = Number(selectedWeekday ?? 1);
-        if (type === 'cron') schedule.cron = document.getElementById('automation-cron-input').value.trim() || '0 9 * * 1';
         return schedule;
     }
 
