@@ -2,17 +2,62 @@ import { escapeHtml } from '../utils/html.js';
 import { getFileIconHtml, normalizeMessageFileReferences } from './message-selection.js';
 
 const MAX_VISIBLE_FILES = 120;
+const NO_MATCH = Number.POSITIVE_INFINITY;
 
-function matchesTerm(values, term) {
-    return values.some(function (value) {
-        var normalized = String(value || '').toLowerCase();
-        if (!normalized) return false;
-        if (normalized.indexOf(term) !== -1) return true;
-        return normalized
-            .split(/[^a-z0-9\u4e00-\u9fff]+/)
-            .filter(Boolean)
-            .some(function (part) { return part.startsWith(term); });
-    });
+function normalizeSearchValue(value) {
+    return String(value || '').toLowerCase().replace(/\\/g, '/');
+}
+
+function splitSearchParts(value) {
+    return normalizeSearchValue(value)
+        .split(/[^a-z0-9\u4e00-\u9fff]+/)
+        .filter(Boolean);
+}
+
+function scoreFileNameMatch(fileName, term) {
+    var normalized = normalizeSearchValue(fileName);
+    if (!normalized) return NO_MATCH;
+    if (normalized === term) return 0;
+    if (normalized.startsWith(term)) return 10;
+    if (normalized.indexOf(term) !== -1) return 20;
+    if (splitSearchParts(normalized).some(function (part) { return part.startsWith(term); })) return 30;
+    return NO_MATCH;
+}
+
+function scorePathSegmentMatch(filePath, term) {
+    var normalized = normalizeSearchValue(filePath);
+    var segments = normalized.split('/').filter(Boolean);
+    if (segments.some(function (segment) { return segment === term; })) return 40;
+    if (segments.some(function (segment) { return segment.startsWith(term); })) return 45;
+    if (splitSearchParts(normalized).some(function (part) { return part.startsWith(term); })) return 50;
+    return NO_MATCH;
+}
+
+function scorePathQueryMatch(filePath, term) {
+    var normalized = normalizeSearchValue(filePath);
+    if (!normalized) return NO_MATCH;
+    if (normalized === term) return 0;
+    if (normalized.startsWith(term)) return 5;
+    if (normalized.endsWith('/' + term)) return 8;
+    if (normalized.indexOf('/' + term) !== -1) return 10;
+    if (normalized.indexOf(term) !== -1) return 15;
+    return NO_MATCH;
+}
+
+function scoreFileMatch(file, term) {
+    var normalizedTerm = normalizeSearchValue(term).trim();
+    if (!normalizedTerm) return 0;
+    if (normalizedTerm.indexOf('/') !== -1) {
+        return Math.min(
+            scorePathQueryMatch(file.path, normalizedTerm),
+            scoreFileNameMatch(file.name, normalizedTerm) + 20
+        );
+    }
+    return Math.min(
+        scoreFileNameMatch(file.name, normalizedTerm),
+        scorePathSegmentMatch(file.path, normalizedTerm),
+        normalizeSearchValue(file.path).indexOf(normalizedTerm) !== -1 ? 70 : NO_MATCH
+    );
 }
 
 function normalizeFiles(files) {
@@ -129,9 +174,23 @@ export function createFileReferencePickerController(config) {
             return !selectedPaths.has(file.path);
         });
         if (term) {
-            nextFiltered = nextFiltered.filter(function (file) {
-                return matchesTerm([file.path, file.name], term);
-            });
+            nextFiltered = nextFiltered
+                .map(function (file) {
+                    return {
+                        file: file,
+                        score: scoreFileMatch(file, term),
+                    };
+                })
+                .filter(function (entry) {
+                    return entry.score !== NO_MATCH;
+                })
+                .sort(function (a, b) {
+                    if (a.score !== b.score) return a.score - b.score;
+                    return a.file.path.localeCompare(b.file.path);
+                })
+                .map(function (entry) {
+                    return entry.file;
+                });
         }
         filteredFiles = nextFiltered.slice(0, MAX_VISIBLE_FILES);
         if (activeIndex >= filteredFiles.length) {
