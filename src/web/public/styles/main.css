@@ -3231,6 +3231,18 @@
             outline: none;
         }
 
+        .skill-picker-item.is-disabled {
+            color: var(--text-dim);
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .skill-picker-item.is-disabled .skill-picker-icon,
+        .skill-picker-item.is-disabled .skill-picker-name,
+        .skill-picker-item.is-disabled .skill-picker-desc {
+            color: var(--text-dim);
+        }
+
         .skill-picker-icon {
             width: 17px;
             height: 17px;

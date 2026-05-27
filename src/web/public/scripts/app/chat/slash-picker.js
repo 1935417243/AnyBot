@@ -131,9 +131,7 @@ export function createSlashPickerController(config) {
             });
         }
         filteredItems = nextFiltered;
-        if (activeIndex >= filteredItems.length) {
-            activeIndex = Math.max(0, filteredItems.length - 1);
-        }
+        normalizeActiveIndex();
     }
 
     function matchesTerm(values, term) {
@@ -163,12 +161,31 @@ export function createSlashPickerController(config) {
         return String(Math.round(n));
     }
 
+    function getCompactContextUsage() {
+        var usage = config.getLatestContextUsage ? config.getLatestContextUsage() : null;
+        var usedTokens = Number(usage && usage.usedTokens || 0);
+        return {
+            usage: usage,
+            usedTokens: Number.isFinite(usedTokens) ? usedTokens : 0,
+        };
+    }
+
+    function isCompactCommand(item) {
+        return item && item.pickerType === 'provider-command' && item.id === 'compact';
+    }
+
+    function isPickerItemDisabled(item) {
+        if (!isCompactCommand(item)) return false;
+        return getCompactContextUsage().usedTokens <= 0;
+    }
+
     function getPickerItemDetailText(item) {
         if (!item) return '';
+        if (isPickerItemDisabled(item)) return '当前上下文为 0，暂无需压缩';
         if (item.pickerType === 'project') return item.path || item.description || '';
-        if (item.pickerType === 'provider-command' && item.id === 'compact') {
-            var usage = config.getLatestContextUsage ? config.getLatestContextUsage() : null;
-            var percent = formatUsagePercent(usage && usage.usedPercentage);
+        if (isCompactCommand(item)) {
+            var compactUsage = getCompactContextUsage();
+            var percent = formatUsagePercent(compactUsage.usage && compactUsage.usage.usedPercentage);
             var base = item.description || '压缩此对话的上下文';
             return percent ? base + '（已使用 ' + percent + '%）' : base;
         }
@@ -225,20 +242,55 @@ export function createSlashPickerController(config) {
         renderPicker();
     }
 
+    function findSelectableIndex(startIndex, delta) {
+        if (filteredItems.length === 0) return -1;
+        var count = filteredItems.length;
+        var index = startIndex;
+        for (var i = 0; i < count; i++) {
+            index = (index + delta + count) % count;
+            if (!isPickerItemDisabled(filteredItems[index])) return index;
+        }
+        return -1;
+    }
+
+    function normalizeActiveIndex() {
+        if (filteredItems.length === 0) {
+            activeIndex = 0;
+            visualActive = false;
+            return;
+        }
+        if (activeIndex >= filteredItems.length) {
+            activeIndex = Math.max(0, filteredItems.length - 1);
+        }
+        if (activeIndex < 0) activeIndex = 0;
+        if (!isPickerItemDisabled(filteredItems[activeIndex])) return;
+
+        var nextIndex = findSelectableIndex(activeIndex, 1);
+        if (nextIndex === -1) {
+            activeIndex = 0;
+            visualActive = false;
+            return;
+        }
+        activeIndex = nextIndex;
+    }
+
     function moveActive(delta) {
         if (filteredItems.length === 0) return;
-        var count = filteredItems.length;
+        var nextIndex = -1;
         if (!visualActive) {
-            activeIndex = delta > 0 ? 0 : count - 1;
+            nextIndex = findSelectableIndex(delta > 0 ? -1 : 0, delta);
         } else {
-            activeIndex = (activeIndex + delta + count) % count;
+            nextIndex = findSelectableIndex(activeIndex, delta);
         }
+        if (nextIndex === -1) return;
+        activeIndex = nextIndex;
         visualActive = true;
         updateActiveItem(true);
     }
 
     function setActiveIndex(index) {
         if (index < 0 || index >= filteredItems.length) return;
+        if (isPickerItemDisabled(filteredItems[index])) return;
         if (activeIndex === index && visualActive) return;
         activeIndex = index;
         visualActive = true;
@@ -249,7 +301,8 @@ export function createSlashPickerController(config) {
         if (!config.skillPickerEl) return;
         var activeItem = null;
         Array.prototype.forEach.call(config.skillPickerEl.querySelectorAll('.skill-picker-item'), function (item) {
-            var isActive = visualActive && Number(item.dataset.index) === activeIndex;
+            var pickerItem = filteredItems[Number(item.dataset.index)];
+            var isActive = visualActive && !isPickerItemDisabled(pickerItem) && Number(item.dataset.index) === activeIndex;
             item.classList.toggle('active', isActive);
             item.setAttribute('aria-selected', isActive ? 'true' : 'false');
             if (isActive) activeItem = item;
@@ -402,6 +455,7 @@ export function createSlashPickerController(config) {
 
     function commitItem(item) {
         if (!item || pickerTokenStart === null || pickerTokenEnd === null) return;
+        if (isPickerItemDisabled(item)) return;
         var value = config.inputEl.value;
         if (item.pickerType === 'project') {
             var nextValue = value.slice(0, pickerTokenStart) + value.slice(pickerTokenEnd);
@@ -491,12 +545,15 @@ export function createSlashPickerController(config) {
 
     function createPickerItem(item, index) {
         var node = document.createElement('button');
-        var isActive = visualActive && index === activeIndex;
-        node.className = 'skill-picker-item' + (isActive ? ' active' : '');
+        var disabled = isPickerItemDisabled(item);
+        var isActive = visualActive && !disabled && index === activeIndex;
+        node.className = 'skill-picker-item' + (isActive ? ' active' : '') + (disabled ? ' is-disabled' : '');
         node.type = 'button';
+        node.disabled = disabled;
         node.dataset.index = String(index);
         node.setAttribute('role', 'option');
         node.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        if (disabled) node.setAttribute('aria-disabled', 'true');
 
         var iconHtml = item.pickerType === 'project'
             ? getProjectIconHtml('skill-picker-icon project')
