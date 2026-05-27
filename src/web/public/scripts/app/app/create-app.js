@@ -705,6 +705,7 @@ export function createAnyBotApp(dom, deps) {
         clearPromptSkills: function () {
             return slashPickerController.clearPromptSelections();
         },
+        clearFileReferences: clearFileReferences,
         fetchSessions: function () {
             return sidebarController.fetchSessions();
         },
