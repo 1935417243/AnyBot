@@ -5,9 +5,8 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（0.1.20）
-- WebUI 新增 `@` 文件引用：在输入框输入 `@` 搜索当前会话项目文件，选中文件后随本轮消息作为引用上下文发送。
-- `/compact` 增加防呆：当前上下文为空时会禁用压缩命令，并提示暂无需压缩。
+### 本次更新（0.1.21）
+- 技能管理页支持下载官方技能包，可按 Provider 拉取 Claude Code 和 Codex 官方技能。
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
