@@ -7,6 +7,7 @@ export function createSkillsPageController(options) {
     var skillsData = null;
     var skillsDataProvider = '';
     var skillsSearchTerm = '';
+    var officialSkillsDownloadActive = false;
 
     function getActiveSlashProviderType() {
         return options.getActiveSlashProviderType ? options.getActiveSlashProviderType() : '';
@@ -26,6 +27,10 @@ export function createSkillsPageController(options) {
 
     function showError(message) {
         if (options.showError) options.showError(message);
+    }
+
+    function isClaudeCodeProvider(providerType) {
+        return providerType === 'claude-code' || providerType === 'claude-agent';
     }
 
     async function fetchSkills() {
@@ -88,6 +93,19 @@ export function createSkillsPageController(options) {
             });
         });
 
+        var downloadOfficialBtn = null;
+        if (isClaudeCodeProvider(skillsDataProvider || getActiveSlashProviderType())) {
+            downloadOfficialBtn = document.createElement('button');
+            downloadOfficialBtn.className = 'skills-toolbar-btn';
+            downloadOfficialBtn.title = '下载官方技能';
+            downloadOfficialBtn.setAttribute('aria-label', '下载官方技能');
+            downloadOfficialBtn.disabled = officialSkillsDownloadActive;
+            downloadOfficialBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v7M4.25 5.75L7 8.5l2.75-2.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9.5v1.75a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            downloadOfficialBtn.addEventListener('click', function () {
+                openOfficialSkillsDownloadModal(skillsDataProvider || getActiveSlashProviderType());
+            });
+        }
+
         var openFolderBtn = document.createElement('button');
         openFolderBtn.className = 'skills-toolbar-btn';
         openFolderBtn.title = '打开文件夹';
@@ -102,6 +120,7 @@ export function createSkillsPageController(options) {
 
         toolbar.appendChild(searchInput);
         toolbar.appendChild(refreshBtn);
+        if (downloadOfficialBtn) toolbar.appendChild(downloadOfficialBtn);
         toolbar.appendChild(openFolderBtn);
         page.appendChild(toolbar);
 
@@ -200,6 +219,217 @@ export function createSkillsPageController(options) {
                 showSkillsSaveStatus('已删除: ' + deletedSkill.name);
             },
         });
+    }
+
+    function closeOfficialSkillsDownloadModal(overlay) {
+        if (officialSkillsDownloadActive) return;
+        overlay.classList.remove('open');
+        setTimeout(function () {
+            overlay.remove();
+        }, 160);
+    }
+
+    function setOfficialSkillsDownloadModalState(overlay, state) {
+        var confirmActions = overlay.querySelector('[data-role="confirm-actions"]');
+        var progressView = overlay.querySelector('[data-role="progress-view"]');
+        var confirmBtn = overlay.querySelector('[data-role="confirm"]');
+        var cancelBtn = overlay.querySelector('[data-role="cancel"]');
+        var doneBtn = overlay.querySelector('[data-role="done"]');
+        var titleEl = overlay.querySelector('[data-role="title"]');
+
+        overlay.dataset.state = state;
+        if (confirmActions) confirmActions.hidden = state !== 'confirm';
+        if (progressView) progressView.hidden = state === 'confirm';
+        if (confirmBtn) confirmBtn.disabled = state !== 'confirm';
+        if (cancelBtn) cancelBtn.disabled = state !== 'confirm';
+        if (doneBtn) doneBtn.hidden = state === 'confirm' || state === 'downloading';
+        if (titleEl) titleEl.textContent = state === 'confirm' ? '下载官方技能' : 'Anthropic 官方技能包';
+    }
+
+    function openOfficialSkillsDownloadModal(providerType) {
+        if (officialSkillsDownloadActive || !isClaudeCodeProvider(providerType)) return;
+
+        var existing = document.getElementById('official-skills-download-overlay');
+        if (existing) {
+            existing.classList.add('open');
+            return;
+        }
+
+        var overlay = document.createElement('div');
+        overlay.className = 'skills-download-overlay open';
+        overlay.id = 'official-skills-download-overlay';
+        overlay.innerHTML =
+            '<div class="skills-download-modal" role="dialog" aria-modal="true" aria-labelledby="official-skills-download-title">' +
+            '<div class="skills-download-header">' +
+            '<div class="skills-download-icon">' +
+            '<svg width="18" height="18" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v7M4.25 5.75L7 8.5l2.75-2.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9.5v1.75a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '</div>' +
+            '<div>' +
+            '<div class="skills-download-title" id="official-skills-download-title" data-role="title">下载官方技能</div>' +
+            '<div class="skills-download-subtitle">Anthropic 官方技能包</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="skills-download-confirm" data-role="confirm-actions">' +
+            '<div class="skills-download-message">是否下载 Anthropic 官方技能包？已有同名技能文件夹会跳过，不会覆盖。</div>' +
+            '<div class="skills-download-actions">' +
+            '<button class="skills-footer-btn" type="button" data-role="cancel">取消</button>' +
+            '<button class="skills-footer-btn primary" type="button" data-role="confirm">下载</button>' +
+            '</div>' +
+            '</div>' +
+            '<div class="skills-download-progress" data-role="progress-view" hidden>' +
+            '<div class="skills-download-message" data-role="message">准备下载...</div>' +
+            '<div class="skills-download-progress-bar"><span data-role="progress-fill"></span></div>' +
+            '<div class="skills-download-progress-meta">' +
+            '<span data-role="percent">0%</span>' +
+            '<span data-role="counts">已安装 0 · 跳过 0 · 失败 0</span>' +
+            '</div>' +
+            '<div class="skills-download-target" data-role="target" hidden></div>' +
+            '<div class="skills-download-actions">' +
+            '<button class="skills-footer-btn primary" type="button" data-role="done" hidden>完成</button>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) closeOfficialSkillsDownloadModal(overlay);
+        });
+        overlay.querySelector('[data-role="cancel"]').addEventListener('click', function () {
+            closeOfficialSkillsDownloadModal(overlay);
+        });
+        overlay.querySelector('[data-role="done"]').addEventListener('click', function () {
+            closeOfficialSkillsDownloadModal(overlay);
+        });
+        overlay.querySelector('[data-role="confirm"]').addEventListener('click', function () {
+            downloadOfficialSkills(providerType, overlay);
+        });
+    }
+
+    function setDownloadToolbarButtonsDisabled(disabled) {
+        var buttons = skillsView.querySelectorAll('.skills-toolbar-btn[aria-label="下载官方技能"]');
+        buttons.forEach(function (button) {
+            button.disabled = disabled;
+        });
+    }
+
+    function normalizeDownloadEvent(raw) {
+        return raw && typeof raw === 'object' ? raw : {};
+    }
+
+    function formatDownloadCounts(event) {
+        var installed = Array.isArray(event.installed) ? event.installed.length : 0;
+        var skipped = Array.isArray(event.skipped) ? event.skipped.length : 0;
+        var failed = Array.isArray(event.failed) ? event.failed.length : 0;
+        return '已安装 ' + installed + ' · 跳过 ' + skipped + ' · 失败 ' + failed;
+    }
+
+    function renderOfficialSkillsDownloadProgress(overlay, rawEvent) {
+        var event = normalizeDownloadEvent(rawEvent);
+        var messageEl = overlay.querySelector('[data-role="message"]');
+        var fillEl = overlay.querySelector('[data-role="progress-fill"]');
+        var percentEl = overlay.querySelector('[data-role="percent"]');
+        var countsEl = overlay.querySelector('[data-role="counts"]');
+        var targetEl = overlay.querySelector('[data-role="target"]');
+        var doneBtn = overlay.querySelector('[data-role="done"]');
+        var percent = Number(event.percent);
+        if (!Number.isFinite(percent)) percent = event.phase === 'discovering' ? 8 : 0;
+        percent = Math.max(0, Math.min(100, percent));
+
+        if (messageEl) messageEl.textContent = event.message || '正在下载官方技能...';
+        if (fillEl) fillEl.style.width = percent.toFixed(1) + '%';
+        if (percentEl) percentEl.textContent = percent.toFixed(0) + '%';
+        if (countsEl) countsEl.textContent = formatDownloadCounts(event);
+        if (targetEl && event.targetDir) {
+            targetEl.hidden = false;
+            targetEl.textContent = '已放到：' + event.targetDir;
+        }
+
+        if (event.phase === 'completed' || event.phase === 'failed') {
+            officialSkillsDownloadActive = false;
+            setDownloadToolbarButtonsDisabled(false);
+            if (doneBtn) doneBtn.hidden = false;
+            if (event.phase === 'completed') {
+                if (messageEl) messageEl.textContent = '技能下载完成，已放到对应位置。';
+                showSkillsSaveStatus('技能下载完成，已放到对应位置');
+            } else if (!overlay._downloadFailureReported) {
+                overlay._downloadFailureReported = true;
+                showError(event.message || '下载官方技能失败');
+            }
+            if (!overlay._skillsRefreshedAfterDownload && Number(event.total || 0) > 0) {
+                overlay._skillsRefreshedAfterDownload = true;
+                fetchSkills().then(function () {
+                    renderSkillsView();
+                    showSkillsSaveStatus(event.phase === 'completed' ? '技能下载完成，已放到对应位置' : '官方技能下载完成，部分失败');
+                });
+            }
+        }
+    }
+
+    function renderOfficialSkillsDownloadFailure(overlay, message) {
+        setOfficialSkillsDownloadModalState(overlay, 'failed');
+        renderOfficialSkillsDownloadProgress(overlay, {
+            phase: 'failed',
+            message: message || '下载官方技能失败',
+            percent: 100,
+            completed: 0,
+            total: 0,
+            installed: [],
+            skipped: [],
+            failed: [{ name: 'official-skills', error: message || '下载官方技能失败' }],
+        });
+    }
+
+    function handleDownloadStreamLine(line, overlay) {
+        if (!line.trim()) return;
+        try {
+            renderOfficialSkillsDownloadProgress(overlay, JSON.parse(line));
+        } catch (e) {
+            console.error('Failed to parse official skills download event:', e);
+        }
+    }
+
+    async function downloadOfficialSkills(providerType, overlay) {
+        officialSkillsDownloadActive = true;
+        setDownloadToolbarButtonsDisabled(true);
+        setOfficialSkillsDownloadModalState(overlay, 'downloading');
+
+        try {
+            var res = await fetch('/api/skills/download-official', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: providerType }),
+            });
+            if (!res.ok) {
+                var errorData = await res.json().catch(function () { return {}; });
+                throw new Error(errorData.error || '下载官方技能失败');
+            }
+            if (!res.body || !window.TextDecoder) {
+                throw new Error('当前浏览器不支持下载进度流');
+            }
+
+            var reader = res.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = '';
+            while (true) {
+                var chunk = await reader.read();
+                if (chunk.done) break;
+                buffer += decoder.decode(chunk.value, { stream: true });
+                var lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                lines.forEach(function (line) {
+                    handleDownloadStreamLine(line, overlay);
+                });
+            }
+            buffer += decoder.decode();
+            handleDownloadStreamLine(buffer, overlay);
+        } catch (e) {
+            var message = e && e.message ? e.message : '下载官方技能失败';
+            officialSkillsDownloadActive = false;
+            setDownloadToolbarButtonsDisabled(false);
+            renderOfficialSkillsDownloadFailure(overlay, message);
+            showError(message);
+        }
     }
 
     function handleKeydown(e) {

@@ -41,6 +41,10 @@ function getClaudeConfigDir(): string {
   return path.resolve(expandHomeDir(configDir || path.join(os.homedir(), ".claude"))).normalize("NFC");
 }
 
+export function getClaudeSkillsDir(): string {
+  return path.join(getClaudeConfigDir(), "skills");
+}
+
 function getCodexHome(): string {
   const codexHome = process.env.CODEX_HOME?.trim();
   return path.resolve(expandHomeDir(codexHome || path.join(os.homedir(), ".codex"))).normalize("NFC");
@@ -51,7 +55,7 @@ const PROVIDER_SKILL_DIRS: Record<string, () => SkillSource[]> = {
     return [{ label: "Codex 技能", dir: path.join(getCodexHome(), "skills") }];
   },
   "claude-code": () => {
-    return [{ label: "Claude Code 技能", dir: path.join(getClaudeConfigDir(), "skills") }];
+    return [{ label: "Claude Code 技能", dir: getClaudeSkillsDir() }];
   },
 };
 
