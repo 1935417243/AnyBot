@@ -16,13 +16,8 @@
             } catch (_) {}
         })();
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet">
     <link id="highlight-theme" rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/lib/marked.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+          href="vendor/highlight/github-dark-dimmed.min.css">
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/claude-agent-loop.css">
     <link rel="stylesheet" href="styles/change-review.css">
@@ -420,6 +415,9 @@
     </div>
 </main>
 
+<script src="vendor/marked/marked.umd.js"></script>
+<script src="vendor/dompurify/purify.min.js"></script>
+<script src="vendor/highlight/highlight.min.js"></script>
 <script src="scripts/change-review.js"></script>
 <script src="scripts/claude-agent-loop.js"></script>
 <script type="module" src="scripts/app/main.js"></script>

@@ -9,8 +9,8 @@ const THEME_OPTIONS = [
     {id: 'dark', name: '深色'},
     {id: 'system', name: '自动'},
 ];
-const HIGHLIGHT_DARK_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css';
-const HIGHLIGHT_LIGHT_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+const HIGHLIGHT_DARK_CSS = 'vendor/highlight/github-dark-dimmed.min.css';
+const HIGHLIGHT_LIGHT_CSS = 'vendor/highlight/github.min.css';
 
 export function createSettingsController(options) {
     const addProjectBtn = options.addProjectBtn;
