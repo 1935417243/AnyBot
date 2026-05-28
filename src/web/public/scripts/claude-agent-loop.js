@@ -36,6 +36,15 @@
         }
     }
 
+    function enhanceLocalFileLinks(root) {
+        if (
+            window.AnyBotLocalFiles &&
+            typeof window.AnyBotLocalFiles.enhance === 'function'
+        ) {
+            window.AnyBotLocalFiles.enhance(root);
+        }
+    }
+
     function parseSseChunk(buffer, onEvent) {
         var boundary = buffer.indexOf('\n\n');
         while (boundary !== -1) {
@@ -254,6 +263,7 @@
                 ? (state.answerIsTruncated ? answerText : answerText.slice(0, LARGE_MESSAGE_PREVIEW_CHARS) + '\n\n...[内容较长，已折叠]')
                 : answerText;
             finalEl.innerHTML = renderMarkdown(visibleText);
+            enhanceLocalFileLinks(finalEl);
             finalEl.querySelectorAll('pre code').forEach(function (block) {
                 if (typeof hljs !== 'undefined') hljs.highlightElement(block);
             });
@@ -276,6 +286,7 @@
                         }
                     }
                     finalEl.innerHTML = renderMarkdown(state.answerText);
+                    enhanceLocalFileLinks(finalEl);
                     finalEl.querySelectorAll('pre code').forEach(function (block) {
                         if (typeof hljs !== 'undefined') hljs.highlightElement(block);
                     });

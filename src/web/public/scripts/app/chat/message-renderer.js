@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/html.js';
+import { enhanceLocalFileLinks } from './local-file-links.js';
 import {
     createMessageFileRefs,
     createMessageProjectRefs,
@@ -31,6 +32,7 @@ export function createMessageRenderer(config) {
         } catch (e) {
             content.textContent = renderText;
         }
+        enhanceLocalFileLinks(content);
         if (!isLarge) return;
 
         var expand = document.createElement('button');
@@ -56,6 +58,7 @@ export function createMessageRenderer(config) {
             } catch (e) {
                 content.textContent = nextText;
             }
+            enhanceLocalFileLinks(content);
         });
         content.appendChild(expand);
     }

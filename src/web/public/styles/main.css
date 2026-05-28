@@ -3017,6 +3017,33 @@
             border-bottom-color: var(--link);
         }
 
+        .message-row.ai .message-content .local-file-link {
+            display: inline;
+            padding: 0;
+            border: 0;
+            border-bottom: 1px solid var(--link-border);
+            background: transparent;
+            color: var(--link);
+            cursor: pointer;
+            font: inherit;
+            line-height: inherit;
+            overflow-wrap: anywhere;
+            text-align: left;
+            transition: border-color 0.15s;
+            max-width: 100%;
+        }
+
+        .message-row.ai .message-content .local-file-link:hover,
+        .message-row.ai .message-content .local-file-link:focus-visible {
+            border-bottom-color: var(--link);
+            outline: none;
+        }
+
+        .message-row.ai .message-content .local-file-link:disabled {
+            cursor: default;
+            opacity: 0.7;
+        }
+
         .message-row.ai .message-content img {
             max-width: 100%;
             border-radius: 8px;

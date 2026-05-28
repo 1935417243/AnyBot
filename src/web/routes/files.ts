@@ -4,8 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import multer from "multer";
 import { logger } from "../../logger.js";
+import { openFile, revealFileInFolder } from "../../utils/open-directory.js";
 import * as db from "../db.js";
-import { getUploadDir, isImageFile, listMentionableFiles } from "../services/files.js";
+import { getUploadDir, isHtmlFile, isImageFile, listMentionableFiles, resolveLocalFilePath } from "../services/files.js";
 import { getSessionWorkdir } from "../services/projects.js";
 
 const storage = multer.diskStorage({
@@ -58,6 +59,67 @@ export function createFilesRouter(): Router {
       return;
     }
     res.sendFile(resolved);
+  });
+
+  router.post("/local-file/open", async (req: Request, res: Response) => {
+    const filePath = typeof req.body?.path === "string" ? req.body.path : "";
+    if (!filePath) {
+      res.status(400).json({ error: "缺少 path 参数" });
+      return;
+    }
+
+    let resolved: string;
+    try {
+      resolved = resolveLocalFilePath(filePath);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "路径无效" });
+      return;
+    }
+
+    if (!isHtmlFile(resolved)) {
+      res.status(403).json({ error: "只允许打开 HTML 文件" });
+      return;
+    }
+
+    try {
+      const stat = fs.statSync(resolved);
+      if (!stat.isFile()) {
+        res.status(404).json({ error: "文件不存在" });
+        return;
+      }
+      await openFile(resolved);
+      res.json({ ok: true, path: resolved });
+    } catch (error) {
+      res.status(fs.existsSync(resolved) ? 500 : 404).json({
+        error: fs.existsSync(resolved)
+          ? (error instanceof Error ? error.message : "打开文件失败")
+          : "文件不存在",
+      });
+    }
+  });
+
+  router.post("/local-file/reveal", async (req: Request, res: Response) => {
+    const filePath = typeof req.body?.path === "string" ? req.body.path : "";
+    if (!filePath) {
+      res.status(400).json({ error: "缺少 path 参数" });
+      return;
+    }
+
+    let resolved: string;
+    try {
+      resolved = resolveLocalFilePath(filePath);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "路径无效" });
+      return;
+    }
+
+    const directory = path.dirname(resolved);
+    try {
+      await revealFileInFolder(resolved);
+      res.json({ ok: true, path: resolved, directory });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "打开文件夹失败" });
+    }
   });
 
   router.get("/sessions/:id/files/mentions", async (req: Request, res: Response) => {

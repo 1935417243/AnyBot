@@ -1,11 +1,13 @@
 import { execFile as execFileCallback } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { logger } from "../../logger.js";
 import { getWorkdir } from "../../shared.js";
 
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg", ".ico", ".tiff", ".tif", ".heic", ".heif", ".avif"]);
+const HTML_EXTS = new Set([".html", ".htm"]);
 const MAX_FILE_LIST_ITEMS = 5000;
 const DEFAULT_WORKSPACE_EXCLUDED_DIRS = ["artifacts", "tem", "tmp"];
 const execFile = promisify(execFileCallback);
@@ -22,6 +24,25 @@ export type MentionableFileOptions = {
 
 export function isImageFile(filePath: string): boolean {
   return IMAGE_EXTS.has(path.extname(filePath).toLowerCase());
+}
+
+export function isHtmlFile(filePath: string): boolean {
+  return HTML_EXTS.has(path.extname(filePath).toLowerCase());
+}
+
+export function resolveLocalFilePath(filePath: string): string {
+  let value = String(filePath || "").trim();
+  if (!value || value.includes("\0")) {
+    throw new Error("路径无效");
+  }
+
+  if (/^file:/i.test(value)) {
+    value = fileURLToPath(value);
+  } else if (!path.isAbsolute(value)) {
+    throw new Error("只允许打开绝对路径");
+  }
+
+  return path.resolve(value);
 }
 
 export function getUploadDir(): string {
