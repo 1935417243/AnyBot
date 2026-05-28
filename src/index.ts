@@ -197,6 +197,7 @@ const channelCallbacks: ChannelCallbacks = {
 // --- Startup ---
 
 const WEB_PORT = getConfiguredWebPort();
+const WEB_HOST = "127.0.0.1";
 
 function exitWhenDesktopParentDies(): void {
   const parentPid = Number.parseInt(process.env.ANYBOT_DESKTOP_PARENT_PID || "", 10);
@@ -233,13 +234,14 @@ async function main(): Promise<void> {
     sandbox: getSandbox(),
     logIncludeContent: includeContentInLogs(),
     logIncludePrompt: includePromptInLogs(),
+    webHost: WEB_HOST,
     webPort: WEB_PORT,
   });
 
   const webApp = createApp();
-  webApp.listen(WEB_PORT, () => {
-    logger.info("web.started", { port: WEB_PORT });
-    console.log(`AnyBot Web UI: http://localhost:${WEB_PORT}`);
+  webApp.listen(WEB_PORT, WEB_HOST, () => {
+    logger.info("web.started", { host: WEB_HOST, port: WEB_PORT });
+    console.log(`AnyBot Web UI: http://${WEB_HOST}:${WEB_PORT}`);
     checkDesktopUpdateOnStartup().catch((error) => {
       logger.warn("desktop_update.startup_check_failed", {
         error: error instanceof Error ? error.message : String(error),
