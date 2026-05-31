@@ -408,6 +408,20 @@ export function createSidebarController(options) {
         ensureProjectSessionsLoaded(projectId);
     }
 
+    function toggleProject(projectId) {
+        var shouldExpand = !expandedProjectIds.has(projectId);
+        activeProjectId = projectId;
+        if (shouldExpand) {
+            expandedProjectIds.add(projectId);
+        } else {
+            expandedProjectIds.delete(projectId);
+        }
+        saveStoredSet("expandedProjectIds", expandedProjectIds);
+        if (options.getCurrentView() !== "chat") options.showChatView();
+        renderProjects();
+        if (shouldExpand) ensureProjectSessionsLoaded(projectId);
+    }
+
     function confirmProjectDelete(project) {
         return new Promise(function (resolve) {
             var existing = document.getElementById("project-delete-confirm-overlay");
@@ -640,18 +654,7 @@ export function createSidebarController(options) {
                 '</button>';
             row.querySelector(".project-name").textContent = project.name;
             row.addEventListener("click", function () {
-                if (activeProjectId === project.id) {
-                    if (isExpanded) {
-                        expandedProjectIds.delete(project.id);
-                    } else {
-                        expandedProjectIds.add(project.id);
-                    }
-                    saveStoredSet("expandedProjectIds", expandedProjectIds);
-                    renderProjects();
-                    if (!isExpanded) ensureProjectSessionsLoaded(project.id);
-                    return;
-                }
-                selectProject(project.id);
+                toggleProject(project.id);
             });
             row.addEventListener("keydown", function (e) {
                 if (e.target !== row) return;
