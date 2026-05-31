@@ -27,6 +27,7 @@ export function getAppDom(documentRef) {
         currentModelNameEl: byId(documentRef, 'current-model-name'),
 
         settingsBtn: byId(documentRef, 'settings-btn'),
+        sidebarUpdateBtn: byId(documentRef, 'sidebar-update-btn'),
         settingsView: byId(documentRef, 'settings-view'),
         settingsCancelBtn: byId(documentRef, 'settings-cancel-btn'),
         settingsSaveBtn: byId(documentRef, 'settings-save-btn'),

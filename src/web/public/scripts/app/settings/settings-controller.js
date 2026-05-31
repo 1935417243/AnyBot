@@ -4,6 +4,7 @@ import { escapeHtml } from '../utils/html.js';
 
 const GITHUB_LATEST_RELEASE_URL = 'https://github.com/1935417243/AnyBot/releases/latest';
 const THEME_STORAGE_KEY = 'webuiTheme';
+const DESKTOP_UPDATE_STATUS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const THEME_OPTIONS = [
     {id: 'light', name: '浅色'},
     {id: 'dark', name: '深色'},
@@ -69,6 +70,7 @@ export function createSettingsController(options) {
     const settingsUpdateStatus = options.settingsUpdateStatus;
     const settingsView = options.settingsView;
     const settingsBtn = options.settingsBtn;
+    const sidebarUpdateBtn = options.sidebarUpdateBtn;
     const settingsWorkdirOpenBtn = options.settingsWorkdirOpenBtn;
     const settingsWorkdirPickBtn = options.settingsWorkdirPickBtn;
     const systemThemeQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
@@ -81,6 +83,7 @@ export function createSettingsController(options) {
     let activeSettingsTab = 'general';
     let desktopUpdateStatus = null;
     let desktopUpdatePollTimer = null;
+    let desktopUpdateRefreshTimer = null;
     let sessionModelSelections = {};
     let settingsProviderController = null;
     let currentThemeSetting = readStoredTheme();
@@ -581,8 +584,37 @@ export function createSettingsController(options) {
         return Boolean(status && (status.manualDownload || status.supported === false));
     }
 
+    function shouldShowSidebarUpdateButton(status) {
+        if (!status) return false;
+        return status.state === 'available' || status.state === 'downloading' || status.state === 'downloaded';
+    }
+
+    function shouldAutoDownloadOnUpdateClick(status) {
+        return Boolean(status &&
+            status.platform === 'win32' &&
+            status.supported &&
+            status.state === 'available' &&
+            !isManualUpdateStatus(status));
+    }
+
     function getUpdateReleaseUrl(status) {
         return (status && (status.downloadUrl || status.releaseUrl)) || GITHUB_LATEST_RELEASE_URL;
+    }
+
+    function renderSidebarUpdateButton(status) {
+        if (!sidebarUpdateBtn) return;
+        var showUpdate = shouldShowSidebarUpdateButton(status);
+        sidebarUpdateBtn.hidden = !showUpdate;
+        sidebarUpdateBtn.classList.toggle('downloading', Boolean(status && status.state === 'downloading'));
+        sidebarUpdateBtn.classList.toggle('downloaded', Boolean(status && status.state === 'downloaded'));
+        if (!showUpdate) return;
+
+        var version = status && status.latestVersion ? ' ' + status.latestVersion : '';
+        var label = status && status.state === 'downloaded'
+            ? '更新已下载，打开关于页重启安装'
+            : '发现新版本' + version + '，打开更新设置';
+        sidebarUpdateBtn.title = label;
+        sidebarUpdateBtn.setAttribute('aria-label', label);
     }
 
     function getUpdateStatusText(status) {
@@ -604,6 +636,7 @@ export function createSettingsController(options) {
         var state = status && status.state;
         var progress = status && status.progress;
         var manualDownload = isManualUpdateStatus(status);
+        renderSidebarUpdateButton(status);
         if (settingsAboutVersion) {
             settingsAboutVersion.textContent = status && status.currentVersion ? status.currentVersion : '未知';
         }
@@ -682,6 +715,12 @@ export function createSettingsController(options) {
         }
     }
 
+    function startDesktopUpdateStatusRefresh() {
+        if (desktopUpdateRefreshTimer) return;
+        fetchDesktopUpdateStatus();
+        desktopUpdateRefreshTimer = setInterval(fetchDesktopUpdateStatus, DESKTOP_UPDATE_STATUS_REFRESH_INTERVAL_MS);
+    }
+
     async function checkDesktopUpdate() {
         if (!settingsUpdateCheckBtn) return;
         settingsUpdateCheckBtn.disabled = true;
@@ -724,7 +763,7 @@ export function createSettingsController(options) {
 
     function updateDesktopUpdatePolling() {
         var state = desktopUpdateStatus && desktopUpdateStatus.state;
-        var shouldPoll = activeSettingsTab === 'about' && (state === 'checking' || state === 'downloading');
+        var shouldPoll = state === 'checking' || state === 'downloading';
         if (!shouldPoll) {
             if (desktopUpdatePollTimer) {
                 clearInterval(desktopUpdatePollTimer);
@@ -968,9 +1007,9 @@ export function createSettingsController(options) {
         }
     }
 
-    function openSettingsPanel() {
+    function openSettingsPanel(tab) {
         showSettingsView();
-        setSettingsTab(activeSettingsTab || 'general');
+        setSettingsTab(tab || activeSettingsTab || 'general');
         if (appSettings) renderAppSettings();
         if (getProviderData() && settingsProviderController) settingsProviderController.renderProviderSelect();
         if (sandboxConfig) {
@@ -1006,6 +1045,15 @@ export function createSettingsController(options) {
         e.stopPropagation();
         openSettingsPanel();
     });
+    if (sidebarUpdateBtn) {
+        sidebarUpdateBtn.addEventListener('click', async function (e) {
+            e.stopPropagation();
+            openSettingsPanel('about');
+            if (shouldAutoDownloadOnUpdateClick(desktopUpdateStatus)) {
+                await downloadDesktopUpdate();
+            }
+        });
+    }
 
     if (settingsCancelBtn) settingsCancelBtn.addEventListener('click', closeSettingsPanel);
     if (settingsWorkdirPickBtn) {
@@ -1317,6 +1365,7 @@ export function createSettingsController(options) {
         fetchProviders: fetchProviders,
         fetchProxyConfig: fetchProxyConfig,
         fetchSandboxConfig: fetchSandboxConfig,
+        fetchDesktopUpdateStatus: fetchDesktopUpdateStatus,
         getModelConfig: function () {
             return modelConfig;
         },
@@ -1324,5 +1373,6 @@ export function createSettingsController(options) {
         handleDocumentClick: handleDocumentClick,
         handleDocumentEscape: handleDocumentEscape,
         openSettingsPanel: openSettingsPanel,
+        startDesktopUpdateStatusRefresh: startDesktopUpdateStatusRefresh,
     };
 }

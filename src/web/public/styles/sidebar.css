@@ -339,6 +339,9 @@
             border-top: 1px solid var(--border);
             background: var(--sidebar);
             flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         #settings-btn {
@@ -359,6 +362,7 @@
             transition: all 0.18s ease;
             letter-spacing: 0.01em;
             text-align: left;
+            flex: 0 0 auto;
         }
 
         #settings-btn:hover,
@@ -369,6 +373,78 @@
 
         #settings-btn svg {
             flex-shrink: 0;
+        }
+
+        #sidebar-update-btn {
+            min-height: 30px;
+            margin-left: auto;
+            border: 1px solid rgba(124, 111, 247, 0.24);
+            border-radius: 12px;
+            background: var(--accent-dim);
+            color: #b8b2ff;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            line-height: 1;
+            transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+        }
+
+        #sidebar-update-btn[hidden] {
+            display: none;
+        }
+
+        #sidebar-update-btn:hover,
+        #sidebar-update-btn:focus-visible {
+            background: rgba(124, 111, 247, 0.14);
+            border-color: rgba(124, 111, 247, 0.38);
+            color: #d8d4ff;
+            outline: none;
+        }
+
+        #sidebar-update-btn:active {
+            transform: translateY(1px);
+        }
+
+        #sidebar-update-btn svg {
+            flex: 0 0 auto;
+        }
+
+        #sidebar-update-btn.downloading svg {
+            animation: sidebar-update-pulse 1.2s ease-in-out infinite;
+        }
+
+        #sidebar-update-btn.downloaded {
+            color: var(--success);
+            border-color: rgba(34, 197, 94, 0.28);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        :root[data-theme="light"] #sidebar-update-btn {
+            background: var(--accent-dim);
+            border-color: rgba(91, 80, 230, 0.2);
+            color: var(--accent);
+        }
+
+        :root[data-theme="light"] #sidebar-update-btn:hover,
+        :root[data-theme="light"] #sidebar-update-btn:focus-visible {
+            background: rgba(91, 80, 230, 0.12);
+            border-color: rgba(91, 80, 230, 0.32);
+            color: #473dd4;
+        }
+
+        @keyframes sidebar-update-pulse {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.55;
+            }
         }
 
         #sidebar.history-collapsed .history-list {

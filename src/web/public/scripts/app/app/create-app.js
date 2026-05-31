@@ -61,6 +61,7 @@ export function createAnyBotApp(dom, deps) {
         modelDropdown,
         currentModelNameEl,
         settingsBtn,
+        sidebarUpdateBtn,
         settingsView,
         settingsCancelBtn,
         settingsSaveBtn,
@@ -253,6 +254,7 @@ export function createAnyBotApp(dom, deps) {
         settingsUpdateStatus: settingsUpdateStatus,
         settingsView: settingsView,
         settingsBtn: settingsBtn,
+        sidebarUpdateBtn: sidebarUpdateBtn,
         settingsWorkdirOpenBtn: settingsWorkdirOpenBtn,
         settingsWorkdirPickBtn: settingsWorkdirPickBtn,
         showChatView: showChatView,
@@ -870,6 +872,7 @@ export function createAnyBotApp(dom, deps) {
             settingsController.fetchAppSettings(),
             settingsController.fetchProxyConfig(),
         ]);
+        settingsController.startDesktopUpdateStatusRefresh();
         var initialSessions = sidebarController.getSessions();
         if (initialSessions.length > 0) {
             await sessionController.loadSession(initialSessions[0].id);
