@@ -222,6 +222,10 @@ const stmts = {
     UPDATE projects SET updated_at = ? WHERE id = ?
   `),
 
+  deleteProject: db.prepare(`
+    DELETE FROM projects WHERE id = ?
+  `),
+
   listSessions: db.prepare(`
     SELECT id, title, provider, source, project_id AS projectId,
            message_count AS messageCount, created_at AS createdAt, updated_at AS updatedAt
@@ -319,6 +323,7 @@ const stmts = {
   `),
 
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
+  deleteProjectSessions: db.prepare(`DELETE FROM sessions WHERE project_id = ?`),
   deleteAllSessions: db.prepare(`DELETE FROM sessions`),
 
   insertMessage: db.prepare(`
@@ -473,6 +478,15 @@ export function createProject(project: Project): void {
 
 export function touchProject(id: string, updatedAt: number): void {
   stmts.touchProject.run(updatedAt, id);
+}
+
+export function deleteProject(id: string): boolean {
+  const deleteProjectWithSessions = db.transaction((projectId: string) => {
+    stmts.deleteProjectSessions.run(projectId);
+    return stmts.deleteProject.run(projectId);
+  });
+  const result = deleteProjectWithSessions(id);
+  return result.changes > 0;
 }
 
 export function listSessions(): SessionSummary[] {

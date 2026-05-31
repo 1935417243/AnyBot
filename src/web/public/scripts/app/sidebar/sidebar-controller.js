@@ -408,6 +408,130 @@ export function createSidebarController(options) {
         ensureProjectSessionsLoaded(projectId);
     }
 
+    function confirmProjectDelete(project) {
+        return new Promise(function (resolve) {
+            var existing = document.getElementById("project-delete-confirm-overlay");
+            if (existing) existing.remove();
+
+            var overlay = document.createElement("div");
+            overlay.className = "project-delete-confirm-overlay";
+            overlay.id = "project-delete-confirm-overlay";
+
+            var dialog = document.createElement("div");
+            dialog.className = "project-delete-confirm-dialog";
+            dialog.setAttribute("role", "dialog");
+            dialog.setAttribute("aria-modal", "true");
+            dialog.setAttribute("aria-labelledby", "project-delete-confirm-title");
+
+            var header = document.createElement("div");
+            header.className = "project-delete-confirm-header";
+
+            var icon = document.createElement("div");
+            icon.className = "project-delete-confirm-icon";
+            icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 6.6v3.6M9 12.6h.01M3.4 14.4h11.2L9 3.6 3.4 14.4Z" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+            var title = document.createElement("div");
+            title.className = "project-delete-confirm-title";
+            title.id = "project-delete-confirm-title";
+            title.textContent = "删除项目";
+
+            header.appendChild(icon);
+            header.appendChild(title);
+
+            var message = document.createElement("p");
+            message.className = "project-delete-confirm-message";
+            message.textContent = "将从 AnyBot 移除“" + project.name + "”，并删除该项目内所有对话。";
+
+            var actions = document.createElement("div");
+            actions.className = "project-delete-confirm-actions";
+
+            var cancelBtn = document.createElement("button");
+            cancelBtn.className = "project-delete-confirm-cancel";
+            cancelBtn.type = "button";
+            cancelBtn.textContent = "取消";
+
+            var confirmBtn = document.createElement("button");
+            confirmBtn.className = "project-delete-confirm-danger";
+            confirmBtn.type = "button";
+            confirmBtn.textContent = "删除项目";
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(confirmBtn);
+
+            dialog.appendChild(header);
+            dialog.appendChild(message);
+            dialog.appendChild(actions);
+            overlay.appendChild(dialog);
+
+            var closed = false;
+            function close(result) {
+                if (closed) return;
+                closed = true;
+                document.removeEventListener("keydown", onKeydown);
+                overlay.classList.remove("open");
+                setTimeout(function () {
+                    overlay.remove();
+                }, 160);
+                resolve(result);
+            }
+
+            function onKeydown(e) {
+                if (e.key === "Escape") close(false);
+            }
+
+            overlay.addEventListener("click", function (e) {
+                if (e.target === overlay) close(false);
+            });
+            cancelBtn.addEventListener("click", function () {
+                close(false);
+            });
+            confirmBtn.addEventListener("click", function () {
+                close(true);
+            });
+            document.addEventListener("keydown", onKeydown);
+            document.body.appendChild(overlay);
+            requestAnimationFrame(function () {
+                overlay.classList.add("open");
+            });
+            setTimeout(function () {
+                cancelBtn.focus();
+            }, 0);
+        });
+    }
+
+    async function deleteProject(project) {
+        if (!project || !project.id) return;
+        var confirmed = await confirmProjectDelete(project);
+        if (!confirmed) return;
+
+        var currentSessionId = options.getCurrentSessionId();
+        var isCurrentProjectSession = currentSessionId && options.getCurrentSessionProjectId() === project.id;
+
+        try {
+            var res = await fetch("/api/projects/" + encodeURIComponent(project.id), { method: "DELETE" });
+            if (!res.ok) throw new Error("delete project failed");
+
+            if (activeProjectId === project.id) activeProjectId = null;
+            expandedProjectIds.delete(project.id);
+            expandedProjectSessionIds.delete(project.id);
+            projectSessionPages.delete(project.id);
+            saveStoredSet("expandedProjectIds", expandedProjectIds);
+            projects = projects.filter(function (item) { return item.id !== project.id; });
+            sessions = sessions.filter(function (session) { return session.projectId !== project.id; });
+            options.invalidateSlashItemsData();
+            renderProjects();
+
+            if (isCurrentProjectSession) {
+                await options.deleteSession(currentSessionId);
+                return;
+            }
+
+            await refreshDirectory();
+        } catch (e) {
+            options.showError("删除项目失败");
+        }
+    }
+
     function renderProjectSessions(projectId) {
         var list = document.createElement("div");
         list.className = "project-session-list";
@@ -506,6 +630,9 @@ export function createSidebarController(options) {
             row.innerHTML =
                 folderIcon(isExpanded) +
                 '<span class="project-name"></span>' +
+                '<button class="project-delete" type="button" title="删除项目" aria-label="删除项目">' +
+                '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>' +
+                '</button>' +
                 '<button class="project-create-chat" type="button" data-tooltip="新对话" aria-label="在当前项目新建对话">' +
                 '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">' +
                 '<path d="M6.5 1.5v10M1.5 6.5h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
@@ -535,6 +662,10 @@ export function createSidebarController(options) {
             row.querySelector(".project-create-chat").addEventListener("click", function (e) {
                 e.stopPropagation();
                 options.createNewChat(project.id, { force: true });
+            });
+            row.querySelector(".project-delete").addEventListener("click", function (e) {
+                e.stopPropagation();
+                deleteProject(project);
             });
             projectList.appendChild(row);
 

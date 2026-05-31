@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { logger } from "../../logger.js";
 import { generateId, getWorkdir } from "../../shared.js";
 import * as db from "../db.js";
-import { emitProjectsChanged } from "../events.js";
+import { emitProjectsChanged, emitSessionsChanged } from "../events.js";
 
 const execFile = promisify(execFileCallback);
 const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md"] as const;
@@ -62,6 +62,14 @@ export function createOrTouchProject(projectPath: string): db.Project {
   db.createProject(project);
   emitProjectsChanged(project.id, "project_created");
   return project;
+}
+
+export function deleteProject(projectId: string): boolean {
+  const deleted = db.deleteProject(projectId);
+  if (!deleted) return false;
+  emitProjectsChanged(projectId, "project_deleted");
+  emitSessionsChanged(undefined, "project_deleted");
+  return true;
 }
 
 function isFolderPickerCanceled(error: unknown): boolean {

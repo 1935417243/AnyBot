@@ -4,6 +4,7 @@ import { getWorkdir } from "../../shared.js";
 import * as db from "../db.js";
 import {
   createOrTouchProject,
+  deleteProject,
   pickProjectFolder,
   readProjectTree,
 } from "../services/projects.js";
@@ -37,6 +38,21 @@ export function createProjectsRouter(): Router {
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : "选择项目失败" });
     }
+  });
+
+  router.delete("/projects/:id", (req: Request, res: Response) => {
+    const projectId = req.params.id as string;
+    if (!db.getProject(projectId)) {
+      res.status(404).json({ error: "项目不存在" });
+      return;
+    }
+
+    if (!deleteProject(projectId)) {
+      res.status(500).json({ error: "删除项目失败" });
+      return;
+    }
+
+    res.json({ ok: true, projectId });
   });
 
   router.get("/projects/:id/tree", (req: Request, res: Response) => {
