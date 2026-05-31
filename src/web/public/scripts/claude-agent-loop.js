@@ -96,6 +96,7 @@
             answerChars: opts.contentChars || 0,
             fullAnswerLoader: opts.fullContentLoader || null,
         };
+        var hasAttachedCompletionMeta = false;
 
         var row = document.createElement('div');
         row.className = 'message-row ai';
@@ -166,12 +167,7 @@
         bubble.appendChild(content);
         row.appendChild(bubble);
         messagesEl.appendChild(row);
-        if (window.AnyBotMessageMeta && typeof window.AnyBotMessageMeta.attach === 'function') {
-            window.AnyBotMessageMeta.attach(row, {
-                createdAt: opts.createdAt || startedAt,
-                copyText: function () { return state.answerText || finalEl.textContent || ''; },
-            });
-        }
+        if (isPersisted) attachCompletionMeta();
         scrollBottom();
 
         var ticker = isPersisted ? null : setInterval(function () {
@@ -196,6 +192,16 @@
         process.addEventListener('toggle', function () {
             if (process.open && !hasProcessDetails()) process.open = false;
         });
+
+        function attachCompletionMeta() {
+            if (hasAttachedCompletionMeta) return;
+            if (!window.AnyBotMessageMeta || typeof window.AnyBotMessageMeta.attach !== 'function') return;
+            hasAttachedCompletionMeta = true;
+            window.AnyBotMessageMeta.attach(row, {
+                createdAt: opts.createdAt || startedAt,
+                copyText: function () { return state.answerText || finalEl.textContent || ''; },
+            });
+        }
 
         function updateProcessTitle() {
             var title = processSummary.querySelector('[data-role="title"]');
@@ -844,6 +850,7 @@
                 state.durationMs = Date.now() - startedAt;
             }
             renderAnswer();
+            attachCompletionMeta();
             state.status = 'completed';
             updateProcessTitle();
             if (ticker) clearInterval(ticker);
@@ -926,6 +933,7 @@
             if (event.type === 'error') {
                 state.answerText = state.answerText || ('处理失败：' + (event.error || '未知错误'));
                 renderAnswer();
+                attachCompletionMeta();
                 state.status = 'completed';
                 updateProcessTitle();
                 if (ticker) clearInterval(ticker);
@@ -937,6 +945,7 @@
             if (event.type === 'cancelled') {
                 state.answerText = event.message || '已中断';
                 renderAnswer();
+                attachCompletionMeta();
                 state.status = 'completed';
                 updateProcessTitle();
                 if (ticker) clearInterval(ticker);
