@@ -15,9 +15,6 @@ import { createSendRouter } from "./routes/send.js";
 import { createSessionsRouter } from "./routes/sessions.js";
 import { createSettingsRouter } from "./routes/settings.js";
 import { createSkillsRouter } from "./routes/skills.js";
-import { checkDesktopUpdateOnStartup } from "./services/desktop-update.js";
-
-export { checkDesktopUpdateOnStartup };
 
 export function createApiRouter(): Router {
   const router = Router();

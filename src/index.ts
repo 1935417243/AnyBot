@@ -28,7 +28,7 @@ import {
   getWorkdir,
   getSandbox,
 } from "./shared.js";
-import { checkDesktopUpdateOnStartup } from "./web/api.js";
+import { startDesktopUpdateAutoCheck } from "./web/services/desktop-update.js";
 import {
   createActiveAgentStream,
   emitAgentStream,
@@ -242,11 +242,7 @@ async function main(): Promise<void> {
   webApp.listen(WEB_PORT, WEB_HOST, () => {
     logger.info("web.started", { host: WEB_HOST, port: WEB_PORT });
     console.log(`AnyBot Web UI: http://${WEB_HOST}:${WEB_PORT}`);
-    checkDesktopUpdateOnStartup().catch((error) => {
-      logger.warn("desktop_update.startup_check_failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
+    startDesktopUpdateAutoCheck();
   });
 
   const channels = await startAllChannels(channelCallbacks);

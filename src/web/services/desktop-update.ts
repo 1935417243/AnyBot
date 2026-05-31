@@ -5,8 +5,11 @@ import { asRecord, getObjectStringValue } from "./object-utils.js";
 
 const GITHUB_LATEST_RELEASE_API_URL = "https://api.github.com/repos/1935417243/AnyBot/releases/latest";
 const GITHUB_LATEST_RELEASE_URL = "https://github.com/1935417243/AnyBot/releases/latest";
+const DESKTOP_UPDATE_AUTO_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
 let manualDesktopUpdateStatus: Record<string, unknown> | null = null;
+let desktopUpdateAutoCheckTimer: NodeJS.Timeout | null = null;
+let desktopUpdateAutoCheckPromise: Promise<void> | null = null;
 
 function getDesktopUpdateCurrentVersion(): string {
   return process.env.ANYBOT_DESKTOP_APP_VERSION || process.env.npm_package_version || "0.0.0";
@@ -204,13 +207,13 @@ export async function proxyDesktopUpdate(
   }
 }
 
-export async function checkDesktopUpdateOnStartup(): Promise<void> {
+async function checkDesktopUpdateInBackground(trigger: "startup" | "interval"): Promise<void> {
   const baseUrl = process.env.ANYBOT_DESKTOP_UPDATE_URL;
   const token = process.env.ANYBOT_DESKTOP_UPDATE_TOKEN;
 
   if (!baseUrl || !token) {
     await checkLatestGitHubReleaseStatus(getDesktopUpdateUnavailableStatus());
-    logger.info("desktop_update.startup_checked", { mode: "manual" });
+    logger.info("desktop_update.auto_checked", { trigger, mode: "manual" });
     return;
   }
 
@@ -230,7 +233,8 @@ export async function checkDesktopUpdateOnStartup(): Promise<void> {
     }
 
     if (!response.ok) {
-      logger.warn("desktop_update.startup_check_failed", {
+      logger.warn("desktop_update.auto_check_failed", {
+        trigger,
         status: response.status,
         error: getObjectStringValue(payload, "error") || getObjectStringValue(payload, "message"),
       });
@@ -240,14 +244,40 @@ export async function checkDesktopUpdateOnStartup(): Promise<void> {
     const payloadRecord = asRecord(payload);
     if (shouldUseManualReleaseCheck(payloadRecord)) {
       await checkLatestGitHubReleaseStatus(normalizeManualDesktopUpdateStatus(payloadRecord));
-      logger.info("desktop_update.startup_checked", { mode: "manual" });
+      logger.info("desktop_update.auto_checked", { trigger, mode: "manual" });
       return;
     }
 
-    logger.info("desktop_update.startup_checked", { mode: "desktop" });
+    logger.info("desktop_update.auto_checked", { trigger, mode: "desktop" });
   } catch (error) {
-    logger.warn("desktop_update.startup_check_failed", {
+    logger.warn("desktop_update.auto_check_failed", {
+      trigger,
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+function runDesktopUpdateAutoCheck(trigger: "startup" | "interval"): void {
+  if (desktopUpdateAutoCheckPromise) {
+    logger.info("desktop_update.auto_check_skipped", { trigger, reason: "in_flight" });
+    return;
+  }
+
+  desktopUpdateAutoCheckPromise = checkDesktopUpdateInBackground(trigger).finally(() => {
+    desktopUpdateAutoCheckPromise = null;
+  });
+}
+
+export function startDesktopUpdateAutoCheck(): void {
+  if (desktopUpdateAutoCheckTimer) return;
+
+  runDesktopUpdateAutoCheck("startup");
+  desktopUpdateAutoCheckTimer = setInterval(() => {
+    runDesktopUpdateAutoCheck("interval");
+  }, DESKTOP_UPDATE_AUTO_CHECK_INTERVAL_MS);
+  desktopUpdateAutoCheckTimer.unref();
+
+  logger.info("desktop_update.auto_check_started", {
+    intervalMs: DESKTOP_UPDATE_AUTO_CHECK_INTERVAL_MS,
+  });
 }
