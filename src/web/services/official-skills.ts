@@ -5,7 +5,7 @@ import path from "node:path";
 import { fetch as undiciFetch } from "undici";
 import { logger } from "../../logger.js";
 import { getClaudeSkillsDir } from "../../claude-config.js";
-import { getCodexSkillsDir } from "../skills.js";
+import { getCodexUserSkillsDir } from "../../codex-config.js";
 
 const DOWNLOAD_TIMEOUT_MS = 30000;
 const SAFE_SKILL_DIR_RE = /^[A-Za-z0-9._-]+$/;
@@ -40,7 +40,7 @@ const OFFICIAL_SKILL_SOURCES: Record<string, OfficialSkillSource> = {
     skillTreeBaseUrl: "https://github.com/openai/skills/tree/main/skills/.curated",
     skillsPrefix: "skills/.curated/",
     folderNameIndex: 2,
-    targetDir: getCodexSkillsDir,
+    targetDir: getCodexUserSkillsDir,
   },
 };
 

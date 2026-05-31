@@ -7,7 +7,18 @@ import {
   type ThreadOptions,
   type Usage,
 } from "@openai/codex-sdk";
-import { accessSync, constants, mkdirSync } from "fs";
+import {
+  accessSync,
+  constants,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+} from "fs";
 import fs from "fs/promises";
 import { randomUUID } from "crypto";
 import { createRequire } from "module";
@@ -26,9 +37,10 @@ import type {
 import { sanitizeAgentText } from "./claude-code-agent-events.js";
 import { logger } from "../logger.js";
 import { DEFAULT_SANDBOX } from "../sandbox-config.js";
-import { DEFAULT_PROVIDER_TIMEOUT_MS, getDataDir } from "../app-settings.js";
+import { DEFAULT_PROVIDER_TIMEOUT_MS } from "../app-settings.js";
 import { registerCodexAdapterStream } from "../codex-adapter-stream.js";
 import { resolveExecutable } from "../utils/process.js";
+import { getCodexHome, getCodexSkillsDir, getIsolatedCodexHome } from "../codex-config.js";
 
 export class ProviderTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -117,6 +129,15 @@ type CodexTokenCountEvent = {
   };
 };
 
+type CodexSkillsMapping = {
+  sourceDir: string;
+  runtimeDir: string;
+  mode: "same-home" | "linked-entries" | "failed";
+  linked: number;
+  removedStale: number;
+  error?: string;
+};
+
 export type CodexExecutableResolution = {
   source: "bundled" | "configured";
   bin: string;
@@ -127,6 +148,96 @@ export type CodexExecutableResolution = {
 function cleanString(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function normalizeFsPath(value: string): string {
+  return path.resolve(value).normalize("NFC");
+}
+
+function isSamePath(left: string, right: string): boolean {
+  return normalizeFsPath(left) === normalizeFsPath(right);
+}
+
+function isDirectoryLike(dir: string, entryName: string): boolean {
+  const entryPath = path.join(dir, entryName);
+  try {
+    const stat = lstatSync(entryPath);
+    if (stat.isDirectory()) return true;
+    if (!stat.isSymbolicLink()) return false;
+    return statSync(entryPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function isPathInside(parentDir: string, childPath: string): boolean {
+  const parent = normalizeFsPath(parentDir);
+  const child = normalizeFsPath(childPath);
+  return child === parent || child.startsWith(parent + path.sep);
+}
+
+function ensureCodexSkillsAvailableInHome(runtimeCodexHome: string): CodexSkillsMapping {
+  const sourceDir = getCodexSkillsDir();
+  const runtimeDir = path.join(runtimeCodexHome, "skills");
+
+  if (isSamePath(getCodexHome(), runtimeCodexHome)) {
+    return { sourceDir, runtimeDir, mode: "same-home", linked: 0, removedStale: 0 };
+  }
+
+  try {
+    mkdirSync(sourceDir, { recursive: true });
+    mkdirSync(runtimeDir, { recursive: true });
+
+    const sourceEntries = readdirSync(sourceDir, { withFileTypes: true });
+    const sourceNames = new Set<string>();
+    let linked = 0;
+    let removedStale = 0;
+
+    for (const entry of sourceEntries) {
+      if (entry.name.startsWith(".")) continue;
+      if (!isDirectoryLike(sourceDir, entry.name)) continue;
+
+      sourceNames.add(entry.name);
+      const sourcePath = path.join(sourceDir, entry.name);
+      const runtimePath = path.join(runtimeDir, entry.name);
+      if (existsSync(runtimePath)) continue;
+
+      symlinkSync(sourcePath, runtimePath, process.platform === "win32" ? "junction" : "dir");
+      linked++;
+    }
+
+    const runtimeEntries = readdirSync(runtimeDir, { withFileTypes: true });
+    for (const entry of runtimeEntries) {
+      if (entry.name.startsWith(".") || sourceNames.has(entry.name)) continue;
+
+      const runtimePath = path.join(runtimeDir, entry.name);
+      let stat;
+      try {
+        stat = lstatSync(runtimePath);
+      } catch {
+        continue;
+      }
+      if (!stat.isSymbolicLink()) continue;
+
+      const linkTarget = path.resolve(path.dirname(runtimePath), readlinkSync(runtimePath));
+      if (!isPathInside(sourceDir, linkTarget)) continue;
+      if (existsSync(linkTarget)) continue;
+
+      rmSync(runtimePath, { force: true });
+      removedStale++;
+    }
+
+    return { sourceDir, runtimeDir, mode: "linked-entries", linked, removedStale };
+  } catch (err) {
+    return {
+      sourceDir,
+      runtimeDir,
+      mode: "failed",
+      linked: 0,
+      removedStale: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 function buildCodexAdapterRunBaseUrl(baseUrl: string, runId: string): string {
@@ -342,7 +453,7 @@ function isCodexTokenCountEvent(event: unknown): event is CodexTokenCountEvent {
 }
 
 async function findCodexSessionFile(sessionId: string, codexHomeOverride?: string): Promise<string | null> {
-  const codexHome = codexHomeOverride || process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+  const codexHome = codexHomeOverride || getCodexHome();
   const sessionsDir = path.join(codexHome, "sessions");
   const stack = [sessionsDir];
 
@@ -530,8 +641,7 @@ export class CodexProvider implements IProvider {
     this.codexFastModel = cleanString(opts?.codexFastModel);
     this.codexCodeModel = cleanString(opts?.codexCodeModel);
     if (this.codexCompatEnabled && this.codexAdapterBaseUrl) {
-      this.codexHome = path.join(getDataDir(), "codex");
-      mkdirSync(this.codexHome, { recursive: true });
+      this.codexHome = getIsolatedCodexHome();
       const env = this.buildIsolatedCodexEnv();
       codexOptions.env = env;
       codexOptions.apiKey = "anybot-local-codex-adapter";
@@ -602,6 +712,9 @@ export class CodexProvider implements IProvider {
     const abortController = new AbortController();
     const toolStateById = new Map<string, ToolState>();
     const textByAgentMessageId = new Map<string, string>();
+    const codexSkillsMapping = this.codexHome
+      ? ensureCodexSkillsAvailableInHome(this.codexHome)
+      : null;
     const adapterRunId = onEvent && this.codexCompatEnabled && this.codexAdapterBaseUrl
       ? randomUUID()
       : undefined;
@@ -660,6 +773,13 @@ export class CodexProvider implements IProvider {
       provider: this.type,
       bin: this.bin,
       executablePath: this.executablePath,
+      codexHome: this.codexHome || getCodexHome(),
+      codexSkillsDir: codexSkillsMapping?.sourceDir || getCodexSkillsDir(),
+      codexRuntimeSkillsDir: codexSkillsMapping?.runtimeDir || null,
+      codexSkillsMapping: codexSkillsMapping?.mode || null,
+      codexSkillsLinked: codexSkillsMapping?.linked || 0,
+      codexSkillsRemovedStale: codexSkillsMapping?.removedStale || 0,
+      codexSkillsMappingError: codexSkillsMapping?.error || null,
       workdir,
       sandbox,
       model: model || null,

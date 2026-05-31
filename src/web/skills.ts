@@ -4,6 +4,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import { getProvider, normalizeProviderType } from "../providers/index.js";
 import { getClaudeSkillsDir } from "../claude-config.js";
+import { getCodexHome, getCodexSkillsDir, getCodexUserSkillsDir } from "../codex-config.js";
 
 export interface SkillInfo {
   id: string;
@@ -31,24 +32,12 @@ interface ScannedSkill {
 const SKILL_FILE = "SKILL.md";
 const DISABLED_SKILL_FILE = "SKILL.md.disabled";
 
-function expandHomeDir(dir: string): string {
-  if (dir === "~") return os.homedir();
-  if (dir.startsWith("~/") || dir.startsWith("~\\")) return path.join(os.homedir(), dir.slice(2));
-  return dir;
-}
-
-function getCodexHome(): string {
-  const codexHome = process.env.CODEX_HOME?.trim();
-  return path.resolve(expandHomeDir(codexHome || path.join(os.homedir(), ".codex"))).normalize("NFC");
-}
-
-export function getCodexSkillsDir(): string {
-  return path.join(getCodexHome(), "skills");
-}
-
 const PROVIDER_SKILL_DIRS: Record<string, () => SkillSource[]> = {
   codex: () => {
-    return [{ label: "Codex 技能", dir: getCodexSkillsDir() }];
+    return [
+      { label: "Codex 用户技能", dir: getCodexUserSkillsDir() },
+      { label: "Codex 配置技能", dir: getCodexSkillsDir() },
+    ];
   },
   "claude-code": () => {
     return [{ label: "Claude Code 技能", dir: getClaudeSkillsDir() }];
