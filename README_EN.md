@@ -57,7 +57,7 @@ flowchart LR
     Runner --> Providers[Provider Layer]
     Providers --> Codex[Codex CLI]
     Providers --> Claude[Claude Code]
-    Providers --> DeepSeek[DeepSeek-compatible Models]
+    Providers --> ThirdParty[Third-party Models]
     Runner --> Workspace[Project Workspaces]
     Runner --> Skills[Skills]
     Runner --> Review[Change Review]
