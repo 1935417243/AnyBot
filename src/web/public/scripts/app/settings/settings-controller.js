@@ -978,7 +978,6 @@ export function createSettingsController(options) {
             renderSandboxOptions();
         }
         settingsView.style.display = 'flex';
-        settingsBtn.classList.add('active');
         modelSwitcher.classList.remove('open');
         modelBadge.setAttribute('aria-expanded', 'false');
         requestAnimationFrame(function () {

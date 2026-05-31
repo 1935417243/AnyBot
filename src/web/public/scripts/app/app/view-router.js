@@ -68,7 +68,6 @@ export function createViewRouter(options) {
         hideAllViews();
         currentView = 'settings';
         options.settingsView.style.display = 'flex';
-        options.settingsBtn.classList.add('active');
     }
 
     async function openChannelsPage() {
