@@ -2,11 +2,14 @@ import { createMessageRenderer } from './message-renderer.js';
 import { escapeAttr, escapeHtml } from '../utils/html.js';
 
 export function createMessageListController(config) {
+    var BOTTOM_THRESHOLD_PX = 64;
     var messagesEl = config.messagesEl;
     var currentConversationTitle = '新对话';
     var isBatchRenderingMessages = false;
     var currentSessionHasMoreMessages = false;
     var isLoadingOlderMessages = false;
+    var autoFollowMessages = true;
+    var returnToBottomBtn = null;
 
     var messageRenderer = createMessageRenderer({
         messagesEl: messagesEl,
@@ -35,11 +38,60 @@ export function createMessageListController(config) {
                 config.openImageModal(target.src);
             }
         });
+
+        messagesEl.addEventListener('scroll', function () {
+            if (isBatchRenderingMessages) return;
+            if (isNearBottom()) {
+                autoFollowMessages = true;
+            } else {
+                autoFollowMessages = false;
+            }
+            updateReturnToBottomVisibility();
+        }, { passive: true });
     }
 
-    function scrollBottom() {
+    function ensureReturnToBottomControl() {
+        if (!returnToBottomBtn) {
+            returnToBottomBtn = document.createElement('button');
+            returnToBottomBtn.id = 'return-to-bottom';
+            returnToBottomBtn.className = 'return-to-bottom';
+            returnToBottomBtn.type = 'button';
+            returnToBottomBtn.hidden = true;
+            returnToBottomBtn.textContent = '↓ 回到底部';
+            returnToBottomBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                scrollBottom({ force: true });
+            });
+        }
+        if (!messagesEl.contains(returnToBottomBtn) || messagesEl.lastElementChild !== returnToBottomBtn) {
+            messagesEl.appendChild(returnToBottomBtn);
+        }
+        return returnToBottomBtn;
+    }
+
+    function isNearBottom() {
+        var distance = messagesEl.scrollHeight - messagesEl.clientHeight - messagesEl.scrollTop;
+        return distance <= BOTTOM_THRESHOLD_PX;
+    }
+
+    function updateReturnToBottomVisibility() {
+        var btn = ensureReturnToBottomControl();
+        btn.hidden = autoFollowMessages || isNearBottom();
+    }
+
+    function scrollBottom(opts) {
+        opts = opts || {};
         if (isBatchRenderingMessages) return;
+        ensureReturnToBottomControl();
+        if (opts.force) autoFollowMessages = true;
+        if (!autoFollowMessages && !isNearBottom()) {
+            updateReturnToBottomVisibility();
+            return;
+        }
+        autoFollowMessages = true;
         messagesEl.scrollTop = messagesEl.scrollHeight;
+        updateReturnToBottomVisibility();
     }
 
     function clearEmpty() {
@@ -96,7 +148,9 @@ export function createMessageListController(config) {
     function showEmptyState() {
         currentSessionHasMoreMessages = false;
         isLoadingOlderMessages = false;
+        autoFollowMessages = true;
         messageRenderer.showEmptyState();
+        scrollBottom({ force: true });
     }
 
     function appendMessage(role, text, attachments, changeReview, opts) {
@@ -221,7 +275,7 @@ export function createMessageListController(config) {
             isBatchRenderingMessages = false;
         }
         renderOlderMessagesControl();
-        scrollBottom();
+        scrollBottom({ force: true });
         return getNewestRenderedMessageId();
     }
 

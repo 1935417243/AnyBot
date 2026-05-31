@@ -127,6 +127,7 @@ export function createSendMessageController(config) {
         }
 
         var startedAt = Date.now();
+        config.scrollBottom({ force: true });
         if (config.startCompactProgress) config.startCompactProgress(outgoing.sessionId, startedAt);
 
         config.inputEl.value = '';
@@ -253,6 +254,7 @@ export function createSendMessageController(config) {
 
         config.setPendingAttachments([]);
         config.renderAttachmentPreview();
+        config.scrollBottom({ force: true });
 
         config.appendMessage('user', displayText, attachmentInfos, null, {
             createdAt: Date.now(),

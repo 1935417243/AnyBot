@@ -618,8 +618,8 @@ export function createAnyBotApp(dom, deps) {
         revealSessionContainer: function (projectId) {
             sidebarController.revealSessionContainer(projectId);
         },
-        scrollBottom: function () {
-            return messageListController.scrollBottom();
+        scrollBottom: function (opts) {
+            return messageListController.scrollBottom(opts);
         },
         sessionMessagePageSize: SESSION_MESSAGE_PAGE_SIZE,
         setActiveProjectId: function (projectId) {
@@ -719,8 +719,8 @@ export function createAnyBotApp(dom, deps) {
             return attachmentController.renderPreview();
         },
         resizeChatInput: resizeChatInput,
-        scrollBottom: function () {
-            return messageListController.scrollBottom();
+        scrollBottom: function (opts) {
+            return messageListController.scrollBottom(opts);
         },
         showError: showError,
         showTyping: function () {

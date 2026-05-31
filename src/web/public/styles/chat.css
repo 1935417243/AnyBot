@@ -343,6 +343,36 @@
             border-radius: 99px;
         }
 
+        .return-to-bottom {
+            position: sticky;
+            bottom: 12px;
+            z-index: 3;
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 32px;
+            margin: 8px 0 0;
+            padding: 7px 12px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--popover-bg);
+            color: var(--text);
+            box-shadow: 0 8px 24px var(--panel-shadow);
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .return-to-bottom[hidden] {
+            display: none;
+        }
+
+        .return-to-bottom:hover {
+            border-color: var(--border-hover);
+            background: var(--sidebar-hover);
+        }
+
         .load-older-messages {
             align-self: center;
             margin: 0 0 12px;
@@ -1401,4 +1431,3 @@
             animation: fadeIn 0.2s ease;
             max-width: 360px;
         }
-
