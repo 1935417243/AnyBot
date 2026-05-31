@@ -1,0 +1,490 @@
+        .channel-page {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+
+        .channel-page-header {
+            padding: 28px 32px 0;
+            flex-shrink: 0;
+        }
+
+        .channel-page-header-top {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 6px;
+        }
+
+        .channel-page-header-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-dim);
+            border: 1px solid rgba(124, 111, 247, 0.2);
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .channel-page-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .channel-page-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .channel-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 32px;
+        }
+
+        .channel-list::-webkit-scrollbar { width: 4px; }
+        .channel-list::-webkit-scrollbar-track { background: transparent; }
+        .channel-list::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 99px; }
+
+        .channel-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-bottom: 4px;
+            border: 1px solid transparent;
+        }
+
+        .channel-item:hover {
+            background: var(--sidebar-hover);
+            border-color: var(--border);
+        }
+
+        .channel-item.active {
+            background: var(--sidebar-active);
+            border-color: rgba(124, 111, 247, 0.25);
+        }
+
+        .channel-item-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .channel-item-icon.feishu { background: rgba(51, 112, 255, 0.15); color: #3370ff; }
+        .channel-item-icon.qq { background: rgba(18, 183, 245, 0.15); color: #12b7f5; }
+        .channel-item-icon.weixin { background: rgba(7, 193, 96, 0.15); color: #07c160; }
+        .channel-item-icon.telegram { background: rgba(38, 166, 222, 0.15); color: #26a6de; }
+        .channel-item-icon.dingtalk { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+        .channel-item-icon.discord { background: rgba(88, 101, 242, 0.15); color: #5865f2; }
+        .channel-item-icon.default { background: var(--accent-dim); color: var(--accent); }
+
+        .channel-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .channel-item-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .channel-item-status {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 1px;
+        }
+
+        .channel-item-status.on {
+            color: #4ade80;
+        }
+
+        .channel-item-arrow {
+            color: var(--text-dim);
+            flex-shrink: 0;
+            transition: color 0.15s;
+        }
+
+        .channel-item:hover .channel-item-arrow {
+            color: var(--text-muted);
+        }
+
+        .channel-drawer-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--overlay-bg);
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .channel-drawer-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .channel-drawer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 360px;
+            max-width: 90%;
+            background: var(--sidebar);
+            border-left: 1px solid var(--border);
+            z-index: 11;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: -8px 0 32px var(--panel-shadow);
+        }
+
+        .channel-drawer.open {
+            transform: translateX(0);
+        }
+
+        .weixin-login-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: var(--overlay-bg);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.18s ease, visibility 0.18s ease;
+        }
+
+        .weixin-login-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .weixin-login-modal {
+            width: 340px;
+            max-width: 100%;
+            position: relative;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--sidebar);
+            box-shadow: 0 18px 60px var(--panel-shadow);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .weixin-login-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .weixin-login-close:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+        }
+
+        .weixin-login-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(7, 193, 96, 0.15);
+            color: #07c160;
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+
+        .weixin-login-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .weixin-login-subtitle {
+            min-height: 36px;
+            text-align: center;
+            font-size: 13px;
+            line-height: 1.4;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .weixin-login-qr-frame {
+            width: 236px;
+            height: 236px;
+            border-radius: 8px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            margin-bottom: 14px;
+        }
+
+        .weixin-login-qr {
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+
+        .weixin-login-placeholder {
+            width: 100%;
+            height: 100%;
+            border: 1px dashed rgba(17, 24, 39, 0.28);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .weixin-login-link {
+            display: none;
+            color: #07c160;
+            font-size: 13px;
+            text-decoration: none;
+        }
+
+        .channel-drawer-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .channel-drawer-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .channel-drawer-icon.feishu { background: rgba(51, 112, 255, 0.15); color: #3370ff; }
+        .channel-drawer-icon.qq { background: rgba(18, 183, 245, 0.15); color: #12b7f5; }
+        .channel-drawer-icon.weixin { background: rgba(7, 193, 96, 0.15); color: #07c160; }
+        .channel-drawer-icon.telegram { background: rgba(38, 166, 222, 0.15); color: #26a6de; }
+        .channel-drawer-icon.dingtalk { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+        .channel-drawer-icon.discord { background: rgba(88, 101, 242, 0.15); color: #5865f2; }
+        .channel-drawer-icon.default { background: var(--accent-dim); color: var(--accent); }
+
+        .channel-drawer-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+            flex: 1;
+        }
+
+        .channel-drawer-close {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .channel-drawer-close:hover {
+            color: var(--text);
+            background: var(--sidebar-hover);
+            border-color: var(--border);
+        }
+
+        .channel-drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .channel-drawer-body::-webkit-scrollbar { width: 3px; }
+        .channel-drawer-body::-webkit-scrollbar-track { background: transparent; }
+        .channel-drawer-body::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 99px; }
+
+        .channel-drawer-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .channel-drawer-row-label {
+            font-size: 13px;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .channel-toggle {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background: var(--text-dim);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .channel-toggle.on {
+            background: #4ade80;
+        }
+
+        .channel-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .channel-toggle.on::after {
+            transform: translateX(16px);
+        }
+
+        .channel-drawer-fields {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .channel-drawer-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .channel-drawer-field-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .channel-drawer-input {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 10px 14px;
+            outline: none;
+            transition: border-color 0.18s ease, box-shadow 0.18s ease;
+            width: 100%;
+        }
+
+        .channel-drawer-input:focus {
+            border-color: rgba(124, 111, 247, 0.4);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .channel-drawer-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .channel-drawer-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .channel-drawer-save {
+            padding: 9px 24px;
+            border-radius: 9px;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            flex: 1;
+        }
+
+        .channel-drawer-save:hover {
+            background: #8f84f9;
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        .channel-drawer-save:disabled {
+            background: var(--text-dim);
+            cursor: default;
+            box-shadow: none;
+        }
+
+        .channel-save-ok {
+            font-size: 12px;
+            color: #4ade80;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .channel-save-ok.show {
+            opacity: 1;
+        }
+
