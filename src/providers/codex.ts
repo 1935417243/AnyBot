@@ -868,7 +868,7 @@ export class CodexProvider implements IProvider {
     }
 
     if (item.type === "reasoning" && item.text) {
-      await onEvent?.({ type: "answer_delta", text: sanitizeAgentText(item.text) });
+      await onEvent?.({ type: "process_delta", text: sanitizeAgentText(item.text) });
       return null;
     }
 
@@ -876,7 +876,7 @@ export class CodexProvider implements IProvider {
       const summary = item.items
         .map((todo) => `${todo.completed ? "[x]" : "[ ]"} ${todo.text}`)
         .join("\n");
-      if (summary) await onEvent?.({ type: "answer_delta", text: `${summary}\n` });
+      if (summary) await onEvent?.({ type: "process_delta", text: `${summary}\n` });
       return null;
     }
 

@@ -32,6 +32,7 @@ export type ClaudeAgentStreamEvent =
       durationMs?: number;
     }
   | { type: "answer_delta"; text: string }
+  | { type: "process_delta"; text: string }
   | { type: "thinking_delta"; text: string }
   | {
       type: "task_start";

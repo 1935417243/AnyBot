@@ -40,7 +40,7 @@ export function publishCodexAdapterStreamEvent(
 }
 
 function sanitizeStreamEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEvent {
-  if (event.type === "answer_delta" || event.type === "thinking_delta") {
+  if (event.type === "answer_delta" || event.type === "process_delta" || event.type === "thinking_delta") {
     return { ...event, text: sanitizeAgentText(event.text) };
   }
   return event;

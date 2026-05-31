@@ -44,7 +44,7 @@ function truncateForHistory(value: string | undefined, max = MAX_PERSISTED_EVENT
 }
 
 function compactAgentEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEvent | null {
-  if (event.type === "answer_delta" || event.type === "tool_progress") return null;
+  if (event.type === "answer_delta" || event.type === "process_delta" || event.type === "tool_progress") return null;
   if (event.type === "thinking_delta") return null;
   if (event.type === "tool_start") {
     return {

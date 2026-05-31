@@ -298,6 +298,24 @@
             scrollBottom();
         }
 
+        function renderStreamingAnswer() {
+            var answerText = String(state.answerText || '');
+            if (!answerText) return;
+            finalEl.classList.add('streaming');
+            finalEl.innerHTML = renderMarkdown(answerText);
+            enhanceLocalFileLinks(finalEl);
+            finalEl.querySelectorAll('pre code').forEach(function (block) {
+                if (typeof hljs !== 'undefined') hljs.highlightElement(block);
+            });
+            scrollBottom();
+        }
+
+        function appendAnswerText(text) {
+            if (!text || isPersisted) return;
+            state.answerText += text;
+            renderStreamingAnswer();
+        }
+
         function renderChangeReview() {
             if (!state.changeReview || !window.ChangeReview) return;
             var existing = content.querySelector('.change-review-card');
@@ -844,6 +862,11 @@
             }
 
             if (event.type === 'answer_delta') {
+                appendAnswerText(event.text || '');
+                return;
+            }
+
+            if (event.type === 'process_delta') {
                 appendProcessText(event.text || '');
                 openProcessIfAvailable();
                 return;
