@@ -20,7 +20,11 @@ const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com";
 const FIXED_LOGIN_BASE_URL = "https://ilinkai.weixin.qq.com";
 const CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c";
 const DEFAULT_BOT_TYPE = "3";
-const DEFAULT_BOT_AGENT = "AnyBot/0.1.24";
+const packageJson = require("../../package.json") as { version?: unknown };
+const appVersion = typeof packageJson.version === "string" && packageJson.version.trim()
+  ? packageJson.version.trim()
+  : "0.0.0";
+const DEFAULT_BOT_AGENT = `AnyBot/${appVersion}`;
 const CHANNEL_VERSION = "2.4.3";
 const ILINK_APP_ID = "bot";
 const ILINK_APP_CLIENT_VERSION = buildClientVersion(CHANNEL_VERSION);
