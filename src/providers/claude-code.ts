@@ -1,4 +1,4 @@
-import {mkdirSync} from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 import {
     type Options,
@@ -32,10 +32,11 @@ import {
     extractAssistantTextDelta,
     extractAssistantThinkingDelta,
 } from "./claude-code-agent-events.js";
-import {DEFAULT_PROVIDER_TIMEOUT_MS, getDataDir} from "../app-settings.js";
+import {DEFAULT_PROVIDER_TIMEOUT_MS} from "../app-settings.js";
 import {logger} from "../logger.js";
 import {DEFAULT_SANDBOX} from "../sandbox-config.js";
 import type {SandboxMode} from "../types.js";
+import {getClaudeConfigDir, getClaudeSkillsDir, getIsolatedClaudeConfigDir} from "../claude-config.js";
 
 const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
 
@@ -130,6 +131,60 @@ function buildAllowedTools(sandbox: SandboxMode): string[] | undefined {
     }
 
     return sandbox === "workspace-write" ? WORKSPACE_WRITE_TOOLS : READ_ONLY_TOOLS;
+}
+
+type ClaudeSkillsMapping = {
+    sourceDir: string;
+    runtimeDir: string;
+    mode: "same-config" | "created-symlink" | "existing-symlink" | "existing-directory" | "failed";
+    error?: string;
+};
+
+function normalizeFsPath(value: string): string {
+    return path.resolve(value).normalize("NFC");
+}
+
+function isSamePath(left: string, right: string): boolean {
+    return normalizeFsPath(left) === normalizeFsPath(right);
+}
+
+function ensureClaudeSkillsAvailableInConfigDir(runtimeConfigDir: string): ClaudeSkillsMapping {
+    const sourceConfigDir = getClaudeConfigDir();
+    const sourceDir = getClaudeSkillsDir();
+    const runtimeDir = path.join(runtimeConfigDir, "skills");
+
+    if (isSamePath(sourceConfigDir, runtimeConfigDir)) {
+        return {sourceDir, runtimeDir, mode: "same-config"};
+    }
+
+    try {
+        fs.mkdirSync(sourceDir, {recursive: true});
+        fs.mkdirSync(runtimeConfigDir, {recursive: true});
+
+        if (fs.existsSync(runtimeDir)) {
+            const stat = fs.lstatSync(runtimeDir);
+            if (stat.isSymbolicLink()) {
+                const target = path.resolve(path.dirname(runtimeDir), fs.readlinkSync(runtimeDir));
+                if (!isSamePath(target, sourceDir)) {
+                    fs.rmSync(runtimeDir, {force: true});
+                    fs.symlinkSync(sourceDir, runtimeDir, process.platform === "win32" ? "junction" : "dir");
+                    return {sourceDir, runtimeDir, mode: "created-symlink"};
+                }
+                return {sourceDir, runtimeDir, mode: "existing-symlink"};
+            }
+            return {sourceDir, runtimeDir, mode: "existing-directory"};
+        }
+
+        fs.symlinkSync(sourceDir, runtimeDir, process.platform === "win32" ? "junction" : "dir");
+        return {sourceDir, runtimeDir, mode: "created-symlink"};
+    } catch (err) {
+        return {
+            sourceDir,
+            runtimeDir,
+            mode: "failed",
+            error: err instanceof Error ? err.message : String(err),
+        };
+    }
 }
 
 function getUsageNumber(usage: unknown, key: string): number {
@@ -359,7 +414,10 @@ export class ClaudeCodeProvider implements IProvider {
         const abortController = new AbortController();
         const permissionMode = this.permissionMode ?? mapSandboxToPermissionMode(sandbox);
         const useAnthropicCompat = this.hasAnthropicCompatConfig();
-        const claudeConfigDir = useAnthropicCompat ? this.getIsolatedClaudeConfigDir() : undefined;
+        const claudeConfigDir = useAnthropicCompat ? getIsolatedClaudeConfigDir() : undefined;
+        const claudeSkillsMapping = claudeConfigDir
+            ? ensureClaudeSkillsAvailableInConfigDir(claudeConfigDir)
+            : null;
         const resultModel = this.resolveModelAlias(model && model !== "auto" ? model : undefined)
             || this.anthropicAutoModel
             || this.defaultModel;
@@ -380,6 +438,10 @@ export class ClaudeCodeProvider implements IProvider {
             provider: this.type,
             bin: this.pathToClaudeCodeExecutable || null,
             claudeConfigDir: claudeConfigDir || null,
+            claudeSkillsDir: claudeSkillsMapping?.sourceDir || getClaudeSkillsDir(),
+            claudeRuntimeSkillsDir: claudeSkillsMapping?.runtimeDir || null,
+            claudeSkillsMapping: claudeSkillsMapping?.mode || null,
+            claudeSkillsMappingError: claudeSkillsMapping?.error || null,
             workdir,
             sandbox,
             model: resultModel || null,
@@ -496,6 +558,9 @@ export class ClaudeCodeProvider implements IProvider {
                     allowDangerouslySkipPermissions: permissionMode === "bypassPermissions",
                     allowedTools: buildAllowedTools(sandbox),
                     tools: {type: "preset", preset: "claude_code"},
+                    systemPrompt: {type: "preset", preset: "claude_code"},
+                    settingSources: ["user", "project", "local"],
+                    skills: "all",
                     sandbox: buildSandboxOptions(sandbox, workdir),
                     includePartialMessages: !!onEvent,
                     agentProgressSummaries: !!onEvent,
@@ -700,12 +765,6 @@ export class ClaudeCodeProvider implements IProvider {
             this.anthropicHaikuModel ||
             this.claudeCodeSubagentModel
         );
-    }
-
-    private getIsolatedClaudeConfigDir(): string {
-        const dir = path.join(getDataDir(), "claude-code");
-        mkdirSync(dir, {recursive: true});
-        return dir;
     }
 
     private applyAnthropicEnv(env: NodeJS.ProcessEnv): void {

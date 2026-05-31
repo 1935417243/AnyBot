@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { fetch as undiciFetch } from "undici";
 import { logger } from "../../logger.js";
-import { getClaudeSkillsDir, getCodexSkillsDir } from "../skills.js";
+import { getClaudeSkillsDir } from "../../claude-config.js";
+import { getCodexSkillsDir } from "../skills.js";
 
 const DOWNLOAD_TIMEOUT_MS = 30000;
 const SAFE_SKILL_DIR_RE = /^[A-Za-z0-9._-]+$/;
