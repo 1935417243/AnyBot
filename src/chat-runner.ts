@@ -217,6 +217,7 @@ function shouldPersistAgentEvent(event: AgentStreamEvent): event is ClaudeAgentS
   return (
     event.type !== "result" &&
     event.type !== "error" &&
+    event.type !== "codex_answer_done" &&
     event.type !== "cancelled" &&
     event.type !== "done"
   );
@@ -372,6 +373,45 @@ export async function runPreparedChatTurn(
 ): Promise<ChatTurnResult> {
   const agentEvents: ClaudeAgentStreamEvent[] = [];
   const changeSnapshot = await safeCreateChangeSnapshotForWorkdir(prepared.workdir);
+  let assistantMessageAdded = false;
+  let assistantContent = "";
+  let assistantProviderSessionId = prepared.providerSessionId;
+  let assistantContextUsage: RunResult["contextUsage"] | undefined;
+
+  const persistAssistantMessage = (message: {
+    content: string;
+    providerSessionId: string | null;
+    changeReview: PublicChangeReview | null;
+    contextUsage?: RunResult["contextUsage"];
+  }): boolean => {
+    if (assistantMessageAdded) return false;
+
+    db.addMessage(
+      prepared.session.id,
+      "assistant",
+      message.content,
+      buildAssistantMetadata({
+        provider: prepared.provider.type,
+        events: opts.stream ? agentEvents : undefined,
+        changeReview: message.changeReview,
+      }),
+    );
+    db.updateSession({
+      id: prepared.session.id,
+      title: prepared.session.title,
+      sessionId: message.providerSessionId,
+      provider: prepared.session.provider,
+      updatedAt: Date.now(),
+    });
+    prepared.session.sessionId = message.providerSessionId;
+    assistantMessageAdded = true;
+    assistantContent = message.content;
+    assistantProviderSessionId = message.providerSessionId;
+    assistantContextUsage = message.contextUsage;
+    emitSessionsChanged(prepared.session.id, "assistant_message_added");
+    return true;
+  };
+
   const emitStream = async (event: AgentStreamEvent): Promise<void> => {
     if (event.type === "tool_start" && event.tool.files?.length) {
       await addPathsToChangeSnapshot(changeSnapshot, event.tool.files);
@@ -379,7 +419,32 @@ export async function runPreparedChatTurn(
     if (shouldPersistAgentEvent(event)) {
       agentEvents.push(event);
     }
-    await opts.stream?.emit(event);
+
+    let streamEvent = event;
+    if (event.type === "codex_answer_done" && prepared.provider.type === "codex") {
+      const providerSessionId = event.sessionId || prepared.providerSessionId;
+      agentEvents.push({
+        type: "agent_status",
+        status: "completed",
+        message: "Codex Agent 已完成",
+        sessionId: providerSessionId || undefined,
+        durationMs: event.durationMs,
+      });
+      persistAssistantMessage({
+        content: event.content,
+        providerSessionId,
+        changeReview: null,
+        contextUsage: event.contextUsage,
+      });
+      streamEvent = {
+        ...event,
+        title: prepared.session.title,
+        sessionId: providerSessionId,
+        provider: "codex",
+      };
+    }
+
+    await opts.stream?.emit(streamEvent);
   };
 
   db.addMessage(
@@ -422,34 +487,35 @@ export async function runPreparedChatTurn(
         })
       : await prepared.provider.run(runOptions);
 
-    const providerSessionId = result.sessionId || prepared.providerSessionId;
-    const changeReview = await safeCollectChangeReview(changeSnapshot);
-    if (result.contextUsage) {
+    const providerSessionId = result.sessionId || assistantProviderSessionId || prepared.providerSessionId;
+    const contextUsage = result.contextUsage || assistantContextUsage;
+    const changeReview = assistantMessageAdded ? null : await safeCollectChangeReview(changeSnapshot);
+    if (contextUsage && !assistantMessageAdded) {
       await emitStream({
         type: "context_usage",
-        usage: result.contextUsage,
+        usage: contextUsage,
       });
     }
 
-    db.addMessage(
-      prepared.session.id,
-      "assistant",
-      result.text,
-      buildAssistantMetadata({
-        provider: prepared.provider.type,
-        events: opts.stream ? agentEvents : undefined,
+    if (!assistantMessageAdded) {
+      persistAssistantMessage({
+        content: result.text,
+        providerSessionId,
         changeReview,
-      }),
-    );
-    db.updateSession({
-      id: prepared.session.id,
-      title: prepared.session.title,
-      sessionId: providerSessionId,
-      provider: prepared.session.provider,
-      updatedAt: Date.now(),
-    });
-    prepared.session.sessionId = providerSessionId;
-    emitSessionsChanged(prepared.session.id, "assistant_message_added");
+        contextUsage,
+      });
+    } else if (providerSessionId !== assistantProviderSessionId) {
+      db.updateSession({
+        id: prepared.session.id,
+        title: prepared.session.title,
+        sessionId: providerSessionId,
+        provider: prepared.session.provider,
+        updatedAt: Date.now(),
+      });
+      prepared.session.sessionId = providerSessionId;
+      assistantProviderSessionId = providerSessionId;
+      emitSessionsChanged(prepared.session.id, "session_updated");
+    }
 
     await emitStream({
       type: "result",
@@ -458,7 +524,7 @@ export async function runPreparedChatTurn(
       sessionId: providerSessionId,
       provider: prepared.provider.type,
       changeReview,
-      contextUsage: result.contextUsage,
+      contextUsage,
     });
 
     logger.info(`${opts.logPrefix}.success`, {
@@ -479,9 +545,29 @@ export async function runPreparedChatTurn(
       sessionId: providerSessionId,
       provider: prepared.provider.type,
       changeReview,
-      contextUsage: result.contextUsage,
+      contextUsage,
     };
   } catch (error) {
+    if (assistantMessageAdded) {
+      logger.warn(`${opts.logPrefix}.post_answer_done_failed`, {
+        sessionId: prepared.session.id,
+        providerSessionId: assistantProviderSessionId,
+        source: prepared.source,
+        provider: prepared.provider.type,
+        error,
+        ...(opts.logFields || {}),
+      });
+      return {
+        status: "success",
+        content: assistantContent,
+        title: prepared.session.title,
+        sessionId: assistantProviderSessionId,
+        provider: prepared.provider.type,
+        changeReview: null,
+        contextUsage: assistantContextUsage,
+      };
+    }
+
     if (error instanceof ProviderCancelledError) {
       const changeReview = await safeCollectChangeReview(changeSnapshot);
       db.addMessage(

@@ -15,6 +15,7 @@ import type {
     ProviderCapabilities,
     ProviderContextUsage,
     ProviderModel,
+    ProviderStreamEvent,
     ProviderSlashCommand,
     RunOptions,
     RunResult,
@@ -332,7 +333,7 @@ export class ClaudeCodeProvider implements IProvider {
 
     async runWithEvents(
         opts: RunOptions & {
-            onEvent: (event: ClaudeAgentStreamEvent) => void | Promise<void>;
+            onEvent: (event: ProviderStreamEvent) => void | Promise<void>;
         },
     ): Promise<RunResult> {
         return this.execute(opts, opts.onEvent);
@@ -340,7 +341,7 @@ export class ClaudeCodeProvider implements IProvider {
 
     private async execute(
         opts: RunOptions,
-        onEvent?: (event: ClaudeAgentStreamEvent) => void | Promise<void>,
+        onEvent?: (event: ProviderStreamEvent) => void | Promise<void>,
     ): Promise<RunResult> {
         const {
             workdir,

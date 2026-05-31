@@ -12,6 +12,53 @@ type ClientChatMessage = db.ChatMessage & {
   contentChars?: number;
 };
 
+function hasCompletedDurationEvent(events: ClaudeAgentStreamEvent[]): boolean {
+  return events.some(
+    (event) =>
+      event.type === "agent_status" &&
+      event.status === "completed" &&
+      typeof event.durationMs === "number" &&
+      Number.isFinite(event.durationMs),
+  );
+}
+
+function inferAssistantDurationMs(
+  messages: db.ChatSession["messages"],
+  index: number,
+  assistantCreatedAt: number,
+): number | null {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.role !== "user") continue;
+    const durationMs = assistantCreatedAt - message.createdAt;
+    return Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null;
+  }
+  return null;
+}
+
+function ensureCodexCompletedDurationEvent(
+  messages: db.ChatSession["messages"],
+  index: number,
+  message: db.ChatMessage,
+  provider: string,
+  events: ClaudeAgentStreamEvent[],
+): ClaudeAgentStreamEvent[] {
+  if (provider !== "codex" || hasCompletedDurationEvent(events)) return events;
+
+  const durationMs = inferAssistantDurationMs(messages, index, message.createdAt);
+  if (durationMs === null) return events;
+
+  return [
+    ...events,
+    {
+      type: "agent_status",
+      status: "completed",
+      message: "Codex Agent 已完成",
+      durationMs,
+    },
+  ];
+}
+
 export function readMessagePageQuery(req: Request): { beforeId: number | null; limit: number } {
   const beforeRaw = Array.isArray(req.query.before) ? req.query.before[0] : req.query.before;
   const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
@@ -27,16 +74,24 @@ export async function prepareMessagesForClient(
   messages: db.ChatMessage[],
 ): Promise<ClientChatMessage[]> {
   const hydrated = await hydrateChangeReviewMetadata(messages);
-  return hydrated.map((message) => {
+  return hydrated.map((message, index) => {
     let metadata = message.metadata;
     if (metadata) {
       try {
         const parsed = JSON.parse(metadata) as Record<string, unknown>;
-        const loop = parsed.claudeAgentLoop as { events?: ClaudeAgentStreamEvent[] } | undefined;
+        const loop = parsed.claudeAgentLoop as { provider?: string; events?: ClaudeAgentStreamEvent[] } | undefined;
         if (loop && Array.isArray(loop.events)) {
+          const provider = loop.provider || (typeof parsed.provider === "string" ? parsed.provider : "");
+          const events = ensureCodexCompletedDurationEvent(
+            hydrated,
+            index,
+            message,
+            provider,
+            loop.events,
+          );
           parsed.claudeAgentLoop = {
             ...loop,
-            events: compactAgentEvents(loop.events),
+            events: compactAgentEvents(events),
           };
           metadata = JSON.stringify(parsed);
         }

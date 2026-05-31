@@ -1,6 +1,6 @@
 import type { Response } from "express";
 import type { ClaudeAgentStreamEvent } from "../providers/claude-code-agent-events.js";
-import type { ProviderContextUsage } from "../providers/types.js";
+import type { CodexAnswerDoneEvent, ProviderContextUsage } from "../providers/types.js";
 import type { PublicChangeReview } from "./change-review.js";
 
 const MAX_PERSISTED_AGENT_EVENTS = 240;
@@ -10,6 +10,7 @@ const MAX_PERSISTED_THINKING_TEXT = 4000;
 
 export type AgentStreamEvent =
   | ClaudeAgentStreamEvent
+  | CodexAnswerDoneEvent
   | {
       type: "result";
       content: string;
@@ -229,5 +230,7 @@ export function finishAgentStream(sessionId: string, active: ActiveAgentStream):
     if (!client.writableEnded) client.end();
   }
   active.clients.clear();
-  activeAgentStreams.delete(sessionId);
+  if (activeAgentStreams.get(sessionId) === active) {
+    activeAgentStreams.delete(sessionId);
+  }
 }

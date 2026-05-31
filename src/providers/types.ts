@@ -40,6 +40,18 @@ export interface ProviderContextUsage {
   source: "claude-code" | "codex" | string;
 }
 
+export type CodexAnswerDoneEvent = {
+  type: "codex_answer_done";
+  content: string;
+  title?: string;
+  sessionId: string | null;
+  provider: "codex";
+  durationMs?: number;
+  contextUsage?: ProviderContextUsage;
+};
+
+export type ProviderStreamEvent = ClaudeAgentStreamEvent | CodexAnswerDoneEvent;
+
 export interface ProviderSlashCommand {
   id: string;
   name: string;
@@ -71,7 +83,7 @@ export interface IProvider {
   run(opts: RunOptions): Promise<RunResult>;
   runWithEvents?(
     opts: RunOptions & {
-      onEvent: (event: ClaudeAgentStreamEvent) => void | Promise<void>;
+      onEvent: (event: ProviderStreamEvent) => void | Promise<void>;
     },
   ): Promise<RunResult>;
 }

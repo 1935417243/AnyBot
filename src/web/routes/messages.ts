@@ -281,7 +281,19 @@ export function createMessagesRouter(): Router {
     const active = createActiveAgentStream(id);
     attachAgentStreamClient(id, res);
 
-    const emit = (event: AgentStreamEvent) => emitAgentStream(active, event);
+    let streamReleased = false;
+    const releaseStream = () => {
+      if (streamReleased) return;
+      streamReleased = true;
+      clearActiveRun(id, activeRun.controller);
+      finishAgentStream(id, active);
+    };
+    const emit = (event: AgentStreamEvent) => {
+      emitAgentStream(active, event);
+      if (event.type === "codex_answer_done") {
+        releaseStream();
+      }
+    };
 
     void (async () => {
       try {
@@ -294,8 +306,7 @@ export function createMessagesRouter(): Router {
       } catch {
         // runPreparedChatTurn 已记录日志并推送 error 事件，这里只负责收尾。
       } finally {
-        clearActiveRun(id, activeRun.controller);
-        finishAgentStream(id, active);
+        releaseStream();
       }
     })();
   });

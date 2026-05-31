@@ -19,13 +19,11 @@ import type {
   ProviderCapabilities,
   ProviderModel,
   ProviderContextUsage,
+  ProviderStreamEvent,
   RunOptions,
   RunResult,
 } from "./types.js";
-import {
-  sanitizeAgentText,
-  type ClaudeAgentStreamEvent,
-} from "./claude-code-agent-events.js";
+import { sanitizeAgentText } from "./claude-code-agent-events.js";
 import { logger } from "../logger.js";
 import { DEFAULT_SANDBOX } from "../sandbox-config.js";
 import { DEFAULT_PROVIDER_TIMEOUT_MS, getDataDir } from "../app-settings.js";
@@ -85,7 +83,7 @@ const CODEX_PLATFORM_PACKAGE_BY_TARGET: Record<string, string> = {
   "aarch64-pc-windows-msvc": "@openai/codex-win32-arm64",
 };
 
-type StreamHandler = (event: ClaudeAgentStreamEvent) => void | Promise<void>;
+type StreamHandler = (event: ProviderStreamEvent) => void | Promise<void>;
 
 type ToolState = {
   startedAt: number;
@@ -622,6 +620,30 @@ export class CodexProvider implements IProvider {
     let responseText = "";
     let usage: Usage | null = null;
     let tokenCountInfo: CodexTokenCountInfo | null = null;
+    let answerDoneEmitted = false;
+    let earlyContextUsage: ProviderContextUsage | undefined;
+
+    const buildCurrentContextUsage = (): ProviderContextUsage | undefined =>
+      extractContextUsage(usage, tokenCountInfo);
+
+    const emitCodexAnswerDone = async (): Promise<ProviderContextUsage | undefined> => {
+      if (!onEvent || answerDoneEmitted) return undefined;
+
+      const content = responseText.trim();
+      if (!content) return undefined;
+
+      const contextUsage = buildCurrentContextUsage();
+      answerDoneEmitted = true;
+      await onEvent({
+        type: "codex_answer_done",
+        content,
+        sessionId: providerSessionId,
+        provider: "codex",
+        durationMs: Date.now() - startedAt,
+        contextUsage,
+      });
+      return contextUsage;
+    };
 
     const timer = setTimeout(() => {
       timedOut = true;
@@ -689,6 +711,7 @@ export class CodexProvider implements IProvider {
           });
         } else if (event.type === "turn.completed") {
           usage = event.usage;
+          earlyContextUsage = (await emitCodexAnswerDone()) || earlyContextUsage;
         } else if (event.type === "turn.failed") {
           throw new ProviderProcessError(1, event.error.message);
         } else if (event.type === "error") {
@@ -725,8 +748,14 @@ export class CodexProvider implements IProvider {
         throw new ProviderEmptyOutputError();
       }
 
-      tokenCountInfo = tokenCountInfo || (await readLatestCodexTokenCountInfo(providerSessionId, this.codexHome));
-      const contextUsage = extractContextUsage(usage, tokenCountInfo);
+      let contextUsage = earlyContextUsage;
+      if (onEvent) {
+        contextUsage = contextUsage || buildCurrentContextUsage();
+        contextUsage = (await emitCodexAnswerDone()) || contextUsage;
+      } else {
+        tokenCountInfo = tokenCountInfo || (await readLatestCodexTokenCountInfo(providerSessionId, this.codexHome));
+        contextUsage = buildCurrentContextUsage();
+      }
 
       logger.info("provider.exec.success", {
         provider: this.type,
@@ -864,7 +893,7 @@ export class CodexProvider implements IProvider {
         await onEvent({ type: "answer_delta", text: next.slice(previous.length) });
       }
       textByAgentMessageId.set(item.id, next);
-      return event.type === "item.completed" ? next : null;
+      return next;
     }
 
     if (item.type === "reasoning" && item.text) {

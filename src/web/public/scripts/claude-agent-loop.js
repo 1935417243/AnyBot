@@ -834,6 +834,23 @@
             renderDiffs(toolState, event.diffs);
         }
 
+        function completeAnswer(event) {
+            removeFinalAnswerFromProcessText(event.content);
+            state.answerText = event.content || state.answerText;
+            state.changeReview = event.changeReview || state.changeReview;
+            if (event.durationMs || event.durationMs === 0) {
+                state.durationMs = event.durationMs;
+            } else if (state.status === 'running') {
+                state.durationMs = Date.now() - startedAt;
+            }
+            renderAnswer();
+            state.status = 'completed';
+            updateProcessTitle();
+            if (ticker) clearInterval(ticker);
+            updateProcessAvailability();
+            if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
+        }
+
         function handleEvent(event) {
             if (!event || !event.type) return;
             if (event.type === 'agent_status') {
@@ -897,15 +914,12 @@
             }
 
             if (event.type === 'result') {
-                removeFinalAnswerFromProcessText(event.content);
-                state.answerText = event.content || state.answerText;
-                state.changeReview = event.changeReview || state.changeReview;
-                renderAnswer();
-                state.status = 'completed';
-                updateProcessTitle();
-                if (ticker) clearInterval(ticker);
-                updateProcessAvailability();
-                if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
+                completeAnswer(event);
+                return;
+            }
+
+            if (event.type === 'codex_answer_done') {
+                completeAnswer(event);
                 return;
             }
 
@@ -1009,12 +1023,17 @@
             if (chunk.done) break;
             buffer += decoder.decode(chunk.value, { stream: true });
             buffer = parseSseChunk(buffer, function (_eventName, data) {
-                if (data && data.type === 'result') {
+                if (data && (data.type === 'result' || data.type === 'codex_answer_done')) {
                     resultPayload = data;
                 }
                 if (data && data.type === 'context_usage' && data.usage && opts.onContextUsage) {
                     opts.onContextUsage(data.usage);
-                } else if (data && data.type === 'result' && data.contextUsage && opts.onContextUsage) {
+                } else if (
+                    data &&
+                    (data.type === 'result' || data.type === 'codex_answer_done') &&
+                    data.contextUsage &&
+                    opts.onContextUsage
+                ) {
                     opts.onContextUsage(data.contextUsage);
                 }
                 opts.view.handleEvent(data);
