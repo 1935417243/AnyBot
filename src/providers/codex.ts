@@ -81,10 +81,26 @@ export class ProviderExecutableNotFoundError extends Error {
 }
 
 const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
-const DEFAULT_CODEX_CONTEXT_WINDOW = 258400;
+const DEFAULT_CODEX_CONTEXT_WINDOW = 200000;
 const CODEX_NPM_NAME = "@openai/codex";
 const CODEX_BUNDLED_BIN_LABEL = "bundled Codex CLI";
 const moduleRequire = createRequire(import.meta.url);
+
+const CODEX_MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  "gpt-5.4": 1_000_000,
+  "gpt-5.4-mini": 400_000,
+  "gpt-5.3-codex": 258_000,
+  "gpt-5.2-codex": 258_000,
+  "gpt-5.2": 258_000,
+  "gpt-5.1": 128_000,
+  "gpt-5.1-codex": 128_000,
+  "gpt-4o": 128_000,
+  "gpt-4o-mini": 128_000,
+  "gpt-4-turbo": 128_000,
+  "gpt-4": 8192,
+  "o3": 200_000,
+  "o3-mini": 200_000,
+};
 
 const CODEX_PLATFORM_PACKAGE_BY_TARGET: Record<string, string> = {
   "x86_64-unknown-linux-musl": "@openai/codex-linux-x64",
@@ -414,6 +430,30 @@ function getUsageNumber(usage: CodexTokenUsage | undefined, key: keyof CodexToke
   return getNumber(usage?.[key]);
 }
 
+function parseContextWindowFromModelName(model: string | undefined): number | undefined {
+  const match = model?.trim().match(/\[([0-9.]+)([kKmM])\]\s*$/);
+  if (!match) return undefined;
+
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+
+  const unit = match[2].toLowerCase();
+  return Math.round(value * (unit === "m" ? 1_000_000 : 1_000));
+}
+
+function getCodexContextWindowForModel(model: string | undefined): number {
+  const explicit = parseContextWindowFromModelName(model);
+  if (explicit) return explicit;
+
+  const normalized = model?.trim();
+  if (!normalized) return DEFAULT_CODEX_CONTEXT_WINDOW;
+  return CODEX_MODEL_CONTEXT_WINDOWS[normalized] || DEFAULT_CODEX_CONTEXT_WINDOW;
+}
+
+function calculateCodexUsedTokens(inputTokens: number | undefined, outputTokens: number | undefined): number {
+  return (inputTokens || 0) + (outputTokens || 0);
+}
+
 function calculatePercentage(usedTokens: number, maxTokens: number): number {
   return Math.min(100, Math.round((usedTokens / maxTokens) * 1000) / 10);
 }
@@ -430,11 +470,10 @@ function buildContextUsage(
 ): ProviderContextUsage | undefined {
   if (usedTokens <= 0 || maxTokens <= 0) return undefined;
 
-  const cappedUsedTokens = Math.min(usedTokens, maxTokens);
-  const usedPercentage = calculatePercentage(cappedUsedTokens, maxTokens);
+  const usedPercentage = calculatePercentage(usedTokens, maxTokens);
 
   return {
-    usedTokens: cappedUsedTokens,
+    usedTokens,
     maxTokens,
     usedPercentage,
     remainingPercentage: Math.max(0, Math.round((100 - usedPercentage) * 10) / 10),
@@ -561,15 +600,17 @@ function extractContextUsageFromTokenCount(
   const maxTokens = getNumber(info.model_context_window);
   if (!maxTokens) return undefined;
 
-  const usage = info.last_token_usage || info.total_token_usage;
+  const usage = info.total_token_usage || info.last_token_usage;
   if (!usage) return undefined;
 
-  const usedTokens = getUsageNumber(usage, "total_tokens") || getUsageNumber(usage, "input_tokens");
+  const inputTokens = getUsageNumber(usage, "input_tokens");
+  const outputTokens = getUsageNumber(usage, "output_tokens");
+  const usedTokens = calculateCodexUsedTokens(inputTokens, outputTokens);
   if (!usedTokens) return undefined;
 
   return buildContextUsage(usedTokens, maxTokens, {
-    inputTokens: getUsageNumber(usage, "input_tokens"),
-    outputTokens: getUsageNumber(usage, "output_tokens"),
+    inputTokens,
+    outputTokens,
     cacheReadInputTokens: getUsageNumber(usage, "cached_input_tokens"),
   });
 }
@@ -577,16 +618,38 @@ function extractContextUsageFromTokenCount(
 function extractContextUsage(
   usage: Usage | null,
   tokenCountInfo: CodexTokenCountInfo | null,
+  model?: string,
 ): ProviderContextUsage | undefined {
   const tokenCountUsage = extractContextUsageFromTokenCount(tokenCountInfo);
   if (tokenCountUsage) return tokenCountUsage;
 
   if (!usage) return undefined;
-  return buildContextUsage(usage.input_tokens, DEFAULT_CODEX_CONTEXT_WINDOW, {
-    inputTokens: usage.input_tokens,
-    outputTokens: usage.output_tokens,
-    cacheReadInputTokens: usage.cached_input_tokens,
-  });
+  return buildContextUsage(
+    calculateCodexUsedTokens(usage.input_tokens, usage.output_tokens),
+    getCodexContextWindowForModel(model),
+    {
+      inputTokens: usage.input_tokens,
+      outputTokens: usage.output_tokens,
+      cacheReadInputTokens: usage.cached_input_tokens,
+    },
+  );
+}
+
+export async function readLatestCodexContextUsage(
+  sessionId: string | null,
+): Promise<ProviderContextUsage | undefined> {
+  if (!sessionId) return undefined;
+
+  const homes = [getIsolatedCodexHome(), getCodexHome()];
+  const uniqueHomes = Array.from(new Set(homes));
+
+  for (const codexHome of uniqueHomes) {
+    const info = await readLatestCodexTokenCountInfo(sessionId, codexHome);
+    const usage = extractContextUsageFromTokenCount(info);
+    if (usage) return usage;
+  }
+
+  return undefined;
 }
 
 function isToolItem(item: ThreadItem): boolean {
@@ -685,6 +748,19 @@ export class CodexProvider implements IProvider {
     ];
   }
 
+  private resolveContextModel(model: string | undefined): string | undefined {
+    const requested = cleanString(model);
+    if (!this.codexCompatEnabled) return requested;
+
+    if (requested?.includes("mini")) {
+      return this.codexFastModel || this.codexDefaultModel || requested;
+    }
+    if (requested?.includes("codex")) {
+      return this.codexCodeModel || this.codexDefaultModel || requested;
+    }
+    return this.codexDefaultModel || requested;
+  }
+
   async run(opts: RunOptions): Promise<RunResult> {
     return this.execute(opts);
   }
@@ -735,9 +811,10 @@ export class CodexProvider implements IProvider {
     let tokenCountInfo: CodexTokenCountInfo | null = null;
     let answerDoneEmitted = false;
     let earlyContextUsage: ProviderContextUsage | undefined;
+    const contextModel = this.resolveContextModel(model);
 
     const buildCurrentContextUsage = (): ProviderContextUsage | undefined =>
-      extractContextUsage(usage, tokenCountInfo);
+      extractContextUsage(usage, tokenCountInfo, contextModel);
 
     const emitCodexAnswerDone = async (): Promise<ProviderContextUsage | undefined> => {
       if (!onEvent || answerDoneEmitted) return undefined;
@@ -869,12 +946,13 @@ export class CodexProvider implements IProvider {
       }
 
       let contextUsage = earlyContextUsage;
+      tokenCountInfo = tokenCountInfo || (await readLatestCodexTokenCountInfo(providerSessionId, this.codexHome));
+      const finalContextUsage = buildCurrentContextUsage();
       if (onEvent) {
-        contextUsage = contextUsage || buildCurrentContextUsage();
+        contextUsage = finalContextUsage || contextUsage;
         contextUsage = (await emitCodexAnswerDone()) || contextUsage;
       } else {
-        tokenCountInfo = tokenCountInfo || (await readLatestCodexTokenCountInfo(providerSessionId, this.codexHome));
-        contextUsage = buildCurrentContextUsage();
+        contextUsage = finalContextUsage;
       }
 
       logger.info("provider.exec.success", {

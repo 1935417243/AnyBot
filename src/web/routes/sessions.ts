@@ -129,7 +129,11 @@ export function createSessionsRouter(): Router {
       projectId: session.projectId,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
-      messages: await prepareMessagesForClient(page.messages),
+      messages: await prepareMessagesForClient(page.messages, {
+        provider: session.provider,
+        providerSessionId: session.sessionId,
+        hydrateLatestContextUsage: true,
+      }),
       hasMoreMessages: page.hasMore,
       activeRun: getActiveRunInfo(session.id),
       activeStream: getActiveAgentStreamInfo(session.id),

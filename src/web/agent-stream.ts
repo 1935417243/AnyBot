@@ -149,6 +149,7 @@ export function buildAssistantMetadata(opts: {
   provider?: string;
   events?: ClaudeAgentStreamEvent[];
   changeReview?: PublicChangeReview | null;
+  contextUsage?: ProviderContextUsage | null;
 }): string | null {
   const metadata: Record<string, unknown> = {};
   if (opts.provider) {
@@ -163,6 +164,9 @@ export function buildAssistantMetadata(opts: {
   }
   if (opts.changeReview) {
     metadata.changeReview = opts.changeReview;
+  }
+  if (opts.contextUsage) {
+    metadata.contextUsage = opts.contextUsage;
   }
   return Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null;
 }

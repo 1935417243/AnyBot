@@ -1,5 +1,7 @@
 import type { Request } from "express";
 import type { ClaudeAgentStreamEvent } from "../../providers/claude-code-agent-events.js";
+import { readLatestCodexContextUsage } from "../../providers/codex.js";
+import type { ProviderContextUsage } from "../../providers/types.js";
 import { compactAgentEvents } from "../agent-stream.js";
 import { getChangeReview } from "../change-review.js";
 import * as db from "../db.js";
@@ -11,6 +13,51 @@ type ClientChatMessage = db.ChatMessage & {
   contentTruncated?: boolean;
   contentChars?: number;
 };
+
+type PrepareMessagesForClientOptions = {
+  provider?: string | null;
+  providerSessionId?: string | null;
+  hydrateLatestContextUsage?: boolean;
+};
+
+type CodexContextUsageHydration = {
+  messageId: number;
+  contextUsage: ProviderContextUsage;
+};
+
+function parseMetadata(raw: string | null | undefined): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function withContextUsageMetadata(
+  metadata: string | null | undefined,
+  contextUsage: ProviderContextUsage,
+): string {
+  const parsed = parseMetadata(metadata) || {};
+  return JSON.stringify({
+    ...parsed,
+    contextUsage,
+  });
+}
+
+async function readCodexContextUsageHydration(
+  messages: db.ChatMessage[],
+  opts: PrepareMessagesForClientOptions,
+): Promise<CodexContextUsageHydration | null> {
+  if (!opts.hydrateLatestContextUsage || opts.provider !== "codex") return null;
+
+  const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+  if (!latestAssistant) return null;
+
+  const contextUsage = await readLatestCodexContextUsage(opts.providerSessionId || null);
+  return contextUsage ? { messageId: latestAssistant.id, contextUsage } : null;
+}
 
 function hasCompletedDurationEvent(events: ClaudeAgentStreamEvent[]): boolean {
   return events.some(
@@ -72,10 +119,15 @@ export function readMessagePageQuery(req: Request): { beforeId: number | null; l
 
 export async function prepareMessagesForClient(
   messages: db.ChatMessage[],
+  opts: PrepareMessagesForClientOptions = {},
 ): Promise<ClientChatMessage[]> {
   const hydrated = await hydrateChangeReviewMetadata(messages);
+  const codexContextUsage = await readCodexContextUsageHydration(hydrated, opts);
   return hydrated.map((message, index) => {
     let metadata = message.metadata;
+    if (codexContextUsage && message.id === codexContextUsage.messageId) {
+      metadata = withContextUsageMetadata(metadata, codexContextUsage.contextUsage);
+    }
     if (metadata) {
       try {
         const parsed = JSON.parse(metadata) as Record<string, unknown>;

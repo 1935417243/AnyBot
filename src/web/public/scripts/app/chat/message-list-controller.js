@@ -206,19 +206,24 @@ export function createMessageListController(config) {
         messagesEl.insertBefore(btn, getFirstMessageContentNode());
     }
 
-    function renderMessageRecord(m, beforeNode) {
+    function renderMessageRecord(m, beforeNode, opts) {
+        opts = opts || {};
+        var shouldUpdateContextUsage = opts.updateContextUsage !== false;
         var row = null;
         var attInfo = null;
         var meta = parseMessageMetadata(m.metadata);
         if (meta.attachments && meta.attachments.length > 0) {
             attInfo = meta.attachments;
         }
+        if (shouldUpdateContextUsage && m.role === 'assistant' && meta.contextUsage) {
+            config.updateContextUsage(meta.contextUsage);
+        }
         if (m.role === 'assistant' && meta.contextCompact) {
             row = appendContextCompactDivider(m.content, {
                 messageId: m.id,
                 createdAt: m.createdAt,
             });
-            if (meta.contextCompact.contextUsage) config.updateContextUsage(meta.contextCompact.contextUsage);
+            if (shouldUpdateContextUsage && meta.contextCompact.contextUsage) config.updateContextUsage(meta.contextCompact.contextUsage);
         } else if (m.role === 'assistant' && meta.claudeAgentLoop && window.ClaudeAgentLoop && window.ClaudeAgentLoop.renderPersistedMessage) {
             clearEmpty();
             var view = window.ClaudeAgentLoop.renderPersistedMessage({
@@ -238,7 +243,7 @@ export function createMessageListController(config) {
             var usageEvents = Array.isArray(meta.claudeAgentLoop.events)
                 ? meta.claudeAgentLoop.events.filter(function (event) { return event && event.type === 'context_usage' && event.usage; })
                 : [];
-            if (usageEvents.length > 0) config.updateContextUsage(usageEvents[usageEvents.length - 1].usage);
+            if (shouldUpdateContextUsage && usageEvents.length > 0) config.updateContextUsage(usageEvents[usageEvents.length - 1].usage);
         } else {
             row = appendMessage(m.role === 'user' ? 'user' : 'ai', m.content, attInfo, meta.changeReview, {
                 messageId: m.id,
@@ -297,7 +302,7 @@ export function createMessageListController(config) {
             try {
                 config.prependInputHistoryMessages(data.messages || [], data.hasMoreMessages);
                 (data.messages || []).forEach(function (m) {
-                    renderMessageRecord(m, anchor);
+                    renderMessageRecord(m, anchor, { updateContextUsage: false });
                 });
             } finally {
                 isBatchRenderingMessages = false;

@@ -394,6 +394,7 @@ export async function runPreparedChatTurn(
         provider: prepared.provider.type,
         events: opts.stream ? agentEvents : undefined,
         changeReview: message.changeReview,
+        contextUsage: message.contextUsage,
       }),
     );
     db.updateSession({
