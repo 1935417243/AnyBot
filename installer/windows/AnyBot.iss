@@ -1,6 +1,6 @@
 #define AppVersion GetEnv("APP_VERSION")
 #if AppVersion == ""
-#define AppVersion "0.1.25"
+#define AppVersion "0.1.26"
 #endif
 
 #define RepoRoot AddBackslash(SourcePath) + "..\.."
