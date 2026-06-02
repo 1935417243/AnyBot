@@ -7,17 +7,18 @@
 ![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 
-AnyBot 可以把你电脑上的 AI Coding Agent 变成远程助手。
+AnyBot 是一个简单易用、开箱即用的本机 AI Coding Agent 控制台与远程入口。
 
-它运行在你自己的电脑上，把 Codex CLI、Claude Code 等本地 Agent 能力接入桌面 App、Web UI 和常用聊天渠道。你可以在内置 **Web UI** 中对话、管理项目、查看 Agent 执行过程、审核文件变更和配置自动化任务；也可以通过 **飞书机器人**、**QQ 机器人**、**Telegram 机器人** 或 **个人微信** 在手机和桌面端远程使用这台机器上的 Agent。
+你可以通过 macOS/Windows 桌面 App，或微信、QQ、Telegram、飞书等聊天机器人，随时调用和管理本机 Agent。Codex CLI 和 Claude Code 不是必需项：无需安装它们，也可以直接接入 DeepSeek、OpenAI 等兼容模型 Provider 使用；本机已安装时，AnyBot 可以直接调用 Codex CLI 或 Claude Code。通过 AnyBot 配置的兼容模型和模型映射只在 AnyBot 内生效，与本机原生 Codex CLI、Claude Code 的全局配置完全隔离。
 
-当前 Provider 支持 [OpenAI Codex CLI](https://developers.openai.com/codex/cli) 和 [Claude Code](https://code.claude.com/docs/en/overview)。桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
+桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
 
 ---
 
 ## 特性
 
 - **多 Provider**：支持 Codex CLI 和 Claude Code，可在 Web UI 或频道命令中切换 Provider 和模型。
+- **兼容模型接入**：支持在 AnyBot 内配置 DeepSeek、OpenAI 等兼容模型 Provider 和模型映射。
 - **Agent Web UI**：本地聊天界面，支持 Markdown、代码高亮、流式 Agent 事件、停止响应、上下文压缩和会话历史。
 - **项目工作区**：在侧边栏管理项目，项目会话会把项目目录作为 Provider 工作目录；也支持在单轮消息中额外选择项目。
 - **技能入口**：Web UI 可浏览、启用、禁用、删除技能，并在输入框 `/` 菜单中按当前 Provider 展示可用技能和命令。

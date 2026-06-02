@@ -7,17 +7,18 @@
 ![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 
-AnyBot turns your local AI coding agents into remote assistants.
+AnyBot is a simple, ready-to-use local AI Coding Agent console and remote entry point.
 
-It runs on your own computer and connects local Agent backends such as Codex CLI and Claude Code to a desktop app, Web UI, and everyday chat channels. From the built-in **Web UI**, you can chat, manage projects, inspect Agent activity, review file changes, and configure automations. You can also use **Feishu Bot**, **QQ Bot**, **Telegram Bot**, or **personal Weixin** to remotely reach the Agent running on that machine.
+Use the macOS/Windows desktop app, or chat bots for Weixin, QQ, Telegram, and Feishu, to call and manage local Agents anytime. Codex CLI and Claude Code are optional: without installing them, you can connect directly to compatible model Providers such as DeepSeek and OpenAI. If they are installed locally, AnyBot can call Codex CLI or Claude Code directly. Compatible models and model mappings configured through AnyBot only take effect inside AnyBot and stay fully isolated from the global configuration of the native Codex CLI and Claude Code.
 
-Current Providers are [OpenAI Codex CLI](https://developers.openai.com/codex/cli) and [Claude Code](https://code.claude.com/docs/en/overview). The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
+The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
 
 ---
 
 ## Features
 
 - **Multiple Providers**: switch between Codex CLI and Claude Code from the Web UI or channel commands.
+- **Compatible model access**: configure compatible model Providers such as DeepSeek and OpenAI, plus model mappings inside AnyBot. These mappings only take effect inside AnyBot and stay fully isolated from the global configuration of the native Codex CLI and Claude Code.
 - **Agent Web UI**: local chat UI with Markdown, code highlighting, streamed Agent events, cancellation, context compaction, and persistent history.
 - **Project workspaces**: manage projects in the sidebar; project sessions use the project path as the Provider working directory.
 - **Skills and slash menu**: browse, enable, disable, and delete skills; the `/` picker shows Provider-specific skills and commands.
