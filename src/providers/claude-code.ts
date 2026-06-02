@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import {createRequire} from "node:module";
 import {
     type Options,
     type PermissionMode,
@@ -39,6 +40,11 @@ import type {SandboxMode} from "../types.js";
 import {getClaudeConfigDir, getClaudeSkillsDir, getIsolatedClaudeConfigDir} from "../claude-config.js";
 
 const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
+const require = createRequire(import.meta.url);
+const packageJson = require("../../package.json") as { version?: unknown };
+const appVersion = typeof packageJson.version === "string" && packageJson.version.trim()
+    ? packageJson.version.trim()
+    : "0.0.0";
 
 const WORKDIR_SAFETY_PROMPT = [
     "## 工作目录规则",
@@ -468,7 +474,7 @@ export class ClaudeCodeProvider implements IProvider {
             let streamedResponseText = "";
             const env: NodeJS.ProcessEnv = {
                 ...process.env,
-                CLAUDE_AGENT_SDK_CLIENT_APP: process.env.CLAUDE_AGENT_SDK_CLIENT_APP || "anybot/0.1.0",
+                CLAUDE_AGENT_SDK_CLIENT_APP: process.env.CLAUDE_AGENT_SDK_CLIENT_APP || `anybot/${appVersion}`,
             };
             this.applyAnthropicEnv(env);
             if (useAnthropicCompat) {
