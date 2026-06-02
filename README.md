@@ -7,9 +7,11 @@
 ![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 
-AnyBot 是一个简单易用、开箱即用的本机 AI Coding Agent 控制台与远程入口。
+AnyBot 是一个本机 AI Coding Agent 控制台与远程入口，可以让你通过桌面 App、Web UI、微信、QQ、Telegram、飞书等渠道控制和管理电脑上的 AI Coding Agent。
 
-你可以通过 macOS/Windows 桌面 App，或微信、QQ、Telegram、飞书等聊天机器人，随时调用和管理本机 Agent。Codex CLI 和 Claude Code 不是必需项：无需安装它们，也可以直接接入 DeepSeek、OpenAI 等兼容模型 Provider 使用；本机已安装时，AnyBot 可以直接调用 Codex CLI 或 Claude Code。通过 AnyBot 配置的兼容模型和模型映射只在 AnyBot 内生效，与本机原生 Codex CLI、Claude Code 的全局配置完全隔离。
+本机已安装 Codex CLI 或 Claude Code 时，AnyBot 可以直接调用它们，复用本机已有能力；如果不想使用本机全局模型配置，也可以在 AnyBot 内为 Codex / Claude Code 通道单独配置模型映射，接入 DeepSeek、OpenAI 等兼容模型使用。
+
+无论本机是否安装 Codex CLI / Claude Code，AnyBot 内配置的 Provider、模型映射和环境变量都只在 AnyBot 内生效，不会影响本机全局配置。
 
 桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
 

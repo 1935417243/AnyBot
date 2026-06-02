@@ -7,9 +7,11 @@
 ![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 
-AnyBot is a simple, ready-to-use local AI Coding Agent console and remote entry point.
+AnyBot is a local AI Coding Agent console and remote entry point that lets you control and manage AI Coding Agents on your computer through the desktop app, Web UI, Weixin, QQ, Telegram, Feishu, and other channels.
 
-Use the macOS/Windows desktop app, or chat bots for Weixin, QQ, Telegram, and Feishu, to call and manage local Agents anytime. Codex CLI and Claude Code are optional: without installing them, you can connect directly to compatible model Providers such as DeepSeek and OpenAI. If they are installed locally, AnyBot can call Codex CLI or Claude Code directly. Compatible models and model mappings configured through AnyBot only take effect inside AnyBot and stay fully isolated from the global configuration of the native Codex CLI and Claude Code.
+When Codex CLI or Claude Code is installed locally, AnyBot can call them directly and reuse your existing local capabilities. If you do not want to use the machine's global model configuration, you can also configure separate model mappings inside AnyBot for the Codex / Claude Code channels and connect compatible models such as DeepSeek and OpenAI.
+
+Whether or not Codex CLI / Claude Code is installed locally, Providers, model mappings, and environment variables configured inside AnyBot only take effect inside AnyBot and do not affect the machine's global configuration.
 
 The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
 
