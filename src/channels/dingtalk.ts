@@ -1,3 +1,7 @@
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import {
   DWClient,
   EventAck,
@@ -7,13 +11,22 @@ import type { DWClientDownStream } from "dingtalk-stream";
 
 import type { ChannelCallbacks, DingtalkChannelConfig, IChannel } from "./types.js";
 import { readChannelConfig, updateChannelConfig } from "./config.js";
-import { sanitizeUserText } from "../message.js";
+import {
+  getImageExtension,
+  isSupportedImagePath,
+  parseReplyPayload,
+  sanitizeUserText,
+} from "../message.js";
 import { includeContentInLogs, logger, rawLogString } from "../logger.js";
 import { handleCommand } from "./commands.js";
+import { getWorkdir } from "../shared.js";
 
 const MAX_HANDLED_IDS = 5000;
 const DINGTALK_TOKEN_URL = "https://api.dingtalk.com/v1.0/oauth2/accessToken";
+const DINGTALK_API_BASE = "https://api.dingtalk.com";
+const DINGTALK_OAPI_BASE = "https://oapi.dingtalk.com";
 const DINGTALK_MAX_TEXT_LENGTH = 3500;
+const DINGTALK_MAX_MEDIA_SIZE_BYTES = 20 * 1024 * 1024;
 
 class CappedSet<T> {
   private set = new Set<T>();
@@ -49,6 +62,7 @@ interface DingtalkRobotMessage {
   text?: {
     content?: string;
   };
+  content?: unknown;
 }
 
 interface DingtalkAccessTokenResponse {
@@ -57,6 +71,66 @@ interface DingtalkAccessTokenResponse {
   code?: string;
   message?: string;
   requestId?: string;
+}
+
+interface DingtalkMessageContent {
+  downloadCode?: string;
+  pictureDownloadCode?: string;
+  fileName?: string;
+  recognition?: string;
+  richText?: DingtalkRichTextNode[];
+  [key: string]: unknown;
+}
+
+interface DingtalkRichTextNode {
+  type?: string;
+  text?: string;
+  downloadCode?: string;
+  pictureDownloadCode?: string;
+  fileName?: string;
+  [key: string]: unknown;
+}
+
+interface DingtalkDownloadUrlResponse {
+  downloadUrl?: string;
+  code?: string;
+  message?: string;
+  requestId?: string;
+}
+
+interface DingtalkMediaUploadResponse {
+  errcode?: number;
+  errmsg?: string;
+  media_id?: string;
+  type?: string;
+  created_at?: number;
+  code?: string;
+  message?: string;
+}
+
+interface DingtalkSendResponse {
+  processQueryKey?: string;
+  invalidStaffIdList?: string[];
+  flowControlledStaffIdList?: string[];
+  code?: string;
+  message?: string;
+  requestId?: string;
+}
+
+interface DownloadedDingtalkMedia {
+  imagePaths: string[];
+  filePaths: Array<{ name: string; path: string }>;
+  tempDir: string | null;
+}
+
+interface DingtalkSendTarget {
+  msgId?: string;
+  sessionWebhook?: string;
+  conversationType?: string;
+  conversationId?: string;
+  userId?: string;
+  robotCode?: string;
+  atUserId?: string;
 }
 
 export class DingtalkChannel implements IChannel {
@@ -125,13 +199,16 @@ export class DingtalkChannel implements IChannel {
     if (!this.config.ownerChatId) {
       throw new Error("DingTalk ownerChatId 未配置，请先私聊机器人一次（会自动记录用户 ID），或在设置中手动填写");
     }
-    if (!this.ownerSessionWebhook) {
-      throw new Error("DingTalk 暂无可用 owner 会话，请先私聊机器人一次后再发送");
+    if (!this.ownerSessionWebhook && !this.config.robotCode) {
+      throw new Error("DingTalk 暂无可用 owner 会话或 robotCode，请先私聊机器人一次后再发送");
     }
 
-    for (const chunk of this.splitMessage(text)) {
-      await this.sendWebhookMarkdown(this.ownerSessionWebhook, chunk);
-    }
+    await this.sendReplyToTarget({
+      sessionWebhook: this.ownerSessionWebhook || undefined,
+      conversationType: "1",
+      userId: this.config.ownerChatId,
+      robotCode: this.config.robotCode,
+    }, text);
   }
 
   private ack(event: DWClientDownStream): void {
@@ -209,45 +286,68 @@ export class DingtalkChannel implements IChannel {
       this.ownerSessionWebhook = message.sessionWebhook;
     }
 
-    if (message.msgtype !== "text") {
-      if (message.sessionWebhook) {
-        await this.sendWebhookMarkdown(message.sessionWebhook, "目前只支持文本消息。", message.senderStaffId);
-      }
+    const userText = this.extractUserText(message);
+    let media: DownloadedDingtalkMedia;
+    try {
+      media = await this.downloadMessageMedia(message);
+    } catch (error) {
+      logger.error("dingtalk.media.download_failed", {
+        messageId,
+        chatId,
+        error,
+      });
+      await this.sendReply(message, "媒体已收到，但下载失败，请重试。");
       return;
     }
 
-    const userText = sanitizeUserText(message.text?.content || "");
-    if (!userText) {
-      if (message.sessionWebhook) {
-        await this.sendWebhookMarkdown(message.sessionWebhook, "请直接发送文字问题。", message.senderStaffId);
-      }
+    const effectiveUserText = buildIncomingUserText(userText, media);
+    logger.info("dingtalk.message.media_resolved", {
+      messageId,
+      chatId,
+      textChars: userText.length,
+      imageCount: media.imagePaths.length,
+      fileCount: media.filePaths.length,
+    });
+
+    if (!effectiveUserText) {
+      await this.sendReply(message, "当前钉钉频道支持文本、图片和文件消息。");
       return;
     }
 
     this.enqueueChatTask(chatId, async () => {
-      if (!this.callbacks) return;
-
-      const cmd = handleCommand(userText, chatId, "dingtalk", this.callbacks);
-      if (cmd.handled) {
-        if (cmd.reply) await this.sendReply(message, cmd.reply);
-        return;
-      }
-
       try {
-        const reply = await this.callbacks.generateReply(
-          chatId,
-          userText,
-          undefined,
-          "dingtalk",
-        );
-        await this.sendReply(message, reply);
+        if (!this.callbacks) return;
+
+        if (media.imagePaths.length === 0 && media.filePaths.length === 0) {
+          const cmd = handleCommand(userText, chatId, "dingtalk", this.callbacks);
+          if (cmd.handled) {
+            if (cmd.reply) await this.sendReply(message, cmd.reply);
+            return;
+          }
+        }
+
+        try {
+          const reply = await this.callbacks.generateReply(
+            chatId,
+            effectiveUserText,
+            media.imagePaths.length > 0 ? media.imagePaths : undefined,
+            "dingtalk",
+          );
+          await this.sendReply(message, reply);
+        } catch (error) {
+          logger.error("dingtalk.text.failed", {
+            messageId,
+            chatId,
+            error,
+          });
+          await this.sendReply(message, "处理消息时出错了，请稍后再试。");
+        }
       } catch (error) {
-        logger.error("dingtalk.text.failed", {
-          messageId,
-          chatId,
-          error,
-        });
-        await this.sendReply(message, "处理消息时出错了，请稍后再试。");
+        logger.error("dingtalk.reply.failed", { messageId, chatId, error });
+      } finally {
+        if (media.tempDir) {
+          await rm(media.tempDir, { recursive: true, force: true }).catch(() => {});
+        }
       }
     });
   }
@@ -265,18 +365,316 @@ export class DingtalkChannel implements IChannel {
   }
 
   private async sendReply(message: DingtalkRobotMessage, text: string): Promise<void> {
-    if (!message.sessionWebhook) {
-      logger.warn("dingtalk.reply.skipped", {
-        msgId: message.msgId,
-        reason: "missing sessionWebhook",
-      });
+    await this.sendReplyToTarget({
+      msgId: message.msgId,
+      sessionWebhook: message.sessionWebhook,
+      conversationType: message.conversationType,
+      conversationId: message.conversationId,
+      userId: message.senderStaffId,
+      robotCode: message.robotCode || this.config?.robotCode,
+      atUserId: message.conversationType === "2" ? message.senderStaffId : undefined,
+    }, text);
+  }
+
+  private async sendReplyToTarget(target: DingtalkSendTarget, reply: string): Promise<void> {
+    const payload = parseReplyPayload(reply, getWorkdir());
+    logger.info("dingtalk.send_reply", {
+      msgId: target.msgId,
+      conversationType: target.conversationType,
+      textChars: payload.text.length,
+      imageCount: payload.imagePaths.length,
+      fileCount: payload.filePaths.length,
+      ...(includeContentInLogs()
+        ? {
+            reply: rawLogString(reply),
+            text: rawLogString(payload.text),
+          }
+        : {}),
+    });
+
+    if (payload.text) {
+      await this.sendMarkdownToTarget(target, payload.text);
+    } else if (payload.imagePaths.length > 0 || payload.filePaths.length > 0) {
+      await this.sendMarkdownToTarget(target, "请查看附件。");
+    }
+
+    for (const imagePath of payload.imagePaths) {
+      await this.sendImageToTarget(target, imagePath);
+    }
+
+    for (const filePath of payload.filePaths) {
+      await this.sendFileToTarget(target, filePath);
+    }
+
+    if (!payload.text && payload.imagePaths.length === 0 && payload.filePaths.length === 0) {
+      await this.sendMarkdownToTarget(target, reply);
+    }
+  }
+
+  private async sendMarkdownToTarget(target: DingtalkSendTarget, text: string): Promise<void> {
+    if (target.sessionWebhook) {
+      for (const chunk of this.splitMessage(text)) {
+        await this.sendWebhookMarkdown(target.sessionWebhook, chunk, target.atUserId);
+      }
       return;
     }
 
-    const atUserId = message.conversationType === "2" ? message.senderStaffId : undefined;
     for (const chunk of this.splitMessage(text)) {
-      await this.sendWebhookMarkdown(message.sessionWebhook, chunk, atUserId);
+      await this.sendRobotTemplateMessage(target, "sampleMarkdown", {
+        title: "AnyBot 回复",
+        text: chunk,
+      });
     }
+  }
+
+  private async sendImageToTarget(target: DingtalkSendTarget, imagePath: string): Promise<void> {
+    const mediaId = await this.uploadMedia(imagePath, "image");
+    await this.sendRobotTemplateMessage(target, "sampleImageMsg", {
+      photoURL: mediaId,
+    });
+    logger.info("dingtalk.send_image.success", {
+      msgId: target.msgId,
+      imagePath,
+      mediaId,
+    });
+  }
+
+  private async sendFileToTarget(target: DingtalkSendTarget, filePath: string): Promise<void> {
+    const mediaId = await this.uploadMedia(filePath, "file");
+    const fileName = path.basename(filePath);
+    await this.sendRobotTemplateMessage(target, "sampleFile", {
+      mediaId,
+      fileName,
+      fileType: getDingtalkFileType(filePath),
+    });
+    logger.info("dingtalk.send_file.success", {
+      msgId: target.msgId,
+      filePath,
+      mediaId,
+    });
+  }
+
+  private async sendRobotTemplateMessage(
+    target: DingtalkSendTarget,
+    msgKey: string,
+    msgParam: Record<string, unknown>,
+  ): Promise<void> {
+    const robotCode = target.robotCode?.trim() || this.config?.robotCode?.trim();
+    if (!robotCode) {
+      throw new Error("DingTalk robotCode 未缓存，请先让钉钉机器人收到一条消息");
+    }
+
+    const body: Record<string, unknown> = {
+      robotCode,
+      msgKey,
+      msgParam: JSON.stringify(msgParam),
+    };
+    const isGroup = target.conversationType === "2";
+    const endpoint = isGroup
+      ? `${DINGTALK_API_BASE}/v1.0/robot/groupMessages/send`
+      : `${DINGTALK_API_BASE}/v1.0/robot/oToMessages/batchSend`;
+
+    if (isGroup) {
+      const openConversationId = target.conversationId?.trim();
+      if (!openConversationId) {
+        throw new Error("DingTalk openConversationId 缺失，无法发送群附件");
+      }
+      body.openConversationId = openConversationId;
+    } else {
+      const userId = target.userId?.trim();
+      if (!userId) {
+        throw new Error("DingTalk userId 缺失，无法发送单聊附件");
+      }
+      body.userIds = [userId];
+    }
+
+    const data = await this.apiPost<DingtalkSendResponse>(endpoint, body);
+    logger.debug("dingtalk.robot_message.sent", {
+      msgKey,
+      conversationType: target.conversationType,
+      processQueryKey: data.processQueryKey,
+      invalidStaffIdList: data.invalidStaffIdList,
+      flowControlledStaffIdList: data.flowControlledStaffIdList,
+    });
+  }
+
+  private extractUserText(message: DingtalkRobotMessage): string {
+    if (message.msgtype === "text") {
+      return sanitizeUserText(message.text?.content || "");
+    }
+
+    const content = parseDingtalkContent(message.content);
+    if (message.msgtype === "richText" && content.richText?.length) {
+      return sanitizeUserText(
+        content.richText
+          .map((item) => typeof item.text === "string" ? item.text : "")
+          .filter(Boolean)
+          .join("\n"),
+      );
+    }
+
+    if (message.msgtype === "audio" && typeof content.recognition === "string") {
+      return sanitizeUserText(content.recognition);
+    }
+
+    return "";
+  }
+
+  private async downloadMessageMedia(message: DingtalkRobotMessage): Promise<DownloadedDingtalkMedia> {
+    const result: DownloadedDingtalkMedia = { imagePaths: [], filePaths: [], tempDir: null };
+    const robotCode = message.robotCode?.trim() || this.config?.robotCode?.trim();
+    if (!robotCode) {
+      return result;
+    }
+
+    let mediaIndex = 0;
+    const ensureTempDir = async () => {
+      result.tempDir ??= await mkdtemp(path.join(tmpdir(), "anybot-dingtalk-media-"));
+      return result.tempDir;
+    };
+
+    const download = async (
+      downloadCode: string | undefined,
+      fileName: string | undefined,
+      forceImage: boolean,
+    ) => {
+      if (!downloadCode?.trim()) return;
+      const tempDir = await ensureTempDir();
+      const downloaded = await this.downloadMediaByCode({
+        downloadCode,
+        robotCode,
+        tempDir,
+        mediaIndex: mediaIndex++,
+        fileName,
+        forceImage,
+      });
+      if (downloaded.isImage) {
+        result.imagePaths.push(downloaded.filePath);
+      } else {
+        result.filePaths.push({ name: downloaded.fileName, path: downloaded.filePath });
+      }
+    };
+
+    const content = parseDingtalkContent(message.content);
+    if (message.msgtype === "picture") {
+      await download(content.downloadCode || content.pictureDownloadCode, content.fileName, true);
+    } else if (message.msgtype === "file") {
+      await download(content.downloadCode, content.fileName, false);
+    } else if (message.msgtype === "richText" && content.richText?.length) {
+      for (const item of content.richText) {
+        const isPicture = item.type === "picture" || Boolean(item.pictureDownloadCode);
+        await download(item.downloadCode || item.pictureDownloadCode, item.fileName, isPicture);
+      }
+    }
+
+    return result;
+  }
+
+  private async downloadMediaByCode(params: {
+    downloadCode: string;
+    robotCode: string;
+    tempDir: string;
+    mediaIndex: number;
+    fileName?: string;
+    forceImage: boolean;
+  }): Promise<{ filePath: string; fileName: string; isImage: boolean }> {
+    const downloadUrl = await this.getMediaDownloadUrl(params.downloadCode, params.robotCode);
+    const res = await fetch(downloadUrl);
+    if (!res.ok) {
+      throw new Error(`DingTalk media download failed: HTTP ${res.status}`);
+    }
+
+    const contentType = res.headers.get("content-type") || undefined;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    let fileName =
+      params.fileName ||
+      getFileNameFromContentDisposition(res.headers.get("content-disposition")) ||
+      (params.forceImage ? `image-${params.mediaIndex}${getDingtalkImageExtension(contentType)}` : `file-${params.mediaIndex}.bin`);
+    fileName = safeIncomingFileName(fileName);
+
+    const isImageByType = (contentType || "").toLowerCase().startsWith("image/");
+    const isImage = params.forceImage || isImageByType || isSupportedImagePath(fileName);
+    if (isImage && !isSupportedImagePath(fileName)) {
+      const parsed = path.parse(fileName);
+      fileName = `${parsed.name || `image-${params.mediaIndex}`}${getDingtalkImageExtension(contentType)}`;
+    }
+
+    const filePath = path.join(params.tempDir, `${params.mediaIndex}-${fileName}`);
+    await writeFile(filePath, buffer);
+    logger.info("dingtalk.media.download_success", {
+      filePath,
+      fileName,
+      contentType,
+      bytes: buffer.length,
+      isImage,
+    });
+    return { filePath, fileName, isImage };
+  }
+
+  private async getMediaDownloadUrl(downloadCode: string, robotCode: string): Promise<string> {
+    const data = await this.apiPost<DingtalkDownloadUrlResponse>(
+      `${DINGTALK_API_BASE}/v1.0/robot/messageFiles/download`,
+      { downloadCode, robotCode },
+    );
+    if (!data.downloadUrl) {
+      throw new Error(`DingTalk media download URL missing: ${formatDingtalkError(data)}`);
+    }
+    return data.downloadUrl;
+  }
+
+  private async uploadMedia(filePath: string, mediaType: "image" | "file"): Promise<string> {
+    const fileStat = await stat(filePath);
+    if (!fileStat.isFile()) {
+      throw new Error(`不是可发送的文件：${filePath}`);
+    }
+    if (fileStat.size <= 0) {
+      throw new Error(`文件为空，无法发送：${filePath}`);
+    }
+    if (fileStat.size > DINGTALK_MAX_MEDIA_SIZE_BYTES) {
+      throw new Error(`钉钉附件超过 20MB，无法发送：${path.basename(filePath)}`);
+    }
+
+    const token = await this.getAccessToken();
+    const form = new FormData();
+    const buffer = await readFile(filePath);
+    form.append("media", new Blob([new Uint8Array(buffer)]), path.basename(filePath));
+
+    const res = await fetch(
+      `${DINGTALK_OAPI_BASE}/media/upload?access_token=${encodeURIComponent(token)}&type=${encodeURIComponent(mediaType)}`,
+      {
+        method: "POST",
+        body: form,
+      },
+    );
+    const data = await readJsonResponse(res) as DingtalkMediaUploadResponse;
+    const failed = !res.ok || (data.errcode !== undefined && data.errcode !== 0);
+    if (failed || !data.media_id) {
+      throw new Error(`DingTalk media upload failed: HTTP ${res.status} ${formatDingtalkError(data)}`);
+    }
+    logger.info("dingtalk.media.upload_success", {
+      filePath,
+      mediaType,
+      mediaId: data.media_id,
+      fileSize: fileStat.size,
+    });
+    return data.media_id;
+  }
+
+  private async apiPost<T>(url: string, body: Record<string, unknown>): Promise<T> {
+    const token = await this.getAccessToken();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-acs-dingtalk-access-token": token,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await readJsonResponse(res);
+    if (!res.ok) {
+      throw new Error(`DingTalk API failed: HTTP ${res.status} ${formatDingtalkError(data)}`);
+    }
+    return data as T;
   }
 
   private splitMessage(text: string): string[] {
@@ -348,6 +746,74 @@ export class DingtalkChannel implements IChannel {
     this.accessTokenExpiresAtMs = now + ttlSeconds * 1000;
     return data.accessToken;
   }
+}
+
+function parseDingtalkContent(content: unknown): DingtalkMessageContent {
+  if (!content) return {};
+  if (typeof content === "string") {
+    try {
+      return JSON.parse(content) as DingtalkMessageContent;
+    } catch {
+      return {};
+    }
+  }
+  if (typeof content === "object") {
+    return content as DingtalkMessageContent;
+  }
+  return {};
+}
+
+function buildIncomingUserText(rawText: string, media: DownloadedDingtalkMedia): string {
+  const parts: string[] = [];
+  if (rawText) {
+    parts.push(rawText);
+  } else if (media.imagePaths.length > 0) {
+    parts.push(
+      "用户发来了图片。请先根据图片内容直接回答；如果缺少上下文，就先简要描述图片里有什么，并询问对方希望你进一步做什么。",
+    );
+  }
+
+  if (media.filePaths.length > 0) {
+    const fileList = media.filePaths.map((f) => `- ${f.name}: ${f.path}`).join("\n");
+    parts.push(`用户附带了以下文件，请按需读取并处理：\n${fileList}`);
+  }
+
+  if (media.imagePaths.length > 0) {
+    const imageList = media.imagePaths.map((p) => `- ${path.basename(p)}: ${p}`).join("\n");
+    parts.push(`用户附带了以下图片：\n${imageList}`);
+  }
+
+  return parts.join("\n\n").trim();
+}
+
+function safeIncomingFileName(fileName: string): string {
+  const base = path.basename(fileName).replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim();
+  return base || "file.bin";
+}
+
+function getFileNameFromContentDisposition(value: string | null): string | null {
+  if (!value) return null;
+
+  const encodedMatch = value.match(/filename\*=UTF-8''([^;\n]+)/i);
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1]);
+    } catch {
+      return encodedMatch[1];
+    }
+  }
+
+  const plainMatch = value.match(/filename="?([^";\n]+)"?/i);
+  return plainMatch?.[1] || null;
+}
+
+function getDingtalkFileType(filePath: string): string {
+  return path.extname(filePath).slice(1).toLowerCase() || "file";
+}
+
+function getDingtalkImageExtension(contentType?: string): string {
+  const ext = getImageExtension(contentType);
+  return ext === ".img" ? ".jpg" : ext;
 }
 
 async function readJsonResponse(res: Response): Promise<any> {

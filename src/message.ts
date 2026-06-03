@@ -59,7 +59,7 @@ export function normalizeCandidateImagePath(
   filePath: string,
   workdir: string,
 ): string | null {
-  const normalized = filePath.trim();
+  const normalized = unwrapPathToken(filePath);
   if (!normalized || !isSupportedImagePath(normalized)) {
     return null;
   }
@@ -122,26 +122,9 @@ export function parseReplyPayload(reply: string, workdir: string): ReplyPayload 
   const imagePaths = new Set<string>();
   const filePaths = new Set<string>();
 
-  const markdownImagePattern = /!\[[^\]]*]\(([^)\n]+)\)/g;
-  for (const match of reply.matchAll(markdownImagePattern)) {
-    const imagePath = normalizeCandidateImagePath(match[1] || "", workdir);
-    if (imagePath) {
-      imagePaths.add(imagePath);
-    }
-  }
-
-  const plainPathPattern =
-    /(^|\n)(\.{0,2}\/?[^\s<>"')\]]+\.(?:png|jpe?g|webp|gif|tiff?|bmp|ico))(?=\n|$)/gi;
-  for (const match of reply.matchAll(plainPathPattern)) {
+  const imageDirectivePattern = /(^|\n)\s*IMAGE:\s*([^\n]+)(?=\n|$)/gi;
+  for (const match of reply.matchAll(imageDirectivePattern)) {
     const imagePath = normalizeCandidateImagePath(match[2] || "", workdir);
-    if (imagePath) {
-      imagePaths.add(imagePath);
-    }
-  }
-
-  const inlineCodePathPattern = /`([^`\n]+\.(?:png|jpe?g|webp|gif|tiff?|bmp|ico))`/gi;
-  for (const match of reply.matchAll(inlineCodePathPattern)) {
-    const imagePath = normalizeCandidateImagePath(match[1] || "", workdir);
     if (imagePath) {
       imagePaths.add(imagePath);
     }
@@ -155,14 +138,8 @@ export function parseReplyPayload(reply: string, workdir: string): ReplyPayload 
     }
   }
 
-  let text = reply.replace(markdownImagePattern, (fullMatch, imgPath: string) => {
-    return normalizeCandidateImagePath(imgPath, workdir) ? "" : fullMatch;
-  });
-  text = text.replace(plainPathPattern, (fullMatch, prefix: string, imgPath: string) => {
-    return normalizeCandidateImagePath(imgPath, workdir) ? prefix : fullMatch;
-  });
-  text = text.replace(inlineCodePathPattern, (fullMatch, imgPath: string) => {
-    return normalizeCandidateImagePath(imgPath, workdir) ? "" : fullMatch;
+  let text = reply.replace(imageDirectivePattern, (fullMatch, prefix: string, imagePath: string) => {
+    return normalizeCandidateImagePath(imagePath, workdir) ? prefix : fullMatch;
   });
   text = text.replace(fileDirectivePattern, (fullMatch, prefix: string, filePath: string) => {
     return normalizeCandidateFilePath(filePath, workdir) ? prefix : fullMatch;
