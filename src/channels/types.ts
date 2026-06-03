@@ -16,6 +16,8 @@ export interface QQBotChannelConfig extends ChannelConfig {
   [key: string]: unknown;
 }
 
+export interface DingtalkChannelConfig extends ChannelConfig {}
+
 export interface TelegramChannelConfig {
   enabled: boolean;
   token: string;
@@ -38,6 +40,7 @@ export interface ChannelsConfig {
   [channelType: string]: ChannelConfig | TelegramChannelConfig | WeixinChannelConfig | undefined;
   feishu?: FeishuChannelConfig;
   qqbot?: QQBotChannelConfig;
+  dingtalk?: DingtalkChannelConfig;
   telegram?: TelegramChannelConfig;
   weixin?: WeixinChannelConfig;
 }

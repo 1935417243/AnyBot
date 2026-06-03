@@ -439,6 +439,19 @@
             color: var(--text-dim);
         }
 
+        .channel-drawer-input.auto-filled,
+        .channel-drawer-input[readonly] {
+            background: var(--sidebar-hover);
+            color: var(--text-dim);
+            cursor: default;
+        }
+
+        .channel-drawer-input.auto-filled:focus,
+        .channel-drawer-input[readonly]:focus {
+            border-color: var(--border);
+            box-shadow: none;
+        }
+
         .channel-drawer-footer {
             padding: 16px 20px;
             border-top: 1px solid var(--border);
@@ -487,4 +500,3 @@
         .channel-save-ok.show {
             opacity: 1;
         }
-

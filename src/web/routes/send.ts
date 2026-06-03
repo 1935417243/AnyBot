@@ -13,7 +13,7 @@ export function createSendRouter(): Router {
     };
 
     if (!channel) {
-      res.status(400).json({ error: "缺少 channel 参数（feishu / telegram / qqbot / weixin）" });
+      res.status(400).json({ error: `缺少 channel 参数（${getRegisteredChannelTypes().join(" / ")}）` });
       return;
     }
     if (!message?.trim()) {

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import type {
   ChannelsConfig,
+  DingtalkChannelConfig,
   FeishuChannelConfig,
   QQBotChannelConfig,
   TelegramChannelConfig,
@@ -30,6 +31,12 @@ const DEFAULT_CONFIG: ChannelsConfig = {
     appSecret: "",
     ownerChatId: "",
   } satisfies QQBotChannelConfig,
+  dingtalk: {
+    enabled: false,
+    appId: "",
+    appSecret: "",
+    ownerChatId: "",
+  } satisfies DingtalkChannelConfig,
   telegram: {
     enabled: false,
     token: "",

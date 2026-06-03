@@ -112,12 +112,22 @@ export function createChannelsPageController(options) {
         } else if (type === 'weixin') {
             fieldsHtml =
                 '<div class="channel-drawer-field">' +
-                '<label class="channel-drawer-field-label">Bot Token <span style="font-weight:400;color:var(--text-dim)">(首次启用后扫码自动填入)</span></label>' +
-                '<input class="channel-drawer-input" id="ch-token-' + type + '" type="password" value="' + escapeHtml(cfg.token || '') + '" placeholder="扫码后自动填入" spellcheck="false">' +
+                '<label class="channel-drawer-field-label">Bot Token</label>' +
+                '<input class="channel-drawer-input auto-filled" id="ch-token-' + type + '" type="password" value="' + escapeHtml(cfg.token || '') + '" spellcheck="false" readonly>' +
                 '</div>' +
                 '<div class="channel-drawer-field">' +
                 '<label class="channel-drawer-field-label">Account ID</label>' +
-                '<input class="channel-drawer-input" id="ch-account-' + type + '" value="' + escapeHtml(cfg.accountId || '') + '" placeholder="扫码后自动填入" spellcheck="false">' +
+                '<input class="channel-drawer-input auto-filled" id="ch-account-' + type + '" value="' + escapeHtml(cfg.accountId || '') + '" spellcheck="false" readonly>' +
+                '</div>';
+        } else if (type === 'dingtalk') {
+            fieldsHtml =
+                '<div class="channel-drawer-field">' +
+                '<label class="channel-drawer-field-label">Client ID / AppKey</label>' +
+                '<input class="channel-drawer-input" id="ch-appid-' + type + '" value="' + escapeHtml(cfg.appId || '') + '" placeholder="输入钉钉应用 Client ID / AppKey" spellcheck="false">' +
+                '</div>' +
+                '<div class="channel-drawer-field">' +
+                '<label class="channel-drawer-field-label">Client Secret / AppSecret</label>' +
+                '<input class="channel-drawer-input" id="ch-secret-' + type + '" type="password" value="' + escapeHtml(cfg.appSecret || '') + '" placeholder="输入钉钉应用 Client Secret / AppSecret" spellcheck="false">' +
                 '</div>';
         } else {
             fieldsHtml =
@@ -132,8 +142,8 @@ export function createChannelsPageController(options) {
         }
         fieldsHtml +=
             '<div class="channel-drawer-field">' +
-            '<label class="channel-drawer-field-label">Owner Chat ID <span style="font-weight:400;color:var(--text-dim)">(私聊机器人后自动填入)</span></label>' +
-            '<input class="channel-drawer-input" id="ch-owner-' + type + '" value="' + escapeHtml(cfg.ownerChatId || '') + '" placeholder="私聊机器人一次即可自动记录" spellcheck="false">' +
+            '<label class="channel-drawer-field-label">' + (type === 'dingtalk' ? 'Owner User ID' : 'Owner Chat ID') + '</label>' +
+            '<input class="channel-drawer-input auto-filled" id="ch-owner-' + type + '" value="' + escapeHtml(cfg.ownerChatId || '') + '" spellcheck="false" readonly>' +
             '</div>';
 
         drawer.innerHTML =
@@ -216,6 +226,11 @@ export function createChannelsPageController(options) {
             payload.baseUrl = currentWeixinCfg.baseUrl || 'https://ilinkai.weixin.qq.com';
             payload.botAgent = currentWeixinCfg.botAgent || 'AnyBot/0.1.0';
             payload.botType = currentWeixinCfg.botType || '3';
+        } else if (type === 'dingtalk') {
+            var dtAppIdInput = document.getElementById('ch-appid-' + type);
+            var dtAppSecretInput = document.getElementById('ch-secret-' + type);
+            payload.appId = dtAppIdInput.value.trim();
+            payload.appSecret = dtAppSecretInput.value.trim();
         } else {
             var appIdInput = document.getElementById('ch-appid-' + type);
             var appSecretInput = document.getElementById('ch-secret-' + type);

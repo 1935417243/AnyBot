@@ -1,5 +1,6 @@
 import type { IChannel, ChannelCallbacks } from "./types.js";
 import { readChannelsConfig } from "./config.js";
+import { DingtalkChannel } from "./dingtalk.js";
 import { FeishuChannel } from "./feishu.js";
 import { QQBotChannel } from "./qqbot.js";
 import { TelegramChannel } from "./telegram.js";
@@ -11,6 +12,7 @@ type ChannelFactory = () => IChannel;
 const channelFactories: Record<string, ChannelFactory> = {
   feishu: () => new FeishuChannel(),
   qqbot: () => new QQBotChannel(),
+  dingtalk: () => new DingtalkChannel(),
   telegram: () => new TelegramChannel(),
   weixin: () => new WeixinChannel(),
 };
@@ -120,6 +122,7 @@ export type {
   ChannelCallbacks,
   ChannelsConfig,
   ChannelConfig,
+  DingtalkChannelConfig,
   FeishuChannelConfig,
   TelegramChannelConfig,
   WeixinChannelConfig,
