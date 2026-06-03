@@ -12,55 +12,22 @@ import {
 } from './message-selection.js';
 
 export function createMessageRenderer(config) {
+    var USER_MESSAGE_COLLAPSE_LINES = 9;
+    var USER_MESSAGE_COLLAPSE_CHARS = 500;
+
     function clearEmpty() {
         var empty = document.getElementById('empty-state');
         if (empty) empty.remove();
     }
 
-    function renderAssistantText(content, text, opts) {
-        opts = opts || {};
+    function renderAssistantText(content, text) {
         var fullText = String(text || '');
-        var renderText = fullText;
-        var isLarge = opts.contentTruncated || fullText.length > config.largeMessagePreviewChars;
-        if (isLarge) {
-            renderText = opts.contentTruncated
-                ? fullText
-                : fullText.slice(0, config.largeMessagePreviewChars) + '\n\n...[内容较长，已折叠]';
-        }
         try {
-            content.innerHTML = config.renderMarkdown(renderText);
+            content.innerHTML = config.renderMarkdown(fullText);
         } catch (e) {
-            content.textContent = renderText;
+            content.textContent = fullText;
         }
         enhanceLocalFileLinks(content);
-        if (!isLarge) return;
-
-        var expand = document.createElement('button');
-        expand.className = 'large-message-expand';
-        expand.type = 'button';
-        expand.textContent = opts.contentChars ? ('展开完整内容（' + config.formatTokenCount(opts.contentChars) + ' 字符）') : '展开完整内容';
-        expand.addEventListener('click', async function () {
-            expand.disabled = true;
-            expand.textContent = '加载中...';
-            var nextText = fullText;
-            if (opts.contentTruncated && opts.messageId) {
-                try {
-                    nextText = await config.fetchFullMessageContent(opts.messageId);
-                } catch (e) {
-                    config.showError(e.message || '加载完整内容失败');
-                    expand.disabled = false;
-                    expand.textContent = '展开完整内容';
-                    return;
-                }
-            }
-            try {
-                content.innerHTML = config.renderMarkdown(nextText);
-            } catch (e) {
-                content.textContent = nextText;
-            }
-            enhanceLocalFileLinks(content);
-        });
-        content.appendChild(expand);
     }
 
     function showEmptyState() {
@@ -229,7 +196,7 @@ export function createMessageRenderer(config) {
 
         var content = document.createElement('div');
         content.className = 'message-content';
-        renderAssistantText(content, text, opts);
+        renderAssistantText(content, text);
         if (changeReview && window.ChangeReview) {
             var reviewCard = window.ChangeReview.render({
                 review: changeReview,
@@ -251,10 +218,8 @@ export function createMessageRenderer(config) {
         content.className = 'message-content';
         var userLine = createUserMessageLine(visibleText, opts, messageSkills, messageProjects, messageFileReferences);
         if (userLine) content.appendChild(userLine.line);
-        if (opts && opts.contentTruncated && opts.messageId) {
-            content.appendChild(createUserExpandButton(userLine ? userLine.textEl : null, opts));
-        }
         appendAttachments(content, attachments);
+        setupUserMessageCollapse(content, userLine ? userLine.textEl : null, visibleText, opts);
 
         bubble.appendChild(content);
         return bubble;
@@ -283,24 +248,87 @@ export function createMessageRenderer(config) {
         return { line: userLine, textEl: userText };
     }
 
-    function createUserExpandButton(userText, opts) {
-        var userExpand = document.createElement('button');
-        userExpand.className = 'large-message-expand';
-        userExpand.type = 'button';
-        userExpand.textContent = opts.contentChars ? ('展开完整内容（' + config.formatTokenCount(opts.contentChars) + ' 字符）') : '展开完整内容';
-        userExpand.addEventListener('click', async function () {
-            userExpand.disabled = true;
-            userExpand.textContent = '加载中...';
-            try {
-                if (userText) userText.textContent = await config.fetchFullMessageContent(opts.messageId);
-                userExpand.remove();
-            } catch (e) {
-                config.showError(e.message || '加载完整内容失败');
-                userExpand.disabled = false;
-                userExpand.textContent = '展开完整内容';
+    function setupUserMessageCollapse(content, userText, visibleText, opts) {
+        if (!userText) return;
+
+        var shouldCollapse = !!(opts && opts.contentTruncated && opts.messageId)
+            || shouldCollapseUserMessageByText(visibleText);
+        if (shouldCollapse) {
+            activateUserMessageCollapse(content, userText, opts);
+            return;
+        }
+
+        requestUserMessageLayoutCheck(function () {
+            if (!content.isConnected || userText.classList.contains('user-message-collapsible')) return;
+            if (shouldCollapseUserMessageByLayout(userText)) {
+                activateUserMessageCollapse(content, userText, opts);
             }
         });
-        return userExpand;
+    }
+
+    function shouldCollapseUserMessageByText(text) {
+        var value = String(text || '');
+        if (!value) return false;
+        if (Array.from(value).length > USER_MESSAGE_COLLAPSE_CHARS) return true;
+        return value.split(/\r\n|\r|\n/).length > USER_MESSAGE_COLLAPSE_LINES;
+    }
+
+    function requestUserMessageLayoutCheck(callback) {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(callback);
+            return;
+        }
+        setTimeout(callback, 0);
+    }
+
+    function shouldCollapseUserMessageByLayout(userText) {
+        var style = window.getComputedStyle(userText);
+        var lineHeight = parseFloat(style.lineHeight);
+        if (!Number.isFinite(lineHeight)) {
+            var fontSize = parseFloat(style.fontSize);
+            lineHeight = Number.isFinite(fontSize) ? fontSize * 1.65 : 23;
+        }
+        return userText.scrollHeight > Math.ceil(lineHeight * USER_MESSAGE_COLLAPSE_LINES) + 1;
+    }
+
+    function activateUserMessageCollapse(content, userText, opts) {
+        var fullContentLoaded = !(opts && opts.contentTruncated && opts.messageId);
+        var toggle = document.createElement('button');
+        toggle.className = 'user-message-toggle';
+        toggle.type = 'button';
+        toggle.textContent = '展开';
+        toggle.setAttribute('aria-expanded', 'false');
+
+        userText.classList.add('user-message-collapsible', 'is-collapsed');
+
+        toggle.addEventListener('click', async function () {
+            if (userText.classList.contains('is-collapsed')) {
+                if (!fullContentLoaded) {
+                    toggle.disabled = true;
+                    toggle.textContent = '加载中...';
+                    try {
+                        userText.textContent = await config.fetchFullMessageContent(opts.messageId);
+                        fullContentLoaded = true;
+                    } catch (e) {
+                        config.showError(e.message || '加载完整内容失败');
+                        toggle.disabled = false;
+                        toggle.textContent = '展开';
+                        return;
+                    }
+                    toggle.disabled = false;
+                }
+                userText.classList.remove('is-collapsed');
+                toggle.textContent = '收起';
+                toggle.setAttribute('aria-expanded', 'true');
+                return;
+            }
+
+            userText.classList.add('is-collapsed');
+            toggle.textContent = '展开';
+            toggle.setAttribute('aria-expanded', 'false');
+        });
+
+        content.appendChild(toggle);
     }
 
     function appendAttachments(content, attachments) {

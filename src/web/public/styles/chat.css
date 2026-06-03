@@ -685,6 +685,57 @@
             overflow-wrap: anywhere;
         }
 
+        .message-user-text.user-message-collapsible {
+            display: block;
+        }
+
+        .message-user-text.user-message-collapsible.is-collapsed {
+            display: -webkit-box;
+            -webkit-line-clamp: 9;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            padding-bottom: 2px;
+        }
+
+        .user-message-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px auto 0 0;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.4;
+            cursor: pointer;
+        }
+
+        .user-message-toggle::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid currentColor;
+            border-bottom: 2px solid currentColor;
+            transform: rotate(45deg) translateY(-2px);
+            transition: transform 0.14s ease;
+        }
+
+        .user-message-toggle[aria-expanded="true"]::after {
+            transform: rotate(225deg) translateY(-2px);
+        }
+
+        .user-message-toggle:hover,
+        .user-message-toggle:focus-visible {
+            outline: none;
+        }
+
+        .user-message-toggle:disabled {
+            color: var(--text-dim);
+            cursor: default;
+        }
+
         .message-skills {
             display: inline-flex;
             align-items: center;

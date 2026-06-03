@@ -152,7 +152,7 @@ export async function prepareMessagesForClient(
       }
     }
 
-    if (message.content.length <= MESSAGE_PREVIEW_CHARS) {
+    if (message.role !== "user" || message.content.length <= MESSAGE_PREVIEW_CHARS) {
       return { ...message, metadata };
     }
 
