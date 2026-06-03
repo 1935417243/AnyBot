@@ -31,6 +31,7 @@ const CHANNEL_OUTPUT_RULES: Record<string, string[]> = {
     "Telegram 渠道当前不支持附件回传；如果生成了文件，请给出文件的本机绝对路径。",
   ],
   qqbot: [
+    "QQ 渠道支持 Markdown 文本回复，请优先用 Markdown 组织标题、列表和代码块。",
     "QQ 渠道当前不支持附件回传；如果生成了文件，请给出文件的本机绝对路径。",
   ],
 };

@@ -8,6 +8,8 @@ import WebSocket from "ws";
 const QQ_OAUTH_URL = "https://bots.qq.com/app/getAppAccessToken";
 const QQ_GATEWAY_URL = "https://api.sgroup.qq.com/gateway";
 const QQ_BASE_API = "https://api.sgroup.qq.com";
+const QQ_TEXT_MSG_TYPE = 0;
+const QQ_MARKDOWN_MSG_TYPE = 2;
 
 export class QQBotChannel implements IChannel {
   readonly type = "qqbot";
@@ -183,24 +185,8 @@ export class QQBotChannel implements IChannel {
       throw new Error("QQBot ownerChatId 未配置，请先私聊机器人一次（会自动记录），或在设置中手动填写");
     }
     try {
-      const token = await this.getValidToken();
       const url = `${QQ_BASE_API}/v2/users/${ownerChatId}/messages`;
-      const body = { content: text, msg_type: 0 };
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Authorization": `QQBot ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const responseData = await res.json();
-        logger.error("qqbot.send_to_owner.failed", { status: res.status, response: responseData });
-        throw new Error(`QQ send failed: HTTP ${res.status}`);
-      }
+      await this.sendMessageWithMarkdownFallback(url, text, "C2C_MESSAGE_CREATE");
       logger.info("qqbot.send_to_owner.success", { ownerChatId });
     } catch (e) {
       logger.error("qqbot.send_to_owner.error", { error: e });
@@ -284,7 +270,6 @@ export class QQBotChannel implements IChannel {
 
   private async sendText(chatId: string, msgId: string, text: string, eventType: string): Promise<void> {
     try {
-      const token = await this.getValidToken();
       let url = "";
 
       // 新版直接发群聊
@@ -308,39 +293,83 @@ export class QQBotChannel implements IChannel {
       }
 
       logger.info("qqbot.send_text.start", { chatId, url });
-
-      // QQ的要求：回复消息需要带上 msg_id
-      const body = {
-          content: text,
-          msg_id: msgId,
-          // 如果是C2C或者GROUP，新版要求有 msg_type: 0 代表文本，同时不需要 msg_id 也能回复
-          // 但是有些文档显示带上 msg_type 更好：
-          msg_type: 0 
-      };
-
-      const res = await fetch(url, {
-          method: "POST",
-          headers: {
-              "Authorization": `QQBot ${token}`,
-              "Content-Type": "application/json"
-          },
-          body: JSON.stringify(body)
-      });
-      
-      const responseData = await res.json();
-      if (!res.ok) {
-          logger.error("qqbot.send_text.failed_http", { status: res.status, response: responseData });
-          
-          // 如果返回不支持，并且是频道，回退到 postDirectMessage
-          if (res.status === 404 || res.status === 400) {
-              // 你可能需要先调用 /users/@me/dms 创建会话
-              // 这里简化处理为记录报错
-          }
-      } else {
-          logger.info("qqbot.send_text.success", { chatId });
-      }
+      await this.sendMessageWithMarkdownFallback(url, text, eventType, msgId);
+      logger.info("qqbot.send_text.success", { chatId });
     } catch (e) {
       logger.error("qqbot.send_text.failed", { error: e });
     }
+  }
+
+  private async sendMessageWithMarkdownFallback(
+    url: string,
+    text: string,
+    eventType: string,
+    msgId?: string,
+  ): Promise<void> {
+    try {
+      await this.postMessage(url, buildQQMarkdownBody(text, eventType, msgId));
+      logger.info("qqbot.send_markdown.success", { url, eventType });
+    } catch (error) {
+      logger.warn("qqbot.send_markdown.failed_fallback_text", { url, eventType, error });
+      await this.postMessage(url, buildQQTextBody(text, eventType, msgId));
+    }
+  }
+
+  private async postMessage(url: string, body: Record<string, unknown>): Promise<void> {
+    const token = await this.getValidToken();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `QQBot ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const responseData = await readJsonResponse(res);
+    if (!res.ok) {
+      logger.error("qqbot.send_message.failed_http", { status: res.status, response: responseData });
+      throw new Error(`QQ send failed: HTTP ${res.status}`);
+    }
+  }
+}
+
+function buildQQMarkdownBody(text: string, eventType: string, msgId?: string): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    markdown: { content: text },
+  };
+  if (msgId) {
+    body.msg_id = msgId;
+  }
+  if (usesV2MessageBody(eventType)) {
+    body.msg_type = QQ_MARKDOWN_MSG_TYPE;
+  }
+  return body;
+}
+
+function buildQQTextBody(text: string, eventType: string, msgId?: string): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    content: text,
+  };
+  if (msgId) {
+    body.msg_id = msgId;
+  }
+  if (usesV2MessageBody(eventType)) {
+    body.msg_type = QQ_TEXT_MSG_TYPE;
+  }
+  return body;
+}
+
+function usesV2MessageBody(eventType: string): boolean {
+  return eventType === "GROUP_AT_MESSAGE_CREATE" || eventType === "C2C_MESSAGE_CREATE";
+}
+
+async function readJsonResponse(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
   }
 }

@@ -79,7 +79,7 @@ interface ParsedCommand {
 type ReplyStyle = "plain" | "markdown";
 
 function getReplyStyle(source: string): ReplyStyle {
-  return source === "weixin" ? "markdown" : "plain";
+  return source === "weixin" || source === "qqbot" ? "markdown" : "plain";
 }
 
 function parseCommand(userText: string): ParsedCommand | null {
