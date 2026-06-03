@@ -1,8 +1,18 @@
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import type { QQBotChannelConfig, IChannel, ChannelCallbacks } from "./types.js";
 import { readChannelConfig, updateChannelConfig } from "./config.js";
 import { logger } from "../logger.js";
-import { sanitizeUserText } from "../message.js";
+import {
+  getImageExtension,
+  isSupportedImagePath,
+  parseReplyPayload,
+  sanitizeUserText,
+} from "../message.js";
 import { handleCommand } from "./commands.js";
+import { getWorkdir } from "../shared.js";
 import WebSocket from "ws";
 
 const QQ_OAUTH_URL = "https://bots.qq.com/app/getAppAccessToken";
@@ -10,6 +20,31 @@ const QQ_GATEWAY_URL = "https://api.sgroup.qq.com/gateway";
 const QQ_BASE_API = "https://api.sgroup.qq.com";
 const QQ_TEXT_MSG_TYPE = 0;
 const QQ_MARKDOWN_MSG_TYPE = 2;
+const QQ_MEDIA_MSG_TYPE = 7;
+const QQ_IMAGE_FILE_TYPE = 1;
+const QQ_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const QQ_MAX_INCOMING_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+
+interface QQAttachment {
+  id?: string;
+  filename?: string;
+  content_type?: string;
+  url?: string;
+  size?: number;
+  height?: number;
+  width?: number;
+}
+
+interface DownloadedQQMedia {
+  imagePaths: string[];
+  filePaths: Array<{ name: string; path: string }>;
+  tempDir: string | null;
+}
+
+interface QQMediaUploadResponse {
+  file_info?: string;
+  [key: string]: unknown;
+}
 
 export class QQBotChannel implements IChannel {
   readonly type = "qqbot";
@@ -185,8 +220,7 @@ export class QQBotChannel implements IChannel {
       throw new Error("QQBot ownerChatId 未配置，请先私聊机器人一次（会自动记录），或在设置中手动填写");
     }
     try {
-      const url = `${QQ_BASE_API}/v2/users/${ownerChatId}/messages`;
-      await this.sendMessageWithMarkdownFallback(url, text, "C2C_MESSAGE_CREATE");
+      await this.sendReply(ownerChatId, undefined, text, "C2C_MESSAGE_CREATE");
       logger.info("qqbot.send_to_owner.success", { ownerChatId });
     } catch (e) {
       logger.error("qqbot.send_to_owner.error", { error: e });
@@ -197,6 +231,10 @@ export class QQBotChannel implements IChannel {
   private async handleMessage(message: any, eventType: string): Promise<void> {
     // 频道和单聊里的作者ID是不一样的字段结构
     let chatId = message.guild_id || message.channel_id || message.author?.id;
+
+    if (eventType === "C2C_MESSAGE_CREATE" && message.author?.user_openid) {
+      chatId = message.author.user_openid;
+    }
     
     // 群聊（新版群助手）
     if (message.group_openid) {
@@ -218,41 +256,147 @@ export class QQBotChannel implements IChannel {
     logger.info("qqbot.message.received", {
       messageId: message.id,
       chatId,
-      eventType
+      eventType,
+      attachmentCount: Array.isArray(message.attachments) ? message.attachments.length : 0,
     });
 
     const rawText = message.content || "";
     // 如果是频道被@或者是群里被@的消息，最好能过滤掉类似 `<@!1234>` 的本身
     const userText = sanitizeUserText(rawText).replace(/<@!\d+>/g, "").trim();
 
-    if (!userText) {
+    let media: DownloadedQQMedia;
+    try {
+      media = await this.downloadMessageMedia(message);
+    } catch (error) {
+      logger.error("qqbot.media.download_failed", {
+        messageId: message.id,
+        chatId,
+        error,
+      });
+      await this.sendText(chatId, message.id, "附件已收到，但下载失败，请重试。", eventType);
+      return;
+    }
+
+    const effectiveUserText = buildIncomingUserText(userText, media);
+    logger.info("qqbot.message.media_resolved", {
+      messageId: message.id,
+      chatId,
+      textChars: userText.length,
+      imageCount: media.imagePaths.length,
+      fileCount: media.filePaths.length,
+    });
+
+    if (!effectiveUserText) {
+      if (media.tempDir) {
+        await rm(media.tempDir, { recursive: true, force: true }).catch(() => {});
+      }
       return;
     }
 
     this.enqueueChatTask(chatId, async () => {
-      const cmd = handleCommand(userText, chatId, "qqbot", this.callbacks!);
-      if (cmd.handled) {
-        if (cmd.reply) await this.sendText(chatId, message.id, cmd.reply, eventType);
-        return;
-      }
-
       try {
-        const reply = await this.callbacks!.generateReply(
-          chatId,
-          userText,
-          undefined,
-          "qqbot"
-        );
-        await this.sendText(chatId, message.id, reply, eventType);
+        if (media.imagePaths.length === 0 && media.filePaths.length === 0) {
+          const cmd = handleCommand(userText, chatId, "qqbot", this.callbacks!);
+          if (cmd.handled) {
+            if (cmd.reply) await this.sendText(chatId, message.id, cmd.reply, eventType);
+            return;
+          }
+        }
+
+        try {
+          const reply = await this.callbacks!.generateReply(
+            chatId,
+            effectiveUserText,
+            media.imagePaths.length > 0 ? media.imagePaths : undefined,
+            "qqbot"
+          );
+          await this.sendReply(chatId, message.id, reply, eventType);
+        } catch (error) {
+          logger.error("qqbot.text.failed", {
+            messageId: message.id,
+            chatId: chatId,
+            error,
+          });
+          await this.sendText(chatId, message.id, "处理消息时出错了，请稍后再试。", eventType);
+        }
       } catch (error) {
-        logger.error("qqbot.text.failed", {
-          messageId: message.id,
-          chatId: chatId,
-          error,
-        });
-        await this.sendText(chatId, message.id, "处理消息时出错了，请稍后再试。", eventType);
+        logger.error("qqbot.reply.failed", { messageId: message.id, chatId, error });
+      } finally {
+        if (media.tempDir) {
+          await rm(media.tempDir, { recursive: true, force: true }).catch(() => {});
+        }
       }
     });
+  }
+
+  private async sendReply(chatId: string, msgId: string | undefined, reply: string, eventType: string): Promise<void> {
+    const payload = parseReplyPayload(reply, getWorkdir());
+    logger.info("qqbot.send_reply", {
+      chatId,
+      eventType,
+      textChars: payload.text.length,
+      imageCount: payload.imagePaths.length,
+      fileCount: payload.filePaths.length,
+    });
+
+    let msgSeq = 1;
+    if (payload.text) {
+      await this.sendText(chatId, msgId, payload.text, eventType, msgSeq++);
+    } else if (payload.imagePaths.length > 0) {
+      await this.sendText(chatId, msgId, "请查看图片。", eventType, msgSeq++);
+    }
+
+    for (const imagePath of payload.imagePaths) {
+      await this.sendImage(chatId, msgId, imagePath, eventType, msgSeq++);
+    }
+
+    if (payload.filePaths.length > 0) {
+      const fileText = [
+        "QQ 渠道当前未放开非图片文件发送，文件已生成在本机：",
+        ...payload.filePaths.map((filePath) => `- ${filePath}`),
+      ].join("\n");
+      await this.sendText(chatId, msgId, fileText, eventType, msgSeq++);
+    }
+
+    if (!payload.text && payload.imagePaths.length === 0 && payload.filePaths.length === 0) {
+      await this.sendText(chatId, msgId, reply, eventType, msgSeq++);
+    }
+  }
+
+  private async downloadMessageMedia(message: any): Promise<DownloadedQQMedia> {
+    const result: DownloadedQQMedia = { imagePaths: [], filePaths: [], tempDir: null };
+    const attachments = Array.isArray(message.attachments)
+      ? message.attachments as QQAttachment[]
+      : [];
+    if (attachments.length === 0) {
+      return result;
+    }
+
+    let mediaIndex = 0;
+    const ensureTempDir = async () => {
+      result.tempDir ??= await mkdtemp(path.join(tmpdir(), "anybot-qq-media-"));
+      return result.tempDir;
+    };
+
+    for (const attachment of attachments) {
+      const url = normalizeAttachmentUrl(attachment.url);
+      if (!url) continue;
+
+      const declaredSize = Number(attachment.size || 0);
+      if (declaredSize > QQ_MAX_INCOMING_ATTACHMENT_BYTES) {
+        throw new Error(`QQ attachment exceeds 50MB: ${attachment.filename || attachment.id || url}`);
+      }
+
+      const tempDir = await ensureTempDir();
+      const downloaded = await downloadQQAttachment(attachment, url, tempDir, mediaIndex++);
+      if (downloaded.isImage) {
+        result.imagePaths.push(downloaded.filePath);
+      } else {
+        result.filePaths.push({ name: downloaded.fileName, path: downloaded.filePath });
+      }
+    }
+
+    return result;
   }
 
   private enqueueChatTask(chatId: string, task: () => Promise<void>): void {
@@ -268,36 +412,104 @@ export class QQBotChannel implements IChannel {
     this.queueByChat.set(chatId, next);
   }
 
-  private async sendText(chatId: string, msgId: string, text: string, eventType: string): Promise<void> {
+  private async sendText(
+    chatId: string,
+    msgId: string | undefined,
+    text: string,
+    eventType: string,
+    msgSeq = 1,
+  ): Promise<void> {
     try {
-      let url = "";
-
-      // 新版直接发群聊
-      if (eventType === "GROUP_AT_MESSAGE_CREATE") {
-          url = `${QQ_BASE_API}/v2/groups/${chatId}/messages`;
-      } 
-      // 新版直接发C2C（好友）
-      else if (eventType === "C2C_MESSAGE_CREATE") {
-          url = `${QQ_BASE_API}/v2/users/${chatId}/messages`;
-      } 
-      // 频道私信
-      else if (eventType === "DIRECT_MESSAGE_CREATE") {
-          // 这里如果是频道主动发起的私信，chatId通常是 guild_id 或者发过来的 dm_channelId
-          // 为了简化，目前依然用 /dms 或者 /channels/${chatId}/messages 如果chatId是频道的channel
-          url = `${QQ_BASE_API}/dms/${chatId}/messages`; 
-          // 实际上如果创建了DM频道，chatId就是dm频道的id
-      }
-      // 频道被艾特
-      else {
-          url = `${QQ_BASE_API}/channels/${chatId}/messages`;
-      }
+      const url = this.getMessageUrl(chatId, eventType);
 
       logger.info("qqbot.send_text.start", { chatId, url });
-      await this.sendMessageWithMarkdownFallback(url, text, eventType, msgId);
+      await this.sendMessageWithMarkdownFallback(url, text, eventType, msgId, msgSeq);
       logger.info("qqbot.send_text.success", { chatId });
     } catch (e) {
       logger.error("qqbot.send_text.failed", { error: e });
     }
+  }
+
+  private async sendImage(
+    chatId: string,
+    msgId: string | undefined,
+    imagePath: string,
+    eventType: string,
+    msgSeq: number,
+  ): Promise<void> {
+    if (!usesV2MessageBody(eventType)) {
+      await this.sendText(
+        chatId,
+        msgId,
+        `QQ 当前仅在群聊/C2C 中支持本地图片回传，图片路径：${imagePath}`,
+        eventType,
+        msgSeq,
+      );
+      return;
+    }
+
+    const upload = await this.uploadImage(chatId, imagePath, eventType);
+    const url = this.getMessageUrl(chatId, eventType);
+    await this.postMessage(url, buildQQMediaBody(upload.file_info!, eventType, msgId, msgSeq));
+    logger.info("qqbot.send_image.success", { chatId, eventType, imagePath });
+  }
+
+  private async uploadImage(chatId: string, imagePath: string, eventType: string): Promise<QQMediaUploadResponse> {
+    const fileStat = await stat(imagePath);
+    if (!fileStat.isFile()) {
+      throw new Error(`不是可发送的图片：${imagePath}`);
+    }
+    if (fileStat.size <= 0) {
+      throw new Error(`图片为空，无法发送：${imagePath}`);
+    }
+    if (fileStat.size > QQ_MAX_IMAGE_SIZE_BYTES) {
+      throw new Error(`QQ 图片超过 10MB，无法发送：${path.basename(imagePath)}`);
+    }
+
+    const token = await this.getValidToken();
+    const endpoint = eventType === "GROUP_AT_MESSAGE_CREATE"
+      ? `${QQ_BASE_API}/v2/groups/${chatId}/files`
+      : `${QQ_BASE_API}/v2/users/${chatId}/files`;
+    const fileBuffer = await readFile(imagePath);
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `QQBot ${token}`,
+        "Content-Type": "application/json",
+        ...(this.config?.appId ? { "X-Union-Appid": this.config.appId } : {}),
+      },
+      body: JSON.stringify({
+        file_type: QQ_IMAGE_FILE_TYPE,
+        file_data: fileBuffer.toString("base64"),
+        srv_send_msg: false,
+      }),
+    });
+
+    const responseData = await readJsonResponse(res) as QQMediaUploadResponse;
+    if (!res.ok || !responseData.file_info) {
+      logger.error("qqbot.upload_image.failed_http", { status: res.status, response: responseData });
+      throw new Error(`QQ upload image failed: HTTP ${res.status}`);
+    }
+    logger.info("qqbot.upload_image.success", {
+      chatId,
+      eventType,
+      imagePath,
+      fileSize: fileStat.size,
+    });
+    return responseData;
+  }
+
+  private getMessageUrl(chatId: string, eventType: string): string {
+    if (eventType === "GROUP_AT_MESSAGE_CREATE") {
+      return `${QQ_BASE_API}/v2/groups/${chatId}/messages`;
+    }
+    if (eventType === "C2C_MESSAGE_CREATE") {
+      return `${QQ_BASE_API}/v2/users/${chatId}/messages`;
+    }
+    if (eventType === "DIRECT_MESSAGE_CREATE") {
+      return `${QQ_BASE_API}/dms/${chatId}/messages`;
+    }
+    return `${QQ_BASE_API}/channels/${chatId}/messages`;
   }
 
   private async sendMessageWithMarkdownFallback(
@@ -305,13 +517,14 @@ export class QQBotChannel implements IChannel {
     text: string,
     eventType: string,
     msgId?: string,
+    msgSeq = 1,
   ): Promise<void> {
     try {
-      await this.postMessage(url, buildQQMarkdownBody(text, eventType, msgId));
+      await this.postMessage(url, buildQQMarkdownBody(text, eventType, msgId, msgSeq));
       logger.info("qqbot.send_markdown.success", { url, eventType });
     } catch (error) {
       logger.warn("qqbot.send_markdown.failed_fallback_text", { url, eventType, error });
-      await this.postMessage(url, buildQQTextBody(text, eventType, msgId));
+      await this.postMessage(url, buildQQTextBody(text, eventType, msgId, msgSeq));
     }
   }
 
@@ -334,12 +547,18 @@ export class QQBotChannel implements IChannel {
   }
 }
 
-function buildQQMarkdownBody(text: string, eventType: string, msgId?: string): Record<string, unknown> {
+function buildQQMarkdownBody(
+  text: string,
+  eventType: string,
+  msgId?: string,
+  msgSeq = 1,
+): Record<string, unknown> {
   const body: Record<string, unknown> = {
     markdown: { content: text },
   };
   if (msgId) {
     body.msg_id = msgId;
+    body.msg_seq = msgSeq;
   }
   if (usesV2MessageBody(eventType)) {
     body.msg_type = QQ_MARKDOWN_MSG_TYPE;
@@ -347,12 +566,18 @@ function buildQQMarkdownBody(text: string, eventType: string, msgId?: string): R
   return body;
 }
 
-function buildQQTextBody(text: string, eventType: string, msgId?: string): Record<string, unknown> {
+function buildQQTextBody(
+  text: string,
+  eventType: string,
+  msgId?: string,
+  msgSeq = 1,
+): Record<string, unknown> {
   const body: Record<string, unknown> = {
     content: text,
   };
   if (msgId) {
     body.msg_id = msgId;
+    body.msg_seq = msgSeq;
   }
   if (usesV2MessageBody(eventType)) {
     body.msg_type = QQ_TEXT_MSG_TYPE;
@@ -360,8 +585,132 @@ function buildQQTextBody(text: string, eventType: string, msgId?: string): Recor
   return body;
 }
 
+function buildQQMediaBody(
+  fileInfo: string,
+  eventType: string,
+  msgId?: string,
+  msgSeq = 1,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    media: { file_info: fileInfo },
+  };
+  if (msgId) {
+    body.msg_id = msgId;
+    body.msg_seq = msgSeq;
+  }
+  if (usesV2MessageBody(eventType)) {
+    body.msg_type = QQ_MEDIA_MSG_TYPE;
+  }
+  return body;
+}
+
 function usesV2MessageBody(eventType: string): boolean {
   return eventType === "GROUP_AT_MESSAGE_CREATE" || eventType === "C2C_MESSAGE_CREATE";
+}
+
+function normalizeAttachmentUrl(rawUrl?: string): string | null {
+  const value = rawUrl?.trim();
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function downloadQQAttachment(
+  attachment: QQAttachment,
+  url: string,
+  tempDir: string,
+  mediaIndex: number,
+): Promise<{ filePath: string; fileName: string; isImage: boolean }> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`QQ attachment download failed: HTTP ${res.status}`);
+  }
+
+  const contentLength = Number(res.headers.get("content-length") || attachment.size || 0);
+  if (contentLength > QQ_MAX_INCOMING_ATTACHMENT_BYTES) {
+    throw new Error(`QQ attachment exceeds 50MB: ${attachment.filename || attachment.id || url}`);
+  }
+
+  const contentType = res.headers.get("content-type") || attachment.content_type || undefined;
+  const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.length > QQ_MAX_INCOMING_ATTACHMENT_BYTES) {
+    throw new Error(`QQ attachment exceeds 50MB: ${attachment.filename || attachment.id || url}`);
+  }
+  let fileName = safeIncomingFileName(
+    attachment.filename ||
+    getFileNameFromUrl(url) ||
+    `attachment-${mediaIndex}${getQQAttachmentExtension(contentType)}`,
+  );
+  const isImageByType = (contentType || "").toLowerCase().startsWith("image/");
+  const isImage = isImageByType || isSupportedImagePath(fileName);
+  if (isImage && !isSupportedImagePath(fileName)) {
+    const parsed = path.parse(fileName);
+    fileName = `${parsed.name || `image-${mediaIndex}`}${getQQImageExtension(contentType)}`;
+  }
+
+  const filePath = path.join(tempDir, `${mediaIndex}-${fileName}`);
+  await writeFile(filePath, buffer);
+  logger.info("qqbot.attachment.download_success", {
+    filePath,
+    fileName,
+    contentType,
+    bytes: buffer.length,
+    isImage,
+  });
+  return { filePath, fileName, isImage };
+}
+
+function buildIncomingUserText(rawText: string, media: DownloadedQQMedia): string {
+  const parts: string[] = [];
+  if (rawText) {
+    parts.push(rawText);
+  } else if (media.imagePaths.length > 0) {
+    parts.push(
+      "用户发来了图片。请先根据图片内容直接回答；如果缺少上下文，就先简要描述图片里有什么，并询问对方希望你进一步做什么。",
+    );
+  }
+
+  if (media.filePaths.length > 0) {
+    const fileList = media.filePaths.map((f) => `- ${f.name}: ${f.path}`).join("\n");
+    parts.push(`用户附带了以下文件，请按需读取并处理：\n${fileList}`);
+  }
+
+  if (media.imagePaths.length > 0) {
+    const imageList = media.imagePaths.map((p) => `- ${path.basename(p)}: ${p}`).join("\n");
+    parts.push(`用户附带了以下图片：\n${imageList}`);
+  }
+
+  return parts.join("\n\n").trim();
+}
+
+function safeIncomingFileName(fileName: string): string {
+  const base = path.basename(fileName).replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim();
+  return base || "file.bin";
+}
+
+function getFileNameFromUrl(url: string): string | null {
+  try {
+    const base = path.basename(new URL(url).pathname);
+    return base || null;
+  } catch {
+    return null;
+  }
+}
+
+function getQQAttachmentExtension(contentType?: string): string {
+  if ((contentType || "").toLowerCase().startsWith("image/")) {
+    return getQQImageExtension(contentType);
+  }
+  return ".bin";
+}
+
+function getQQImageExtension(contentType?: string): string {
+  const ext = getImageExtension(contentType);
+  return ext === ".img" ? ".jpg" : ext;
 }
 
 async function readJsonResponse(res: Response): Promise<unknown> {
