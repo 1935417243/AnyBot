@@ -35,6 +35,7 @@ const DEFAULT_CONFIG: ChannelsConfig = {
     enabled: false,
     appId: "",
     appSecret: "",
+    robotCode: "",
     ownerChatId: "",
   } satisfies DingtalkChannelConfig,
   telegram: {

@@ -16,7 +16,9 @@ export interface QQBotChannelConfig extends ChannelConfig {
   [key: string]: unknown;
 }
 
-export interface DingtalkChannelConfig extends ChannelConfig {}
+export interface DingtalkChannelConfig extends ChannelConfig {
+  robotCode?: string;
+}
 
 export interface TelegramChannelConfig {
   enabled: boolean;

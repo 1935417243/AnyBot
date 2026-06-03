@@ -189,6 +189,13 @@ export class DingtalkChannel implements IChannel {
         : {}),
     });
 
+    const robotCode = message.robotCode?.trim();
+    if (robotCode && this.config.robotCode !== robotCode) {
+      this.config.robotCode = robotCode;
+      updateChannelConfig("dingtalk", { robotCode });
+      logger.info("dingtalk.robot_code_auto_saved", { robotCode });
+    }
+
     if (message.conversationType === "1" && !this.config.ownerChatId && message.senderStaffId) {
       this.config.ownerChatId = message.senderStaffId;
       updateChannelConfig("dingtalk", { ownerChatId: message.senderStaffId });
