@@ -113,9 +113,26 @@ export function createFilesRouter(): Router {
       return;
     }
 
-    const directory = path.dirname(resolved);
+    let stat: fs.Stats;
     try {
-      await revealFileInFolder(resolved);
+      stat = fs.statSync(resolved);
+    } catch {
+      res.json({ ok: true, path: resolved, skipped: true });
+      return;
+    }
+
+    if (!stat.isDirectory() && !stat.isFile()) {
+      res.json({ ok: true, path: resolved, skipped: true });
+      return;
+    }
+
+    const directory = stat.isDirectory() ? resolved : path.dirname(resolved);
+    try {
+      if (stat.isDirectory()) {
+        await openFile(resolved);
+      } else {
+        await revealFileInFolder(resolved);
+      }
       res.json({ ok: true, path: resolved, directory });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "打开文件夹失败" });

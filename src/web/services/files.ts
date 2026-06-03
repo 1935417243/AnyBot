@@ -1,5 +1,6 @@
 import { execFile as execFileCallback } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -38,6 +39,8 @@ export function resolveLocalFilePath(filePath: string): string {
 
   if (/^file:/i.test(value)) {
     value = fileURLToPath(value);
+  } else if (value === "~" || /^~[\\/]/.test(value)) {
+    value = path.join(os.homedir(), value.slice(2));
   } else if (!path.isAbsolute(value)) {
     throw new Error("只允许打开绝对路径");
   }

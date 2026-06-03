@@ -1,4 +1,5 @@
 import { escapeAttr, escapeHtml } from './utils/html.js';
+import { isLocalFilePath } from './chat/local-file-links.js';
 
 function getMarked() {
     if (window.marked) return window.marked;
@@ -17,18 +18,7 @@ export function normalizeLinkHref(href) {
 }
 
 export function isLocalFileLinkHref(href) {
-    var value = String(href || '').trim();
-    if (!value) return false;
-
-    try {
-        value = decodeURI(value);
-    } catch (_) {
-    }
-
-    if (/^file:/i.test(value)) return true;
-    if (/^[a-zA-Z]:[\\/]/.test(value)) return true;
-    if (/^\\\\[^\\]+\\[^\\]+/.test(value)) return true;
-    return /^\/(?:Users|home|private|tmp|var|Volumes|Applications|opt|usr|etc)(?:\/|$)/.test(value);
+    return isLocalFilePath(href);
 }
 
 export function isExternalLinkHref(href) {
@@ -61,7 +51,7 @@ export function isSafeImageHref(href) {
 export function sanitizeRenderedHtml(html) {
     if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
         return window.DOMPurify.sanitize(html, {
-            ADD_ATTR: ['target'],
+            ADD_ATTR: ['target', 'data-local-file-action', 'data-local-file-path', 'data-local-file-bound'],
             FORBID_TAGS: ['style'],
             FORBID_ATTR: ['style'],
         });
@@ -124,8 +114,15 @@ export function configureMarkdown() {
         var href = normalizeLinkHref((typeof obj === 'string') ? obj : (obj.href || ''));
         var title = (typeof obj === 'string') ? '' : (obj.title || '');
         var text = (typeof obj === 'string') ? escapeHtml(href) : (obj.text || escapeHtml(href));
-        if (!href || !isSafeLinkHref(href)) return text;
-        if (isLocalFileLinkHref(href)) return text;
+        if (!href) return text;
+        if (isLocalFileLinkHref(href)) {
+            return '<button class="local-file-link" type="button" data-local-file-action="reveal"'
+                + ' data-local-file-path="' + escapeAttr(href) + '"'
+                + ' aria-label="' + escapeAttr(href) + '"'
+                + (title ? ' title="' + escapeAttr(title) + '"' : '')
+                + '>' + text + '</button>';
+        }
+        if (!isSafeLinkHref(href)) return text;
 
         var externalAttrs = isExternalLinkHref(href) ? ' target="_blank" rel="noopener noreferrer"' : '';
         return '<a href="' + escapeAttr(href) + '"'
