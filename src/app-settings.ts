@@ -80,7 +80,7 @@ export interface AppSettings {
   };
 }
 
-export const DEFAULT_PROVIDER_TIMEOUT_MS = 15 * 60 * 1000;
+export const DEFAULT_PROVIDER_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_PROVIDER_TIMEOUT_MS = 2_147_000_000;
 const DESKTOP_DEFAULT_WORKDIR_NAME = "AnyBotData";
 const WINDOWS_HOME_WORKDIR_NAME = "AnyBotWorkspace";

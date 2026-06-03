@@ -25,7 +25,7 @@ export function createSettingsProviderController(options) {
     let remoteProviderModelFetchTimer = null;
     let remoteProviderModelFetchSeq = 0;
 
-    const DEFAULT_PROVIDER_TIMEOUT_MINUTES = 15;
+    const DEFAULT_PROVIDER_TIMEOUT_MINUTES = 30;
     const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
     const KIMI_CODING_MODEL = 'kimi-for-coding';
     const PROVIDER_BASE_URL_SUGGESTIONS = [
@@ -674,7 +674,11 @@ export function createSettingsProviderController(options) {
 
     function buildProviderTimeoutField(providerType, cfg) {
         var minutes = getProviderTimeoutMinutes(cfg);
-        return '<span class="settings-field-label">执行时长</span>' +
+        var tooltip = '控制模型在单次会话中的最大处理时间，达到上限后，本次任务会自动停止。';
+        return '<span class="settings-field-label settings-field-label-with-help">时长上限' +
+            '<span class="settings-field-help" tabindex="0" aria-label="' + escapeAttr(tooltip) + '"' +
+            ' data-tooltip="' + escapeAttr(tooltip) + '">?</span>' +
+            '</span>' +
             '<div class="provider-timeout-control">' +
             '<input class="settings-inline-input provider-timeout-input" id="settings-provider-timeout-minutes" type="number" min="1" max="35791" step="1"' +
             ' inputmode="numeric" value="' + escapeAttr(String(minutes)) + '" data-provider-type="' + escapeAttr(providerType) + '">' +
