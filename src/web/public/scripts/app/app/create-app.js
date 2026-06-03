@@ -38,6 +38,11 @@ const REALTIME_REFRESH_DEBOUNCE_MS = 150;
 const REALTIME_RECONNECT_MS = 3000;
 const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif', '.heic', '.heif', '.avif'];
 
+function requireAppController(controller, name) {
+    if (controller) return controller;
+    throw new Error('AnyBot app controller is not ready: ' + name);
+}
+
 export function createAnyBotApp(dom, deps) {
     deps = deps || {};
 
@@ -146,8 +151,51 @@ export function createAnyBotApp(dom, deps) {
     let skillsPageController = null;
     let automationsPageController = null;
     let viewRouter = null;
+    let attachmentController = null;
+    let inputHistoryController = null;
+    let appEventsBound = false;
     let pendingAttachments = [];
     const toastController = createToastController({ documentRef: documentRef });
+
+    function requireAttachmentController() {
+        return requireAppController(attachmentController, 'attachmentController');
+    }
+
+    function requireFileReferencePickerController() {
+        return requireAppController(fileReferencePickerController, 'fileReferencePickerController');
+    }
+
+    function requireInputHistoryController() {
+        return requireAppController(inputHistoryController, 'inputHistoryController');
+    }
+
+    function requireMessageListController() {
+        return requireAppController(messageListController, 'messageListController');
+    }
+
+    function requireSendMessageController() {
+        return requireAppController(sendMessageController, 'sendMessageController');
+    }
+
+    function requireSessionController() {
+        return requireAppController(sessionController, 'sessionController');
+    }
+
+    function requireSettingsController() {
+        return requireAppController(settingsController, 'settingsController');
+    }
+
+    function requireSidebarController() {
+        return requireAppController(sidebarController, 'sidebarController');
+    }
+
+    function requireSlashPickerController() {
+        return requireAppController(slashPickerController, 'slashPickerController');
+    }
+
+    function requireViewRouter() {
+        return requireAppController(viewRouter, 'viewRouter');
+    }
 
     contextUsageController = createContextUsageController();
 
@@ -179,11 +227,11 @@ export function createAnyBotApp(dom, deps) {
     settingsController = createSettingsController({
         addProjectBtn: addProjectBtn,
         createNewChat: function (projectId, chatOptions) {
-            return sessionController.createNewChat(projectId, chatOptions);
+            return requireSessionController().createNewChat(projectId, chatOptions);
         },
         currentModelNameEl: currentModelNameEl,
         fetchSessions: function () {
-            return sidebarController.fetchSessions();
+            return requireSidebarController().fetchSessions();
         },
         getCurrentSessionId: function () {
             return sessionController ? sessionController.getCurrentSessionId() : null;
@@ -198,7 +246,7 @@ export function createAnyBotApp(dom, deps) {
             return contextUsageController ? contextUsageController.getLatestUsage() : null;
         },
         getSidebarController: function () {
-            return sidebarController;
+            return requireSidebarController();
         },
         modelBadge: modelBadge,
         modelDropdown: modelDropdown,
@@ -271,7 +319,7 @@ export function createAnyBotApp(dom, deps) {
         if (inputUiController) inputUiController.resizeChatInput();
     }
 
-    const attachmentController = createAttachmentController({
+    attachmentController = createAttachmentController({
         attachmentPreview: attachmentPreview,
         imageExts: IMAGE_EXTS,
         getPendingAttachments: function () {
@@ -313,7 +361,7 @@ export function createAnyBotApp(dom, deps) {
             return slashItemsStore ? slashItemsStore.getState() : null;
         },
         resetInputHistoryNavigation: function () {
-            return inputHistoryController.resetNavigation();
+            return requireInputHistoryController().resetNavigation();
         },
         runProviderCommand: function (commandText, item) {
             if (!sendMessageController) return false;
@@ -338,7 +386,7 @@ export function createAnyBotApp(dom, deps) {
         updateSendBtnState: updateSendBtnState,
     });
 
-    const inputHistoryController = createInputHistoryController({
+    inputHistoryController = createInputHistoryController({
         inputEl: inputEl,
         pageSize: SESSION_MESSAGE_PAGE_SIZE,
         applyDraft: applyChatInputDraft,
@@ -365,12 +413,12 @@ export function createAnyBotApp(dom, deps) {
 
     function applyChatInputDraft(value, skills, projects, files) {
         inputEl.value = value;
-        slashPickerController.setSelection(skills, projects);
-        fileReferencePickerController.setSelection(files || []);
+        requireSlashPickerController().setSelection(skills, projects);
+        requireFileReferencePickerController().setSelection(files || []);
     }
 
     function closeSkillPicker(options) {
-        return slashPickerController.close(options);
+        return requireSlashPickerController().close(options);
     }
 
     function closeFilePicker() {
@@ -381,78 +429,14 @@ export function createAnyBotApp(dom, deps) {
         if (fileReferencePickerController) fileReferencePickerController.clearSelection();
     }
 
-    bindChatInputEvents({
-        attachBtn: attachBtn,
-        cancelCurrentResponse: function () {
-            return sessionController.cancelCurrentResponse();
-        },
-        canOpenSkillPickerFromSlash: function (e) {
-            return slashPickerController.canOpenFromSlash(e);
-        },
-        chatViewEl: chatView,
-        clearPromptSkillDeleteTarget: function () {
-            return slashPickerController.clearDeleteTarget();
-        },
-        clearFileDeleteTarget: function () {
-            return fileReferencePickerController.clearDeleteTarget();
-        },
-        closeFilePicker: closeFilePicker,
-        dropOverlay: dropOverlay,
-        fileInput: fileInput,
-        getIsTyping: function () {
-            return sessionController ? sessionController.getIsTyping() : false;
-        },
-        handlePromptSkillBackspace: function (e) {
-            return slashPickerController.handlePromptBackspace(e);
-        },
-        handleFilePickerKeydown: function (e) {
-            return fileReferencePickerController.handleKeydown(e);
-        },
-        handleFileReferenceDelete: function (e) {
-            return fileReferencePickerController.handleSelectedFileDelete(e);
-        },
-        handleSkillPickerKeydown: function (e) {
-            return slashPickerController.handleKeydown(e);
-        },
-        inputEl: inputEl,
-        inputWrapper: inputWrapper,
-        insertSkillSlashTrigger: function () {
-            return slashPickerController.insertSlashTrigger();
-        },
-        navigateInputHistory: function (direction) {
-            return inputHistoryController.navigate(direction);
-        },
-        resetInputHistoryNavigation: function () {
-            return inputHistoryController.resetNavigation();
-        },
-        resizeChatInput: resizeChatInput,
-        sendBtn: sendBtn,
-        sendMessage: function () {
-            return sendMessageController.sendMessage();
-        },
-        shouldHandleInputHistoryKey: function (e, direction) {
-            return inputHistoryController.shouldHandleKey(e, direction);
-        },
-        syncSkillPickerFromInput: function () {
-            return slashPickerController.syncFromInput();
-        },
-        syncFilePickerFromInput: function () {
-            return fileReferencePickerController.syncFromInput();
-        },
-        updateSendBtnState: updateSendBtnState,
-        uploadFiles: function (files) {
-            return attachmentController.uploadFiles(files);
-        },
-    });
-
     sidebarController = createSidebarController({
         addProjectBtn: addProjectBtn,
         createNewChat: function (projectId, options) {
-            return sessionController.createNewChat(projectId, options);
+            return requireSessionController().createNewChat(projectId, options);
         },
         currentSessionRefreshIntervalMs: CURRENT_SESSION_REFRESH_INTERVAL_MS,
         deleteSession: function (id) {
-            return sessionController.deleteSession(id);
+            return requireSessionController().deleteSession(id);
         },
         getActiveStreamSessionId: function () {
             return sessionController ? sessionController.getActiveStreamSessionId() : null;
@@ -489,7 +473,7 @@ export function createAnyBotApp(dom, deps) {
             if (slashItemsStore) slashItemsStore.invalidate(providerType);
         },
         loadSession: function (id, options) {
-            return sessionController.loadSession(id, options);
+            return requireSessionController().loadSession(id, options);
         },
         projectList: projectList,
         projectSessionPreviewLimit: PROJECT_SESSION_PREVIEW_LIMIT,
@@ -508,26 +492,8 @@ export function createAnyBotApp(dom, deps) {
         sidebar: sidebar,
         sidebarRefreshIntervalMs: SIDEBAR_REFRESH_INTERVAL_MS,
         updateConversationHeaderTitle: function (title) {
-            return messageListController.updateConversationHeaderTitle(title);
+            return requireMessageListController().updateConversationHeaderTitle(title);
         },
-    });
-    sidebarController.bindRealtimeLifecycle();
-
-    newChatBtn.addEventListener('click', function () {
-        sessionController.createNewChat();
-    });
-    projectToggle.addEventListener('click', function () {
-        sidebarController.toggleProjects();
-    });
-    addProjectBtn.addEventListener('click', function () {
-        return sidebarController.addProject();
-    });
-    historyToggle.addEventListener('click', function () {
-        sidebarController.toggleHistory();
-    });
-    addHistoryChatBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        sessionController.createNewChat(null, { force: true });
     });
 
     messageMetaController = createMessageMetaController({
@@ -546,7 +512,7 @@ export function createAnyBotApp(dom, deps) {
         messagesEl: messagesEl,
         openImageModal: openImageModal,
         prependInputHistoryMessages: function (messages, hasMoreMessages) {
-            return inputHistoryController.prependMessages(messages, hasMoreMessages);
+            return requireInputHistoryController().prependMessages(messages, hasMoreMessages);
         },
         renderMarkdown: renderMarkdown,
         formatTokenCount: formatTokenCount,
@@ -565,83 +531,83 @@ export function createAnyBotApp(dom, deps) {
 
     sessionController = createSessionController({
         clearPromptSkills: function () {
-            return slashPickerController.clearPromptSelections();
+            return requireSlashPickerController().clearPromptSelections();
         },
         closeFilePicker: closeFilePicker,
         clearFileReferences: clearFileReferences,
         clearSessionModelSelection: function (sessionId) {
-            settingsController.clearSessionModelSelection(sessionId);
+            requireSettingsController().clearSessionModelSelection(sessionId);
         },
         expandProject: function (projectId) {
-            return sidebarController.expandProject(projectId);
+            return requireSidebarController().expandProject(projectId);
         },
         fetchModelConfig: function (providerType) {
-            return settingsController.fetchModelConfig(providerType);
+            return requireSettingsController().fetchModelConfig(providerType);
         },
         fetchSessions: function () {
-            return sidebarController.fetchSessions();
+            return requireSidebarController().fetchSessions();
         },
         findSessionSummary: function (id) {
-            return sidebarController.findSessionSummary(id);
+            return requireSidebarController().findSessionSummary(id);
         },
         getActiveProjectId: function () {
-            return sidebarController.getActiveProjectId();
+            return requireSidebarController().getActiveProjectId();
         },
         getCurrentView: function () {
             return getCurrentView();
         },
         getProviderData: function () {
-            return settingsController.getProviderData();
+            return requireSettingsController().getProviderData();
         },
         inputEl: inputEl,
         messagesEl: messagesEl,
         renderHistory: function () {
-            sidebarController.renderHistory();
+            requireSidebarController().renderHistory();
         },
         renderProjects: function () {
-            sidebarController.renderProjects();
+            requireSidebarController().renderProjects();
         },
         removeSessionSummary: function (id) {
-            sidebarController.removeSessionSummary(id);
+            requireSidebarController().removeSessionSummary(id);
         },
         renderSessionMessages: function (messages, hasMoreMessages) {
-            return messageListController.renderSessionMessages(messages, hasMoreMessages);
+            return requireMessageListController().renderSessionMessages(messages, hasMoreMessages);
         },
         appendContextCompactProgress: function (opts) {
-            return messageListController.appendContextCompactProgress(opts);
+            return requireMessageListController().appendContextCompactProgress(opts);
         },
         resetInputHistoryFromMessages: function (messages, hasMoreMessages) {
-            return inputHistoryController.resetFromMessages(messages, hasMoreMessages);
+            return requireInputHistoryController().resetFromMessages(messages, hasMoreMessages);
         },
         resizeChatInput: resizeChatInput,
         revealActiveSessionInSidebar: function () {
-            sidebarController.revealActiveSession();
+            requireSidebarController().revealActiveSession();
         },
         revealSessionContainer: function (projectId) {
-            sidebarController.revealSessionContainer(projectId);
+            requireSidebarController().revealSessionContainer(projectId);
         },
         scrollBottom: function (opts) {
-            return messageListController.scrollBottom(opts);
+            return requireMessageListController().scrollBottom(opts);
         },
         sessionMessagePageSize: SESSION_MESSAGE_PAGE_SIZE,
         setActiveProjectId: function (projectId) {
-            sidebarController.setActiveProjectId(projectId);
+            requireSidebarController().setActiveProjectId(projectId);
         },
         setSendButtonDisabled: function (value) {
             sendBtn.disabled = value;
         },
         showChatView: showChatView,
         showEmptyState: function () {
-            return messageListController.showEmptyState();
+            return requireMessageListController().showEmptyState();
         },
         showError: showError,
         updateContextUsage: updateContextUsage,
         updateConversationHeaderTitle: function (title) {
-            return messageListController.updateConversationHeaderTitle(title);
+            return requireMessageListController().updateConversationHeaderTitle(title);
         },
         updateSendBtnState: updateSendBtnState,
         updateSidebarSelection: function () {
-            sidebarController.updateSelection();
+            requireSidebarController().updateSelection();
         },
     });
 
@@ -649,116 +615,92 @@ export function createAnyBotApp(dom, deps) {
         inputEl: inputEl,
         messagesEl: messagesEl,
         getState: function () {
-            var promptSelection = slashPickerController.getSelection();
+            var promptSelection = requireSlashPickerController().getSelection();
+            var session = requireSessionController();
+            var settings = requireSettingsController();
             return {
-                currentSessionId: sessionController.getCurrentSessionId(),
-                currentSessionProvider: sessionController.getCurrentSessionProvider(),
-                isTyping: sessionController.getIsTyping(),
-                modelConfig: settingsController.getModelConfig(),
+                currentSessionId: session.getCurrentSessionId(),
+                currentSessionProvider: session.getCurrentSessionProvider(),
+                isTyping: session.getIsTyping(),
+                modelConfig: settings.getModelConfig(),
                 pendingAttachments: pendingAttachments,
                 fileReferences: fileReferencePickerController ? fileReferencePickerController.getSelection() : [],
                 promptProjects: promptSelection.projects,
                 promptSkills: promptSelection.skills,
-                providerData: settingsController.getProviderData(),
+                providerData: settings.getProviderData(),
             };
         },
         setPendingAttachments: function (value) {
             pendingAttachments = value;
         },
         setTyping: function (value) {
-            sessionController.setTyping(value);
+            requireSessionController().setTyping(value);
         },
         setCancelling: function (value) {
-            sessionController.setCancelling(value);
+            requireSessionController().setCancelling(value);
         },
         setSendButtonDisabled: function (value) {
             sendBtn.disabled = value;
         },
         setActiveStream: function (controller, sessionId) {
-            sessionController.setActiveStream(controller, sessionId);
+            requireSessionController().setActiveStream(controller, sessionId);
         },
         clearActiveStreamForSession: function (sessionId) {
-            sessionController.clearActiveStreamForSession(sessionId);
+            requireSessionController().clearActiveStreamForSession(sessionId);
         },
         setCurrentSessionProvider: function (provider) {
-            sessionController.setCurrentSessionProvider(provider);
+            requireSessionController().setCurrentSessionProvider(provider);
         },
         startCompactProgress: function (sessionId, startedAt) {
-            sessionController.startActiveCompact(sessionId, startedAt);
+            requireSessionController().startActiveCompact(sessionId, startedAt);
         },
         finishCompactProgress: function (sessionId, result) {
-            return sessionController.finishActiveCompact(sessionId, result);
+            return requireSessionController().finishActiveCompact(sessionId, result);
         },
         cancelCompactProgress: function (sessionId, label) {
-            return sessionController.cancelActiveCompact(sessionId, label);
+            return requireSessionController().cancelActiveCompact(sessionId, label);
         },
         failCompactProgress: function (sessionId, label) {
-            return sessionController.failActiveCompact(sessionId, label);
+            return requireSessionController().failActiveCompact(sessionId, label);
         },
         appendMessage: function (role, text, attachments, changeReview, opts) {
-            return messageListController.appendMessage(role, text, attachments, changeReview, opts);
+            return requireMessageListController().appendMessage(role, text, attachments, changeReview, opts);
         },
         appendContextCompactDivider: function (text, opts) {
-            return messageListController.appendContextCompactDivider(text, opts);
+            return requireMessageListController().appendContextCompactDivider(text, opts);
         },
         appendContextCompactProgress: function (opts) {
-            return messageListController.appendContextCompactProgress(opts);
+            return requireMessageListController().appendContextCompactProgress(opts);
         },
         clearPromptSkills: function () {
-            return slashPickerController.clearPromptSelections();
+            return requireSlashPickerController().clearPromptSelections();
         },
         clearFileReferences: clearFileReferences,
         fetchSessions: function () {
-            return sidebarController.fetchSessions();
+            return requireSidebarController().fetchSessions();
         },
         rememberSentUserMessage: function (text, skills, projects, files) {
-            return inputHistoryController.rememberSentUserMessage(text, skills, projects, files);
+            return requireInputHistoryController().rememberSentUserMessage(text, skills, projects, files);
         },
         removeTyping: function () {
-            return messageListController.removeTyping();
+            return requireMessageListController().removeTyping();
         },
         renderAttachmentPreview: function () {
-            return attachmentController.renderPreview();
+            return requireAttachmentController().renderPreview();
         },
         resizeChatInput: resizeChatInput,
         scrollBottom: function (opts) {
-            return messageListController.scrollBottom(opts);
+            return requireMessageListController().scrollBottom(opts);
         },
         showError: showError,
         showTyping: function () {
-            return messageListController.showTyping();
+            return requireMessageListController().showTyping();
         },
         updateContextUsage: updateContextUsage,
         updateConversationHeaderTitle: function (title) {
-            return messageListController.updateConversationHeaderTitle(title);
+            return requireMessageListController().updateConversationHeaderTitle(title);
         },
         updateSendBtnState: updateSendBtnState,
-    });
-
-    documentRef.addEventListener('click', function (e) {
-        if (slashPickerController.isOpen() && skillPickerEl && e.target !== inputEl && !skillPickerEl.contains(e.target)) {
-            closeSkillPicker();
-        }
-        if (fileReferencePickerController.isOpen() && filePickerEl && e.target !== inputEl && !filePickerEl.contains(e.target)) {
-            closeFilePicker();
-        }
-        settingsController.handleDocumentClick(e);
-    });
-
-    documentRef.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-            if (fileReferencePickerController.isOpen()) {
-                closeFilePicker();
-                if (documentRef.activeElement === inputEl) inputEl.focus();
-                return;
-            }
-            if (slashPickerController.isOpen()) {
-                closeSkillPicker({ removeTrigger: documentRef.activeElement === inputEl });
-                if (documentRef.activeElement === inputEl) inputEl.focus();
-                return;
-            }
-            if (settingsController.handleDocumentEscape(e)) return;
-        }
     });
 
     channelsPageController = createChannelsPageController({
@@ -831,10 +773,10 @@ export function createAnyBotApp(dom, deps) {
             return channelsPageController.render();
         },
         renderHistory: function () {
-            sidebarController.renderHistory();
+            requireSidebarController().renderHistory();
         },
         renderProjects: function () {
-            sidebarController.renderProjects();
+            requireSidebarController().renderProjects();
         },
         renderSkillsPage: function () {
             return skillsPageController.render();
@@ -844,7 +786,6 @@ export function createAnyBotApp(dom, deps) {
         skillsBtn: skillsBtn,
         skillsView: skillsView,
     });
-    viewRouter.bindNavigation();
 
     function getCurrentView() {
         return viewRouter ? viewRouter.getCurrentView() : 'chat';
@@ -858,28 +799,151 @@ export function createAnyBotApp(dom, deps) {
         if (viewRouter) viewRouter.showSettingsView();
     }
 
+    function bindAppEvents() {
+        if (appEventsBound) return;
+        appEventsBound = true;
+
+        bindChatInputEvents({
+            attachBtn: attachBtn,
+            cancelCurrentResponse: function () {
+                return requireSessionController().cancelCurrentResponse();
+            },
+            canOpenSkillPickerFromSlash: function (e) {
+                return requireSlashPickerController().canOpenFromSlash(e);
+            },
+            chatViewEl: chatView,
+            clearPromptSkillDeleteTarget: function () {
+                return requireSlashPickerController().clearDeleteTarget();
+            },
+            clearFileDeleteTarget: function () {
+                return requireFileReferencePickerController().clearDeleteTarget();
+            },
+            closeFilePicker: closeFilePicker,
+            dropOverlay: dropOverlay,
+            fileInput: fileInput,
+            getIsTyping: function () {
+                return sessionController ? sessionController.getIsTyping() : false;
+            },
+            handlePromptSkillBackspace: function (e) {
+                return requireSlashPickerController().handlePromptBackspace(e);
+            },
+            handleFilePickerKeydown: function (e) {
+                return requireFileReferencePickerController().handleKeydown(e);
+            },
+            handleFileReferenceDelete: function (e) {
+                return requireFileReferencePickerController().handleSelectedFileDelete(e);
+            },
+            handleSkillPickerKeydown: function (e) {
+                return requireSlashPickerController().handleKeydown(e);
+            },
+            inputEl: inputEl,
+            inputWrapper: inputWrapper,
+            insertSkillSlashTrigger: function () {
+                return requireSlashPickerController().insertSlashTrigger();
+            },
+            navigateInputHistory: function (direction) {
+                return requireInputHistoryController().navigate(direction);
+            },
+            resetInputHistoryNavigation: function () {
+                return requireInputHistoryController().resetNavigation();
+            },
+            resizeChatInput: resizeChatInput,
+            sendBtn: sendBtn,
+            sendMessage: function () {
+                return requireSendMessageController().sendMessage();
+            },
+            shouldHandleInputHistoryKey: function (e, direction) {
+                return requireInputHistoryController().shouldHandleKey(e, direction);
+            },
+            syncSkillPickerFromInput: function () {
+                return requireSlashPickerController().syncFromInput();
+            },
+            syncFilePickerFromInput: function () {
+                return requireFileReferencePickerController().syncFromInput();
+            },
+            updateSendBtnState: updateSendBtnState,
+            uploadFiles: function (files) {
+                return requireAttachmentController().uploadFiles(files);
+            },
+        });
+
+        newChatBtn.addEventListener('click', function () {
+            requireSessionController().createNewChat();
+        });
+        projectToggle.addEventListener('click', function () {
+            requireSidebarController().toggleProjects();
+        });
+        addProjectBtn.addEventListener('click', function () {
+            return requireSidebarController().addProject();
+        });
+        historyToggle.addEventListener('click', function () {
+            requireSidebarController().toggleHistory();
+        });
+        addHistoryChatBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            requireSessionController().createNewChat(null, { force: true });
+        });
+
+        documentRef.addEventListener('click', function (e) {
+            var slashPicker = requireSlashPickerController();
+            var filePicker = requireFileReferencePickerController();
+            if (slashPicker.isOpen() && skillPickerEl && e.target !== inputEl && !skillPickerEl.contains(e.target)) {
+                closeSkillPicker();
+            }
+            if (filePicker.isOpen() && filePickerEl && e.target !== inputEl && !filePickerEl.contains(e.target)) {
+                closeFilePicker();
+            }
+            requireSettingsController().handleDocumentClick(e);
+        });
+
+        documentRef.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                var filePicker = requireFileReferencePickerController();
+                var slashPicker = requireSlashPickerController();
+                if (filePicker.isOpen()) {
+                    closeFilePicker();
+                    if (documentRef.activeElement === inputEl) inputEl.focus();
+                    return;
+                }
+                if (slashPicker.isOpen()) {
+                    closeSkillPicker({ removeTrigger: documentRef.activeElement === inputEl });
+                    if (documentRef.activeElement === inputEl) inputEl.focus();
+                    return;
+                }
+                if (requireSettingsController().handleDocumentEscape(e)) return;
+            }
+        });
+
+        requireViewRouter().bindNavigation();
+        requireSidebarController().bindRealtimeLifecycle();
+    }
+
     async function init() {
-        sidebarController.setupTooltips();
+        bindAppEvents();
+        var sidebar = requireSidebarController();
+        var settings = requireSettingsController();
+        var session = requireSessionController();
+        sidebar.setupTooltips();
         if (inputUiController) inputUiController.startPlaceholderRotation();
-        sidebarController.updateProjectsCollapsedState();
-        sidebarController.updateHistoryCollapsedState();
+        sidebar.updateProjectsCollapsedState();
+        sidebar.updateHistoryCollapsedState();
         await Promise.all([
-            sidebarController.fetchProjects(),
-            sidebarController.fetchSessions(),
-            settingsController.fetchModelConfig(),
-            settingsController.fetchProviders(),
-            settingsController.fetchSandboxConfig(),
-            settingsController.fetchAppSettings(),
-            settingsController.fetchProxyConfig(),
+            sidebar.fetchProjects(),
+            sidebar.fetchSessions(),
+            settings.fetchModelConfig(),
+            settings.fetchProviders(),
+            settings.fetchSandboxConfig(),
+            settings.fetchAppSettings(),
+            settings.fetchProxyConfig(),
         ]);
-        settingsController.startDesktopUpdateStatusRefresh();
-        var initialSessions = sidebarController.getSessions();
+        settings.startDesktopUpdateStatusRefresh();
+        var initialSessions = sidebar.getSessions();
         if (initialSessions.length > 0) {
-            await sessionController.loadSession(initialSessions[0].id);
+            await session.loadSession(initialSessions[0].id);
         } else {
-            await sessionController.createNewChat();
+            await session.createNewChat();
         }
-        sidebarController.startRealtimeEvents();
+        sidebar.startRealtimeEvents();
         inputEl.focus();
     }
 
