@@ -113,11 +113,11 @@ export function createChannelsPageController(options) {
             fieldsHtml =
                 '<div class="channel-drawer-field">' +
                 '<label class="channel-drawer-field-label">Bot Token</label>' +
-                '<input class="channel-drawer-input auto-filled" id="ch-token-' + type + '" type="password" value="' + escapeHtml(cfg.token || '') + '" spellcheck="false" readonly>' +
+                '<input class="channel-drawer-input" id="ch-token-' + type + '" type="password" value="' + escapeHtml(cfg.token || '') + '" placeholder="输入或扫码后自动填入" spellcheck="false">' +
                 '</div>' +
                 '<div class="channel-drawer-field">' +
                 '<label class="channel-drawer-field-label">Account ID</label>' +
-                '<input class="channel-drawer-input auto-filled" id="ch-account-' + type + '" value="' + escapeHtml(cfg.accountId || '') + '" spellcheck="false" readonly>' +
+                '<input class="channel-drawer-input" id="ch-account-' + type + '" value="' + escapeHtml(cfg.accountId || '') + '" placeholder="输入或扫码后自动填入" spellcheck="false">' +
                 '</div>';
         } else if (type === 'dingtalk') {
             fieldsHtml =

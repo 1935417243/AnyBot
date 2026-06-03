@@ -32,6 +32,7 @@ const LONG_POLL_TIMEOUT_MS = 35_000;
 const API_TIMEOUT_MS = 15_000;
 const CDN_UPLOAD_TIMEOUT_MS = 60_000;
 const CDN_DOWNLOAD_TIMEOUT_MS = 60_000;
+const WEIXIN_RETRY_ATTEMPTS = 3;
 const LOGIN_TIMEOUT_MS = 8 * 60_000;
 const SESSION_EXPIRED_ERRCODE = -14;
 const MAX_WEIXIN_MEDIA_SIZE_BYTES = 50 * 1024 * 1024;
@@ -645,27 +646,29 @@ export class WeixinChannel implements IChannel {
       throw new Error("Weixin channel is not started");
     }
     const clientId = `anybot-weixin:${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-    const raw = await apiPost({
-      baseUrl: this.config.baseUrl,
-      endpoint: "ilink/bot/sendmessage",
-      body: {
-        msg: {
-          from_user_id: "",
-          to_user_id: to,
-          client_id: clientId,
-          message_type: MessageType.BOT,
-          message_state: MessageState.FINISH,
-          item_list: items.length > 0 ? items : undefined,
-          context_token: contextToken || this.contextTokens.get(to) || undefined,
+    await retryWeixinOperation("weixin.sendmessage", async () => {
+      const raw = await apiPost({
+        baseUrl: this.config!.baseUrl,
+        endpoint: "ilink/bot/sendmessage",
+        body: {
+          msg: {
+            from_user_id: "",
+            to_user_id: to,
+            client_id: clientId,
+            message_type: MessageType.BOT,
+            message_state: MessageState.FINISH,
+            item_list: items.length > 0 ? items : undefined,
+            context_token: contextToken || this.contextTokens.get(to) || undefined,
+          },
+          base_info: buildBaseInfo(this.config!.botAgent),
         },
-        base_info: buildBaseInfo(this.config.botAgent),
-      },
-      token: this.config.token,
-      botAgent: this.config.botAgent,
-      label: "weixin.sendmessage",
-      timeoutMs: API_TIMEOUT_MS,
+        token: this.config!.token,
+        botAgent: this.config!.botAgent,
+        label: "weixin.sendmessage",
+        timeoutMs: API_TIMEOUT_MS,
+      });
+      assertIlinkOk(raw, "weixin.sendmessage");
     });
-    assertIlinkOk(raw, "weixin.sendmessage");
     logger.info("weixin.send_items.success", { to, clientId, itemCount: items.length });
   }
 
@@ -727,19 +730,22 @@ export class WeixinChannel implements IChannel {
     if (!this.config?.token) {
       throw new Error("Weixin channel is not started");
     }
-    const raw = await apiPost({
-      baseUrl: this.config.baseUrl,
-      endpoint: "ilink/bot/getuploadurl",
-      body: {
-        ...body,
-        base_info: buildBaseInfo(this.config.botAgent),
-      },
-      token: this.config.token,
-      botAgent: this.config.botAgent,
-      label: "weixin.getuploadurl",
-      timeoutMs: API_TIMEOUT_MS,
+    const raw = await retryWeixinOperation("weixin.getuploadurl", async () => {
+      const response = await apiPost({
+        baseUrl: this.config!.baseUrl,
+        endpoint: "ilink/bot/getuploadurl",
+        body: {
+          ...body,
+          base_info: buildBaseInfo(this.config!.botAgent),
+        },
+        token: this.config!.token,
+        botAgent: this.config!.botAgent,
+        label: "weixin.getuploadurl",
+        timeoutMs: API_TIMEOUT_MS,
+      });
+      assertIlinkOk(response, "weixin.getuploadurl");
+      return response;
     });
-    assertIlinkOk(raw, "weixin.getuploadurl");
     const parsed = JSON.parse(raw) as GetUploadUrlResp;
     if (!parsed.upload_param && !parsed.upload_full_url) {
       throw new Error(`weixin.getuploadurl returned no upload URL: ${raw}`);
@@ -913,7 +919,7 @@ async function uploadBufferToCdn(params: {
   const url = buildCdnUploadUrl(params);
   let lastError: unknown;
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= WEIXIN_RETRY_ATTEMPTS; attempt += 1) {
     try {
       const res = await fetchWithTimeout(url, {
         method: "POST",
@@ -938,7 +944,8 @@ async function uploadBufferToCdn(params: {
       if (error instanceof Error && error.message.includes("client error")) {
         throw error;
       }
-      if (attempt < 3) {
+      if (attempt < WEIXIN_RETRY_ATTEMPTS) {
+        logger.warn("weixin.cdn_upload.retry", { attempt, error });
         await sleep(500 * attempt);
       }
     }
@@ -949,15 +956,18 @@ async function uploadBufferToCdn(params: {
 
 async function downloadCdnMedia(media: CDNMedia, imageAesKey: string | undefined, filePath: string): Promise<void> {
   const key = decodeAesKey(imageAesKey || media.aes_key);
-  const res = await fetchWithTimeout(buildCdnDownloadUrl(media), {
-    method: "GET",
-  }, CDN_DOWNLOAD_TIMEOUT_MS);
-  if (!res.ok) {
-    throw new Error(`Weixin CDN download failed ${res.status}: ${await res.text()}`);
-  }
-  const ciphertext = Buffer.from(await res.arrayBuffer());
-  const plaintext = decryptAesEcb(ciphertext, key);
-  await writeFile(filePath, plaintext);
+  const url = buildCdnDownloadUrl(media);
+  await retryWeixinOperation("weixin.cdn_download", async () => {
+    const res = await fetchWithTimeout(url, {
+      method: "GET",
+    }, CDN_DOWNLOAD_TIMEOUT_MS);
+    if (!res.ok) {
+      throw new Error(`Weixin CDN download failed ${res.status}: ${await res.text()}`);
+    }
+    const ciphertext = Buffer.from(await res.arrayBuffer());
+    const plaintext = decryptAesEcb(ciphertext, key);
+    await writeFile(filePath, plaintext);
+  });
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
@@ -1004,6 +1014,43 @@ function assertIlinkOk(raw: string, label: string): void {
     if (error instanceof SyntaxError) return;
     throw error;
   }
+}
+
+async function retryWeixinOperation<T>(
+  label: string,
+  operation: () => Promise<T>,
+  attempts = WEIXIN_RETRY_ATTEMPTS,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts || !isRetryableWeixinError(error)) {
+        throw error;
+      }
+      logger.warn("weixin.operation.retry", {
+        label,
+        attempt,
+        error,
+      });
+      await sleep(500 * attempt);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
+}
+
+function isRetryableWeixinError(error: unknown): boolean {
+  if (!(error instanceof Error)) return true;
+  const message = error.message;
+  if (/\b4\d\d:/.test(message) && !/\b429:/.test(message)) {
+    return false;
+  }
+  if (/client error 4\d\d/i.test(message) && !/client error 429/i.test(message)) {
+    return false;
+  }
+  return true;
 }
 
 function normalizeConfig(config: WeixinChannelConfig): WeixinChannelConfig {
