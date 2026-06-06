@@ -38,7 +38,7 @@ import {logger} from "../logger.js";
 import {DEFAULT_SANDBOX} from "../sandbox-config.js";
 import type {SandboxMode} from "../types.js";
 import {getClaudeConfigDir, getClaudeSkillsDir, getIsolatedClaudeConfigDir} from "../claude-config.js";
-import {getClaudeMcpServersConfig} from "../web/services/mcp.js";
+import {getClaudeMcpServersConfig} from "../mcp-config.js";
 
 const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
 const require = createRequire(import.meta.url);

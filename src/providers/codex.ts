@@ -41,7 +41,7 @@ import { DEFAULT_PROVIDER_TIMEOUT_MS } from "../app-settings.js";
 import { registerCodexAdapterStream } from "../codex-adapter-stream.js";
 import { resolveExecutable } from "../utils/process.js";
 import { getCodexHome, getCodexSkillsDir, getIsolatedCodexHome } from "../codex-config.js";
-import { getCodexMcpServersConfig } from "../web/services/mcp.js";
+import { getCodexMcpServersConfig } from "../mcp-config.js";
 
 export class ProviderTimeoutError extends Error {
   constructor(timeoutMs: number) {

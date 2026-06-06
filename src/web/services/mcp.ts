@@ -1,6 +1,7 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { readAppSettings, writeAppSettings, type McpServerSettings } from "../../app-settings.js";
 import { logger } from "../../logger.js";
+import { getMcpServersMap } from "../../mcp-config.js";
 import { killProcessTree, spawnCommand } from "../../utils/process.js";
 
 export type McpServerRuntimeStatus = "not_started" | "starting" | "running" | "failed" | "disabled";
@@ -50,7 +51,6 @@ const MCP_LIST_TOOLS_GRACE_MS = 1500;
 const MAX_MCP_VERIFY_TIMEOUT_MS = 60_000;
 const MAX_LOGS_PER_SERVER = 100;
 const INVALID_SERVER_NAME_PATTERN = /[\u0000-\u001f\u007f]/;
-const CODEX_BARE_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 const runtimeStateById = new Map<string, RuntimeState>();
 const logsByServerId = new Map<string, McpServerLogEntry[]>();
@@ -82,7 +82,7 @@ function getRuntimeState(server: McpServerSettings): RuntimeState {
 }
 
 function getServersMap(): Record<string, McpServerSettings> {
-  return readAppSettings().mcp.servers || {};
+  return getMcpServersMap();
 }
 
 function saveServersMap(servers: Record<string, McpServerSettings>): void {
@@ -744,30 +744,4 @@ export function deleteMcpServer(serverId: string): McpServerPublicView[] {
   saveServersMap(servers);
   logger.info("mcp.server.deleted", { id: serverId });
   return listMcpServers();
-}
-
-export function getClaudeMcpServersConfig(): Record<string, Record<string, unknown>> | undefined {
-  const entries = Object.values(getServersMap())
-    .filter((server) => server.enabled)
-    .map((server) => [server.id, { ...server.config }]);
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
-}
-
-function formatCodexMcpServerKey(serverId: string): string {
-  return CODEX_BARE_KEY_PATTERN.test(serverId) ? serverId : JSON.stringify(serverId);
-}
-
-export function getCodexMcpServersConfig(): Record<string, Record<string, unknown>> | undefined {
-  const entries = Object.values(getServersMap())
-    .filter((server) => server.enabled)
-    .map((server) => {
-      const config: Record<string, unknown> = { ...server.config };
-      if (config.headers && !config.http_headers) {
-        config.http_headers = config.headers;
-      }
-      delete config.headers;
-      delete config.type;
-      return [formatCodexMcpServerKey(server.id), config];
-    });
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
