@@ -382,6 +382,15 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .automation-run-card:hover,
+        .automation-run-card:focus-visible {
+            background: var(--sidebar-hover);
+            border-color: rgba(124, 111, 247, 0.25);
         }
 
         .automation-run-main {

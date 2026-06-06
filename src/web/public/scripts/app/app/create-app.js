@@ -730,6 +730,9 @@ export function createAnyBotApp(dom, deps) {
             return slashItemsStore ? slashItemsStore.getActiveProviderType() : '';
         },
         getChannelMeta: getChannelMeta,
+        openSession: function (sessionId) {
+            return requireSessionController().loadSession(sessionId, { force: true });
+        },
         showError: showError,
     });
 

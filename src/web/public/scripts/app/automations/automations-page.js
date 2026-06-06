@@ -493,7 +493,7 @@ export function createAutomationsPageController(options) {
             return;
         }
         container.innerHTML = runs.map(function (run) {
-            return '<div class="automation-run-card">' +
+            return '<div class="automation-run-card" role="button" tabindex="0" data-session-id="' + escapeHtml(run.sessionId || '') + '">' +
                 '<div class="automation-run-main">' +
                 '<div class="automation-run-badges">' +
                 '<span class="automation-run-status ' + runStatusClass(run.status) + '">' + escapeHtml(runStatusLabel(run.status)) + '</span>' +
@@ -505,6 +505,16 @@ export function createAutomationsPageController(options) {
                 '<div class="automation-run-time">' + escapeHtml(formatTimestamp(run.startedAt || run.createdAt)) + '</div>' +
                 '</div>';
         }).join('');
+        container.querySelectorAll('.automation-run-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                openRunSession(card.dataset.sessionId);
+            });
+            card.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                openRunSession(card.dataset.sessionId);
+            });
+        });
     }
 
     function runStatusClass(status) {
@@ -512,6 +522,19 @@ export function createAutomationsPageController(options) {
         if (status === 'failed') return 'failed';
         if (status === 'running') return 'running';
         return 'pending';
+    }
+
+    async function openRunSession(sessionId) {
+        if (!sessionId) {
+            showError('这条运行记录没有对应对话');
+            return;
+        }
+        if (!options.openSession) {
+            showError('无法打开对应对话');
+            return;
+        }
+        closeDrawers();
+        await options.openSession(sessionId);
     }
 
     function detailBlock(label, valueHtml) {
