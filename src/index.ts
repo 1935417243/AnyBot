@@ -1,4 +1,5 @@
 import { applyProxy } from "./proxy.js";
+import { ensureExecutablePathEnv } from "./utils/process.js";
 import { getConfiguredWebPort } from "./app-settings.js";
 import { createApp } from "./web/server.js";
 
@@ -47,6 +48,8 @@ import {
   runPreparedChatTurn,
 } from "./chat-runner.js";
 import * as db from "./web/db.js";
+
+ensureExecutablePathEnv();
 
 function resolveInitialProviderType(): string {
   const persisted = readPersistedProviderType();
