@@ -15,7 +15,7 @@ const MCP_EXAMPLE_JSON = `{
 
 const STATUS_LABELS = {
     not_started: '未启动',
-    starting: '启动中',
+    starting: '准备中...',
     running: '运行中',
     failed: '启动失败',
     disabled: '已禁用',
@@ -130,9 +130,12 @@ export function createSettingsMcpController(options) {
         renderServers();
     }
 
-    function setLocalStarting(serverId) {
+    function setLocalStarting(serverId, enabled) {
         servers = servers.map(function (server) {
-            return server.id === serverId ? Object.assign({}, server, { status: 'starting', error: '' }) : server;
+            if (server.id !== serverId) return server;
+            var next = { status: 'starting', error: '' };
+            if (typeof enabled === 'boolean') next.enabled = enabled;
+            return Object.assign({}, server, next);
         });
         renderServers();
     }
@@ -147,7 +150,14 @@ export function createSettingsMcpController(options) {
     }
 
     async function toggleServer(serverId, enabled) {
-        setLocalStarting(serverId);
+        if (enabled) {
+            setLocalStarting(serverId, true);
+        } else {
+            servers = servers.map(function (server) {
+                return server.id === serverId ? Object.assign({}, server, { enabled: false, status: 'disabled', error: '' }) : server;
+            });
+            renderServers();
+        }
         try {
             var data = await requestJson('/api/mcp/servers/' + encodeURIComponent(serverId) + '/enabled', {
                 method: 'PATCH',
