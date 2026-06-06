@@ -1297,21 +1297,17 @@
         }
 
         .mcp-page-header {
-            min-height: 88px;
-            padding: 20px;
+            position: relative;
+            padding: 18px 20px;
             border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 18px;
             flex-shrink: 0;
         }
 
         .mcp-page-title {
             color: var(--text);
-            font-size: 18px;
+            font-size: 15px;
             font-weight: 700;
-            line-height: 1.25;
+            line-height: normal;
         }
 
         .mcp-page-desc {
@@ -1322,6 +1318,10 @@
         }
 
         .mcp-header-actions {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -2023,8 +2023,10 @@
             }
 
             .mcp-page-header {
+                display: flex;
                 align-items: stretch;
                 flex-direction: column;
+                gap: 12px;
             }
 
             .mcp-server-item {
@@ -2036,6 +2038,8 @@
             }
 
             .mcp-header-actions {
+                position: static;
+                transform: none;
                 width: 100%;
             }
 
