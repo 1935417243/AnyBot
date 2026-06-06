@@ -307,6 +307,29 @@ export function createSettingsMcpController(options) {
             '</div>';
     }
 
+    function positionOpenServerMenu() {
+        if (!settingsMcpServerList || !openMenuServerId) return;
+        var openControl = null;
+        Array.prototype.some.call(settingsMcpServerList.querySelectorAll('.mcp-server-item'), function (item) {
+            if (item.dataset.serverId !== openMenuServerId) return false;
+            openControl = item.querySelector('.mcp-more-control');
+            return true;
+        });
+        if (!openControl) return;
+        openControl.classList.remove('drop-up');
+
+        var menu = openControl.querySelector('.mcp-more-menu');
+        if (!menu) return;
+        var listRect = settingsMcpServerList.getBoundingClientRect();
+        var controlRect = openControl.getBoundingClientRect();
+        var menuRect = menu.getBoundingClientRect();
+        var spaceBelow = listRect.bottom - controlRect.bottom;
+        var spaceAbove = controlRect.top - listRect.top;
+        if (menuRect.bottom > listRect.bottom && spaceAbove > spaceBelow) {
+            openControl.classList.add('drop-up');
+        }
+    }
+
     function renderServers() {
         if (!settingsMcpServerList) return;
         if (loading && !servers.length) {
@@ -320,6 +343,7 @@ export function createSettingsMcpController(options) {
             return;
         }
         settingsMcpServerList.innerHTML = servers.map(buildServerHtml).join('');
+        positionOpenServerMenu();
         syncStatusPolling();
     }
 
@@ -466,6 +490,7 @@ export function createSettingsMcpController(options) {
         if (action === 'menu') {
             setOpenMenuServerId(openMenuServerId === serverId ? '' : serverId);
         } else if (action === 'retry') {
+            setOpenMenuServerId('');
             checkServer(serverId, 'MCP Server 已重新检查');
         } else if (action === 'edit') {
             setOpenMenuServerId('');
@@ -487,14 +512,21 @@ export function createSettingsMcpController(options) {
         if (!actionTarget) return;
         var item = actionTarget.closest('.mcp-server-item');
         if (!item) return;
-        toggleServer(item.dataset.serverId || '', actionTarget.checked);
+        var serverId = item.dataset.serverId || '';
+        var enabled = actionTarget.checked;
+        setOpenMenuServerId('');
+        toggleServer(serverId, enabled);
     }
 
     function handleDocumentClick(e) {
         if (settingsMcpAddControl && !settingsMcpAddControl.contains(e.target)) {
             setAddMenuOpen(false);
         }
-        if (settingsMcpServerList && !settingsMcpServerList.contains(e.target) && openMenuServerId) {
+        if (!openMenuServerId) return;
+        var openControl = settingsMcpServerList
+            ? settingsMcpServerList.querySelector('.mcp-more-control.open')
+            : null;
+        if (!openControl || !openControl.contains(e.target)) {
             setOpenMenuServerId('');
         }
     }
@@ -530,6 +562,7 @@ export function createSettingsMcpController(options) {
     if (settingsMcpAddBtn) {
         settingsMcpAddBtn.addEventListener('click', function (e) {
             e.stopPropagation();
+            setOpenMenuServerId('');
             setAddMenuOpen(!addMenuOpen);
         });
     }

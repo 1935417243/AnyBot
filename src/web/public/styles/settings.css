@@ -1347,6 +1347,11 @@
             display: flex;
         }
 
+        .mcp-more-control.drop-up .mcp-more-menu {
+            top: auto;
+            bottom: calc(100% + 6px);
+        }
+
         .mcp-add-menu button,
         .mcp-more-menu button {
             min-height: 32px;
