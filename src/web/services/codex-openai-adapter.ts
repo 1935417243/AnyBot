@@ -38,6 +38,7 @@ type ResponsesOutputItem = {
   content?: Array<{ type: string; text?: string }>;
   call_id?: string;
   name?: string;
+  namespace?: string;
   arguments?: string;
   summary?: Array<{ type: string; text: string; signature?: string }>;
 };
@@ -115,9 +116,27 @@ type ThinkingState = {
   byTextHash: Map<string, AnthropicContentBlock>;
 };
 
+type ResponseToolIdentity = {
+  name: string;
+  namespace?: string;
+};
+
+type ToolConversion = {
+  tools?: AnthropicRequest["tools"];
+  responseToolByAnthropicName: Map<string, ResponseToolIdentity>;
+  anthropicNameByResponseTool: Map<string, string>;
+  uniqueNamespacedToolByBareName: Map<string, ResponseToolIdentity>;
+};
+
+type AnthropicRequestConversion = {
+  request: AnthropicRequest;
+  toolConversion: ToolConversion;
+};
+
 const DEFAULT_MAX_TOKENS = 65536;
 const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
 const MAX_SESSION_STATES = 200;
+const MAX_ANTHROPIC_TOOL_NAME_LENGTH = 64;
 const thinkingStates = new Map<string, ThinkingState>();
 
 function getString(value: unknown): string {
@@ -205,7 +224,59 @@ function parseJsonObject(text: string): unknown {
   }
 }
 
-function contentPartsToBlocks(content: unknown, role: string): AnthropicContentBlock[] {
+function responseToolKey(name: string, namespace?: string): string {
+  return `${namespace || ""}\u0000${name}`;
+}
+
+function buildNamespacedToolName(name: string, namespace?: string): string {
+  if (!namespace) return name;
+  return namespace.endsWith("__") ? `${namespace}${name}` : `${namespace}__${name}`;
+}
+
+function normalizeAnthropicToolName(rawName: string, usedNames: Set<string>): string {
+  const normalized = rawName.replace(/[^A-Za-z0-9_-]/g, "_") || "tool";
+  const suffix = `_${hashText(rawName).slice(0, 8)}`;
+  const base = normalized.length > MAX_ANTHROPIC_TOOL_NAME_LENGTH
+    ? `${normalized.slice(0, MAX_ANTHROPIC_TOOL_NAME_LENGTH - suffix.length)}${suffix}`
+    : normalized;
+  let candidate = base;
+  let index = 2;
+  while (usedNames.has(candidate)) {
+    const collisionSuffix = `_${index}`;
+    const truncated = base.slice(0, MAX_ANTHROPIC_TOOL_NAME_LENGTH - collisionSuffix.length);
+    candidate = `${truncated}${collisionSuffix}`;
+    index += 1;
+  }
+  usedNames.add(candidate);
+  return candidate;
+}
+
+function resolveAnthropicToolUseName(
+  name: string,
+  namespace: string | undefined,
+  toolConversion: ToolConversion | undefined,
+): string {
+  if (!toolConversion) return buildNamespacedToolName(name, namespace);
+  return toolConversion.anthropicNameByResponseTool.get(responseToolKey(name, namespace))
+    || buildNamespacedToolName(name, namespace);
+}
+
+function resolveResponseToolIdentity(
+  anthropicName: string | undefined,
+  toolConversion: ToolConversion | undefined,
+): ResponseToolIdentity {
+  const name = anthropicName || "tool";
+  if (!toolConversion) return { name };
+  return toolConversion.responseToolByAnthropicName.get(name)
+    || toolConversion.uniqueNamespacedToolByBareName.get(name)
+    || { name };
+}
+
+function contentPartsToBlocks(
+  content: unknown,
+  role: string,
+  toolConversion?: ToolConversion,
+): AnthropicContentBlock[] {
   if (typeof content === "string") return textBlock(content);
   if (!Array.isArray(content)) return textBlock(getString(content));
 
@@ -221,10 +292,12 @@ function contentPartsToBlocks(content: unknown, role: string): AnthropicContentB
     } else if (type === "refusal") {
       blocks.push(...textBlock(getString(item.refusal)));
     } else if (role === "assistant" && type === "tool_use") {
+      const name = getString(item.name);
+      const namespace = getString(item.namespace) || undefined;
       blocks.push({
         type: "tool_use",
         id: getString(item.id) || getString(item.call_id) || `call_${randomUUID()}`,
-        name: getString(item.name),
+        name: resolveAnthropicToolUseName(name, namespace, toolConversion),
         input: item.input || {},
       });
     }
@@ -251,7 +324,12 @@ function ensureThinkingBeforeToolUse(blocks: AnthropicContentBlock[], fallback?:
   return [fallback || { type: "thinking", thinking: "" }, ...blocks];
 }
 
-function inputToMessages(input: unknown, instructions: string | undefined, req: Request): {
+function inputToMessages(
+  input: unknown,
+  instructions: string | undefined,
+  req: Request,
+  toolConversion?: ToolConversion,
+): {
   messages: AnthropicMessage[];
   system: AnthropicContentBlock[];
 } {
@@ -283,11 +361,11 @@ function inputToMessages(input: unknown, instructions: string | undefined, req: 
 
     if (type === "message" || role === "user" || role === "assistant" || role === "system") {
       if (role === "system") {
-        system.push(...contentPartsToBlocks(item.content, role));
+        system.push(...contentPartsToBlocks(item.content, role, toolConversion));
         continue;
       }
       const targetRole = role === "assistant" ? "assistant" : "user";
-      let blocks = contentPartsToBlocks(item.content, targetRole);
+      let blocks = contentPartsToBlocks(item.content, targetRole, toolConversion);
       if (targetRole === "assistant" && pendingReasoning.length > 0) {
         blocks = [...pendingReasoning, ...blocks];
         pendingReasoning = [];
@@ -298,11 +376,13 @@ function inputToMessages(input: unknown, instructions: string | undefined, req: 
 
     if (type === "function_call" || type === "custom_tool_call" || type === "local_shell_call") {
       const callId = getString(item.call_id) || getString(item.id) || `call_${randomUUID()}`;
+      const name = getString(item.name) || getString(item.tool_name) || "tool";
+      const namespace = getString(item.namespace) || undefined;
       let blocks: AnthropicContentBlock[] = [
         {
           type: "tool_use",
           id: callId,
-          name: getString(item.name) || getString(item.tool_name) || "tool",
+          name: resolveAnthropicToolUseName(name, namespace, toolConversion),
           input: parseJsonObject(getString(item.arguments) || getString(item.input)),
         },
       ];
@@ -328,29 +408,63 @@ function inputToMessages(input: unknown, instructions: string | undefined, req: 
   return { messages, system };
 }
 
-function convertTools(tools: ResponsesTool[] | undefined): AnthropicRequest["tools"] {
-  if (!Array.isArray(tools)) return undefined;
+function convertTools(tools: ResponsesTool[] | undefined): ToolConversion {
   const converted: AnthropicRequest["tools"] = [];
-  for (const tool of tools) {
-    if (!tool || typeof tool !== "object") continue;
-    if (Array.isArray(tool.tools)) {
-      converted.push(...(convertTools(tool.tools) || []));
-      continue;
+  const responseToolByAnthropicName = new Map<string, ResponseToolIdentity>();
+  const anthropicNameByResponseTool = new Map<string, string>();
+  const namespacedToolIdentitiesByBareName = new Map<string, ResponseToolIdentity[]>();
+  const usedNames = new Set<string>();
+  const registerBareFallback = (identity: ResponseToolIdentity) => {
+    if (!identity.namespace) return;
+    const identities = namespacedToolIdentitiesByBareName.get(identity.name) || [];
+    identities.push(identity);
+    namespacedToolIdentitiesByBareName.set(identity.name, identities);
+  };
+  const visit = (items: ResponsesTool[] | undefined, namespace?: string) => {
+    if (!Array.isArray(items)) return;
+    for (const tool of items) {
+      if (!tool || typeof tool !== "object") continue;
+      if (tool.type === "namespace" && Array.isArray(tool.tools)) {
+        visit(tool.tools, tool.name || namespace);
+        continue;
+      }
+      if (Array.isArray(tool.tools)) {
+        visit(tool.tools, namespace);
+        continue;
+      }
+      const name = tool.name || tool.type;
+      if (!name || name === "web_search_preview" || name === "web_search") continue;
+      const identity: ResponseToolIdentity = namespace ? { name, namespace } : { name };
+      const anthropicName = normalizeAnthropicToolName(buildNamespacedToolName(name, namespace), usedNames);
+      responseToolByAnthropicName.set(anthropicName, identity);
+      anthropicNameByResponseTool.set(responseToolKey(name, namespace), anthropicName);
+      registerBareFallback(identity);
+      const schema =
+        tool.parameters ||
+        tool.input_schema ||
+        (tool.format && typeof tool.format === "object" ? tool.format : undefined) ||
+        { type: "object", additionalProperties: true };
+      converted.push({
+        name: anthropicName,
+        description: tool.description,
+        input_schema: normalizeAnthropicToolSchema(tool, schema),
+      });
     }
-    const name = tool.name || tool.type;
-    if (!name || name === "web_search_preview" || name === "web_search") continue;
-    const schema =
-      tool.parameters ||
-      tool.input_schema ||
-      (tool.format && typeof tool.format === "object" ? tool.format : undefined) ||
-      { type: "object", additionalProperties: true };
-    converted.push({
-      name,
-      description: tool.description,
-      input_schema: normalizeAnthropicToolSchema(tool, schema),
-    });
+  };
+
+  visit(tools);
+  const uniqueNamespacedToolByBareName = new Map<string, ResponseToolIdentity>();
+  for (const [name, identities] of namespacedToolIdentitiesByBareName) {
+    const keys = new Set(identities.map((identity) => responseToolKey(identity.name, identity.namespace)));
+    if (keys.size === 1) uniqueNamespacedToolByBareName.set(name, identities[0]);
   }
-  return converted.length > 0 ? converted : undefined;
+
+  return {
+    tools: converted.length > 0 ? converted : undefined,
+    responseToolByAnthropicName,
+    anthropicNameByResponseTool,
+    uniqueNamespacedToolByBareName,
+  };
 }
 
 function normalizeAnthropicToolSchema(tool: ResponsesTool, schema: JsonObject): JsonObject {
@@ -378,12 +492,13 @@ function resolveReasoningEffort(reasoning: JsonObject | undefined): string | und
   return undefined;
 }
 
-function toAnthropicRequest(openaiReq: ResponsesRequest, req: Request): AnthropicRequest {
+function toAnthropicRequest(openaiReq: ResponsesRequest, req: Request): AnthropicRequestConversion {
   const upstreamModel = resolveUpstreamModel(openaiReq.model);
   if (!upstreamModel) {
     throw new Error("缺少 Codex 默认模型映射");
   }
-  const converted = inputToMessages(openaiReq.input, openaiReq.instructions, req);
+  const toolConversion = convertTools(openaiReq.tools);
+  const converted = inputToMessages(openaiReq.input, openaiReq.instructions, req, toolConversion);
   const maxTokens = getNumber(openaiReq.max_output_tokens) || DEFAULT_MAX_TOKENS;
   const effort = resolveReasoningEffort(openaiReq.reasoning);
   const anthropicReq: AnthropicRequest = {
@@ -393,14 +508,15 @@ function toAnthropicRequest(openaiReq: ResponsesRequest, req: Request): Anthropi
     stream: openaiReq.stream === true,
   };
   if (converted.system.length > 0) anthropicReq.system = converted.system;
-  const tools = convertTools(openaiReq.tools);
-  if (tools) anthropicReq.tools = tools;
-  if (openaiReq.tool_choice !== undefined) anthropicReq.tool_choice = normalizeToolChoice(openaiReq.tool_choice);
+  if (toolConversion.tools) anthropicReq.tools = toolConversion.tools;
+  if (openaiReq.tool_choice !== undefined) {
+    anthropicReq.tool_choice = normalizeToolChoice(openaiReq.tool_choice, toolConversion);
+  }
   if (effort) anthropicReq.output_config = { effort };
-  return anthropicReq;
+  return { request: anthropicReq, toolConversion };
 }
 
-function normalizeToolChoice(toolChoice: unknown): unknown {
+function normalizeToolChoice(toolChoice: unknown, toolConversion?: ToolConversion): unknown {
   if (typeof toolChoice === "string") {
     if (toolChoice === "auto" || toolChoice === "none") return { type: toolChoice };
     if (toolChoice === "required") return { type: "any" };
@@ -409,12 +525,18 @@ function normalizeToolChoice(toolChoice: unknown): unknown {
     const record = toolChoice as JsonObject;
     const type = getString(record.type);
     const name = getString((record.function as JsonObject | undefined)?.name) || getString(record.name);
-    if (type === "function" && name) return { type: "tool", name };
+    const namespace = getString(record.namespace) || undefined;
+    if (type === "function" && name) {
+      return { type: "tool", name: resolveAnthropicToolUseName(name, namespace, toolConversion) };
+    }
   }
   return undefined;
 }
 
-function responseOutputFromAnthropic(content: AnthropicContentBlock[] | undefined): ResponsesOutputItem[] {
+function responseOutputFromAnthropic(
+  content: AnthropicContentBlock[] | undefined,
+  toolConversion?: ToolConversion,
+): ResponsesOutputItem[] {
   const output: ResponsesOutputItem[] = [];
   let text = "";
 
@@ -447,12 +569,14 @@ function responseOutputFromAnthropic(content: AnthropicContentBlock[] | undefine
       });
     } else if (block.type === "tool_use") {
       flushText();
+      const identity = resolveResponseToolIdentity(block.name, toolConversion);
       output.push({
         type: "function_call",
         id: `fc_${randomUUID()}`,
         status: "completed",
         call_id: block.id || `call_${randomUUID()}`,
-        name: block.name || "tool",
+        name: identity.name,
+        namespace: identity.namespace,
         arguments: JSON.stringify(block.input || {}),
       });
     }
@@ -482,8 +606,12 @@ function usageFromAnthropic(usage: AnthropicResponse["usage"]): ResponsesUsage {
   };
 }
 
-function toOpenAIResponse(upstream: AnthropicResponse, requestedModel: string | undefined): JsonObject {
-  const output = responseOutputFromAnthropic(upstream.content);
+function toOpenAIResponse(
+  upstream: AnthropicResponse,
+  requestedModel: string | undefined,
+  toolConversion?: ToolConversion,
+): JsonObject {
+  const output = responseOutputFromAnthropic(upstream.content, toolConversion);
   return {
     id: upstream.id || `resp_${randomUUID()}`,
     object: "response",
@@ -598,17 +726,25 @@ export async function handleCodexResponsesRequest(req: Request, res: Response): 
   let openaiReq: ResponsesRequest;
   try {
     openaiReq = (req.body || {}) as ResponsesRequest;
-    const anthropicReq = toAnthropicRequest(openaiReq, req);
+    const converted = toAnthropicRequest(openaiReq, req);
     const upstreamUrl = getMessagesUrl(adapterConfig.baseUrl);
     if (openaiReq.stream) {
-      await streamAnthropicResponse(req, res, upstreamUrl, adapterConfig.apiKey, anthropicReq, openaiReq.model);
+      await streamAnthropicResponse(
+        req,
+        res,
+        upstreamUrl,
+        adapterConfig.apiKey,
+        converted.request,
+        openaiReq.model,
+        converted.toolConversion,
+      );
       return;
     }
 
     const upstream = await undiciFetch(upstreamUrl, {
       method: "POST",
       headers: upstreamHeaders(adapterConfig.apiKey),
-      body: JSON.stringify(anthropicReq),
+      body: JSON.stringify(converted.request),
     });
     if (!upstream.ok) {
       writeOpenAIError(res, upstream.status >= 500 ? 502 : upstream.status, await parseUpstreamError(upstream));
@@ -617,7 +753,7 @@ export async function handleCodexResponsesRequest(req: Request, res: Response): 
 
     const payload = (await upstream.json()) as AnthropicResponse;
     rememberThinking(req, payload.content);
-    res.json(toOpenAIResponse(payload, openaiReq.model));
+    res.json(toOpenAIResponse(payload, openaiReq.model, converted.toolConversion));
   } catch (error) {
     logger.warn("codex_adapter.request_failed", {
       error: error instanceof Error ? error.message : String(error),
@@ -642,6 +778,7 @@ async function streamAnthropicResponse(
   apiKey: string,
   anthropicReq: AnthropicRequest,
   requestedModel: string | undefined,
+  toolConversion: ToolConversion,
 ): Promise<void> {
   const upstream = await undiciFetch(upstreamUrl, {
     method: "POST",
@@ -704,7 +841,7 @@ async function streamAnthropicResponse(
     }
 
     if (type === "content_block_start") {
-      startStreamBlock(payload, output, blocks, res, nextSeq);
+      startStreamBlock(payload, output, blocks, res, nextSeq, toolConversion);
       return;
     }
 
@@ -737,7 +874,7 @@ async function streamAnthropicResponse(
       total_tokens: inputTokens + outputTokens,
       input_tokens_details: { cached_tokens: 0 },
     };
-    rememberThinking(req, outputToAnthropicContent(output));
+    rememberThinking(req, outputToAnthropicContent(output, toolConversion));
     writeSse(res, "response.completed", makeLifecycle("response.completed", nextSeq(), response));
     res.end();
   } catch (error) {
@@ -793,6 +930,7 @@ function startStreamBlock(
   blocks: Map<number, StreamBlockState>,
   res: Response,
   nextSeq: () => number,
+  toolConversion: ToolConversion,
 ): void {
   const index = getNumber(payload.index) || 0;
   const block = payload.content_block as JsonObject | undefined;
@@ -830,12 +968,14 @@ function startStreamBlock(
   }
 
   if (blockType === "tool_use") {
+    const identity = resolveResponseToolIdentity(getString(block?.name), toolConversion);
     const item: ResponsesOutputItem = {
       type: "function_call",
       id: `fc_${randomUUID()}`,
       status: "in_progress",
       call_id: getString(block?.id) || `call_${randomUUID()}`,
-      name: getString(block?.name) || "tool",
+      name: identity.name,
+      namespace: identity.namespace,
       arguments: "",
     };
     const outputIndex = output.push(item) - 1;
@@ -1008,7 +1148,10 @@ function finishStreamBlock(
   blocks.delete(index);
 }
 
-function outputToAnthropicContent(output: ResponsesOutputItem[]): AnthropicContentBlock[] {
+function outputToAnthropicContent(
+  output: ResponsesOutputItem[],
+  toolConversion?: ToolConversion,
+): AnthropicContentBlock[] {
   const blocks: AnthropicContentBlock[] = [];
   for (const item of output) {
     if (item.type === "reasoning") {
@@ -1020,7 +1163,7 @@ function outputToAnthropicContent(output: ResponsesOutputItem[]): AnthropicConte
       blocks.push({
         type: "tool_use",
         id: item.call_id,
-        name: item.name,
+        name: resolveAnthropicToolUseName(item.name || "tool", item.namespace, toolConversion),
         input: parseJsonObject(item.arguments || "{}"),
       });
     }
