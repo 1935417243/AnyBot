@@ -41,6 +41,7 @@ import { DEFAULT_PROVIDER_TIMEOUT_MS } from "../app-settings.js";
 import { registerCodexAdapterStream } from "../codex-adapter-stream.js";
 import { resolveExecutable } from "../utils/process.js";
 import { getCodexHome, getCodexSkillsDir, getIsolatedCodexHome } from "../codex-config.js";
+import { getCodexMcpServersConfig } from "../web/services/mcp.js";
 
 export class ProviderTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -709,17 +710,8 @@ export class CodexProvider implements IProvider {
       codexOptions.env = env;
       codexOptions.apiKey = "anybot-local-codex-adapter";
       codexOptions.baseUrl = this.codexAdapterBaseUrl;
-      codexOptions.config = {
-        model_provider: "anybot",
-        model_providers: {
-          anybot: {
-            name: "AnyBot Codex Adapter",
-            base_url: this.codexAdapterBaseUrl,
-            wire_api: "responses",
-          },
-        },
-      };
     }
+    codexOptions.config = this.buildCodexConfig(this.codexAdapterBaseUrl, false);
     this.bin = executable.bin;
     this.executablePath = executable.executablePath;
     this.codexPathOverride = executable.codexPathOverride;
@@ -791,6 +783,7 @@ export class CodexProvider implements IProvider {
     const codexSkillsMapping = this.codexHome
       ? ensureCodexSkillsAvailableInHome(this.codexHome)
       : null;
+    const mcpServers = getCodexMcpServersConfig();
     const adapterRunId = onEvent && this.codexCompatEnabled && this.codexAdapterBaseUrl
       ? randomUUID()
       : undefined;
@@ -857,6 +850,7 @@ export class CodexProvider implements IProvider {
       codexSkillsLinked: codexSkillsMapping?.linked || 0,
       codexSkillsRemovedStale: codexSkillsMapping?.removedStale || 0,
       codexSkillsMappingError: codexSkillsMapping?.error || null,
+      mcpServerCount: mcpServers ? Object.keys(mcpServers).length : 0,
       workdir,
       sandbox,
       model: model || null,
@@ -1050,8 +1044,45 @@ export class CodexProvider implements IProvider {
     return env;
   }
 
+  private buildCodexConfig(
+    baseUrl: string | undefined,
+    includeMcpServers: boolean,
+  ): CodexOptions["config"] | undefined {
+    const config: Record<string, unknown> = {};
+    if (this.codexCompatEnabled && baseUrl) {
+      config.model_provider = "anybot";
+      config.model_providers = {
+        anybot: {
+          name: "AnyBot Codex Adapter",
+          base_url: baseUrl,
+          wire_api: "responses",
+        },
+      };
+    }
+
+    if (includeMcpServers) {
+      const mcpServers = getCodexMcpServersConfig();
+      if (mcpServers) config.mcp_servers = mcpServers;
+    }
+
+    return Object.keys(config).length > 0 ? config as CodexOptions["config"] : undefined;
+  }
+
   private createCodexForAdapterRun(runId: string | undefined): Codex {
+    const mcpServers = getCodexMcpServersConfig();
     if (!runId || !this.codexCompatEnabled || !this.codexAdapterBaseUrl) {
+      if (mcpServers) {
+        const codexOptions: CodexOptions = this.codexPathOverride
+          ? { codexPathOverride: this.codexPathOverride }
+          : {};
+        if (this.codexCompatEnabled && this.codexAdapterBaseUrl) {
+          codexOptions.env = this.buildIsolatedCodexEnv();
+          codexOptions.apiKey = "anybot-local-codex-adapter";
+          codexOptions.baseUrl = this.codexAdapterBaseUrl;
+        }
+        codexOptions.config = this.buildCodexConfig(this.codexAdapterBaseUrl, true);
+        return new Codex(codexOptions);
+      }
       return this.codex;
     }
 
@@ -1062,16 +1093,7 @@ export class CodexProvider implements IProvider {
     codexOptions.env = this.buildIsolatedCodexEnv();
     codexOptions.apiKey = "anybot-local-codex-adapter";
     codexOptions.baseUrl = baseUrl;
-    codexOptions.config = {
-      model_provider: "anybot",
-      model_providers: {
-        anybot: {
-          name: "AnyBot Codex Adapter",
-          base_url: baseUrl,
-          wire_api: "responses",
-        },
-      },
-    };
+    codexOptions.config = this.buildCodexConfig(baseUrl, true);
     return new Codex(codexOptions);
   }
 

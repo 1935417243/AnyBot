@@ -8,6 +8,7 @@ import { createDesktopUpdateRouter } from "./routes/desktop-update.js";
 import { createEventsRouter } from "./routes/events.js";
 import { createFilesRouter } from "./routes/files.js";
 import { createMessagesRouter } from "./routes/messages.js";
+import { createMcpRouter } from "./routes/mcp.js";
 import { createProjectsRouter } from "./routes/projects.js";
 import { createProvidersRouter } from "./routes/providers.js";
 import { createProxyRouter } from "./routes/proxy.js";
@@ -26,6 +27,7 @@ export function createApiRouter(): Router {
   router.use(createSettingsRouter());
   router.use(createDesktopUpdateRouter());
   router.use(createProvidersRouter());
+  router.use(createMcpRouter());
   router.use(createCodexOpenAIRouter());
   router.use(createChannelsRouter());
   router.use(createSkillsRouter());

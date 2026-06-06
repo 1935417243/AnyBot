@@ -1173,6 +1173,517 @@
             color: #f59e0b;
         }
 
+        .settings-subtabs {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            display: inline-flex;
+            gap: 4px;
+            padding: 4px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--sidebar);
+            margin-bottom: 16px;
+        }
+
+        .settings-subtab {
+            min-width: 76px;
+            height: 32px;
+            border: none;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .settings-subtab:hover,
+        .settings-subtab:focus-visible {
+            background: var(--sidebar-hover);
+            color: var(--text);
+            outline: none;
+        }
+
+        .settings-subtab.active {
+            background: var(--sidebar-active);
+            color: var(--text);
+        }
+
+        .provider-settings-tab-panel {
+            display: none;
+        }
+
+        .provider-settings-tab-panel.active {
+            display: block;
+        }
+
+        .mcp-settings-card {
+            min-height: 420px;
+        }
+
+        .mcp-page-header {
+            min-height: 88px;
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+        }
+
+        .mcp-page-title {
+            color: var(--text);
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+
+        .mcp-page-desc {
+            margin-top: 7px;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .mcp-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .mcp-add-control,
+        .mcp-more-control {
+            position: relative;
+        }
+
+        .mcp-add-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .mcp-add-plus {
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .mcp-add-arrow {
+            width: 12px;
+            height: 12px;
+            flex-shrink: 0;
+        }
+
+        .mcp-add-menu,
+        .mcp-more-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 6px);
+            z-index: 70;
+            min-width: 132px;
+            display: none;
+            flex-direction: column;
+            gap: 3px;
+            padding: 5px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: var(--popover-bg);
+            box-shadow: 0 14px 34px var(--popover-shadow);
+        }
+
+        .mcp-add-control.open .mcp-add-menu,
+        .mcp-more-control.open .mcp-more-menu {
+            display: flex;
+        }
+
+        .mcp-add-menu button,
+        .mcp-more-menu button {
+            min-height: 32px;
+            border: none;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            font-family: 'Sora', sans-serif;
+            font-size: 12px;
+            text-align: left;
+            padding: 0 9px;
+        }
+
+        .mcp-add-menu button:hover,
+        .mcp-more-menu button:hover,
+        .mcp-add-menu button:focus-visible,
+        .mcp-more-menu button:focus-visible {
+            background: var(--subtle-hover);
+            outline: none;
+        }
+
+        .mcp-more-menu button.danger {
+            color: #fb7185;
+        }
+
+        .mcp-more-menu button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+
+        .mcp-server-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 16px 20px 20px;
+        }
+
+        .mcp-empty-state {
+            min-height: 96px;
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            text-align: center;
+            padding: 18px;
+        }
+
+        .mcp-server-item {
+            min-height: 76px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--input-bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+        }
+
+        .mcp-server-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            border: 1px solid var(--link-border);
+            background: var(--accent-dim);
+            color: var(--accent);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 48px;
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .mcp-server-main {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .mcp-server-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            flex-wrap: wrap;
+        }
+
+        .mcp-server-name {
+            min-width: 0;
+            color: var(--text);
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.25;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .mcp-server-summary {
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+        }
+
+        .mcp-server-error {
+            color: #fb7185;
+            font-size: 12px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .mcp-server-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+
+        .mcp-server-switch {
+            transform: none;
+        }
+
+        .mcp-more-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            color: var(--text-muted);
+        }
+
+        .mcp-more-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .mcp-status {
+            min-width: 0;
+            height: auto;
+            border-radius: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 6px;
+            padding: 0;
+            font-size: 14px;
+            font-weight: 600;
+            background: transparent;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .mcp-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: currentColor;
+        }
+
+        .mcp-status-warning-icon {
+            width: 17px;
+            height: 17px;
+            color: #fb4d5e;
+            flex-shrink: 0;
+        }
+
+        .mcp-status-running {
+            color: var(--success);
+            background: transparent;
+        }
+
+        .mcp-status-starting {
+            color: #f59e0b;
+            background: transparent;
+        }
+
+        .mcp-status-failed {
+            color: var(--text-muted);
+            background: transparent;
+        }
+
+        .mcp-status-disabled {
+            color: var(--text-dim);
+            background: transparent;
+        }
+
+        .mcp-retry-link {
+            border: none;
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            font-family: 'Sora', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.25;
+            padding: 0;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .mcp-retry-link:hover,
+        .mcp-retry-link:focus-visible {
+            color: var(--accent);
+            outline: none;
+        }
+
+        .mcp-dialog-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 140;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            background: var(--overlay-bg);
+        }
+
+        .mcp-dialog {
+            width: min(680px, 100%);
+            max-height: min(760px, calc(100vh - 56px));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--sidebar);
+            box-shadow: 0 24px 70px var(--panel-shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .mcp-dialog-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 20px 22px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mcp-dialog-title {
+            color: var(--text);
+            font-size: 17px;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+
+        .mcp-dialog-desc {
+            margin-top: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .mcp-dialog-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 22px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .mcp-dialog-close:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+        }
+
+        .mcp-dialog-body {
+            min-height: 0;
+            padding: 18px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .mcp-config-textarea {
+            width: 100%;
+            min-height: 300px;
+            resize: vertical;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--input-bg);
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.55;
+            padding: 12px;
+            outline: none;
+        }
+
+        .mcp-config-textarea:focus {
+            border-color: rgba(124, 111, 247, 0.45);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .mcp-dialog-error {
+            border: 1px solid rgba(244, 63, 94, 0.28);
+            border-radius: 9px;
+            background: rgba(244, 63, 94, 0.08);
+            color: #fb7185;
+            font-size: 12px;
+            line-height: 1.45;
+            padding: 9px 10px;
+            overflow-wrap: anywhere;
+        }
+
+        .mcp-risk-note {
+            color: #f59e0b;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .mcp-dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 22px 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .mcp-log-dialog {
+            width: min(760px, 100%);
+        }
+
+        .mcp-log-content {
+            min-height: 240px;
+            max-height: 460px;
+            overflow: auto;
+            padding: 16px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .mcp-log-entry {
+            display: grid;
+            grid-template-columns: 150px 58px minmax(0, 1fr);
+            gap: 10px;
+            align-items: start;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--input-bg);
+            padding: 9px 10px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .mcp-log-level {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .mcp-log-success .mcp-log-level {
+            color: var(--success);
+        }
+
+        .mcp-log-warn .mcp-log-level {
+            color: #f59e0b;
+        }
+
+        .mcp-log-error .mcp-log-level {
+            color: #fb7185;
+        }
+
+        .mcp-log-message {
+            min-width: 0;
+            color: var(--text);
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+        }
+
         .settings-save-status {
             margin-right: auto;
             align-self: center;
@@ -1382,6 +1893,56 @@
             .settings-row {
                 align-items: flex-start;
                 flex-direction: column;
+            }
+
+            .settings-subtabs {
+                width: 100%;
+            }
+
+            .settings-subtab {
+                flex: 1;
+            }
+
+            .mcp-page-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .mcp-server-item {
+                flex-wrap: wrap;
+            }
+
+            .mcp-server-controls {
+                margin-left: auto;
+            }
+
+            .mcp-header-actions {
+                width: 100%;
+            }
+
+            .mcp-header-actions > button,
+            .mcp-add-control,
+            .mcp-add-control > button {
+                width: 100%;
+            }
+
+            .mcp-add-menu,
+            .mcp-more-menu {
+                left: 0;
+                right: 0;
+            }
+
+            .mcp-log-entry {
+                grid-template-columns: 1fr;
+                gap: 4px;
+            }
+
+            .mcp-dialog-overlay {
+                padding: 12px;
+            }
+
+            .mcp-config-textarea {
+                min-height: 260px;
             }
 
             .provider-timeout-control {

@@ -38,6 +38,7 @@ import {logger} from "../logger.js";
 import {DEFAULT_SANDBOX} from "../sandbox-config.js";
 import type {SandboxMode} from "../types.js";
 import {getClaudeConfigDir, getClaudeSkillsDir, getIsolatedClaudeConfigDir} from "../claude-config.js";
+import {getClaudeMcpServersConfig} from "../web/services/mcp.js";
 
 const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
 const require = createRequire(import.meta.url);
@@ -427,6 +428,7 @@ export class ClaudeCodeProvider implements IProvider {
         const resultModel = this.resolveModelAlias(model && model !== "auto" ? model : undefined)
             || this.anthropicAutoModel
             || this.defaultModel;
+        const mcpServers = getClaudeMcpServersConfig() as Options["mcpServers"] | undefined;
 
         let timedOut = false;
         const timer = setTimeout(() => {
@@ -457,6 +459,7 @@ export class ClaudeCodeProvider implements IProvider {
             anthropicSonnetModel: this.anthropicSonnetModel || null,
             anthropicHaikuModel: this.anthropicHaikuModel || null,
             claudeCodeSubagentModel: this.claudeCodeSubagentModel || null,
+            mcpServerCount: mcpServers ? Object.keys(mcpServers).length : 0,
             apiKeyConfigured: Boolean(this.apiKey),
             apiKeyHelperConfigured: Boolean(this.apiKeyHelper),
             sessionId: sessionId || null,
@@ -567,6 +570,7 @@ export class ClaudeCodeProvider implements IProvider {
                     systemPrompt: {type: "preset", preset: "claude_code"},
                     settingSources: ["user", "project", "local"],
                     skills: "all",
+                    mcpServers,
                     sandbox: buildSandboxOptions(sandbox, workdir),
                     includePartialMessages: !!onEvent,
                     agentProgressSummaries: !!onEvent,

@@ -57,6 +57,15 @@ export interface ProviderRuntimeSettings {
   codexBaseUrlPresets?: Record<string, CodexBaseUrlPreset>;
 }
 
+export interface McpServerSettings {
+  id: string;
+  name: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppSettings {
   general: {
     theme: AppTheme;
@@ -66,6 +75,9 @@ export interface AppSettings {
     webPort: number;
   };
   providers: Record<string, ProviderRuntimeSettings>;
+  mcp: {
+    servers: Record<string, McpServerSettings>;
+  };
   workspace: {
     defaultWorkdir: string;
   };
@@ -120,6 +132,9 @@ function createDefaultSettings(): AppSettings {
       webPort: 19981,
     },
     providers: {},
+    mcp: {
+      servers: {},
+    },
     workspace: {
       defaultWorkdir: getDefaultWorkdir(),
     },
@@ -285,6 +300,40 @@ function normalizeProviderSettings(value: unknown): ProviderRuntimeSettings {
   return settings;
 }
 
+function normalizeMcpServerSettings(id: string, value: unknown): McpServerSettings | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const config = raw.config && typeof raw.config === "object" && !Array.isArray(raw.config)
+    ? { ...(raw.config as Record<string, unknown>) }
+    : null;
+  if (!config) return null;
+
+  const now = new Date().toISOString();
+  return {
+    id,
+    name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : id,
+    enabled: typeof raw.enabled === "boolean" ? raw.enabled : true,
+    config,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : now,
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : now,
+  };
+}
+
+function normalizeMcpSettings(value: unknown): AppSettings["mcp"] {
+  const raw = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const rawServers = raw.servers && typeof raw.servers === "object" && !Array.isArray(raw.servers)
+    ? raw.servers as Record<string, unknown>
+    : {};
+  const servers: Record<string, McpServerSettings> = {};
+  for (const [id, server] of Object.entries(rawServers)) {
+    const normalized = normalizeMcpServerSettings(id, server);
+    if (normalized) servers[id] = normalized;
+  }
+  return { servers };
+}
+
 function mergeSettings(value: unknown): AppSettings {
   const raw = (value && typeof value === "object" ? value : {}) as Partial<AppSettings>;
   const general = (raw.general || {}) as Partial<AppSettings["general"]>;
@@ -292,6 +341,7 @@ function mergeSettings(value: unknown): AppSettings {
   const permissions = (raw.permissions || {}) as Partial<AppSettings["permissions"]>;
   const privacy = (raw.privacy || {}) as Partial<AppSettings["privacy"]>;
   const providers = raw.providers && typeof raw.providers === "object" ? raw.providers : {};
+  const mcp = normalizeMcpSettings(raw.mcp);
   const requestedWorkdir =
     typeof workspace.defaultWorkdir === "string" && workspace.defaultWorkdir.trim()
       ? path.resolve(workspace.defaultWorkdir.trim())
@@ -314,6 +364,7 @@ function mergeSettings(value: unknown): AppSettings {
     providers: Object.fromEntries(
       Object.entries(providers).map(([provider, config]) => [provider, normalizeProviderSettings(config)]),
     ),
+    mcp,
     workspace: {
       defaultWorkdir: requestedWorkdir,
     },
@@ -382,6 +433,7 @@ export function updateAppSettings(partial: Partial<AppSettings>): AppSettings {
     ...partial,
     general: { ...current.general, ...(partial.general || {}) },
     providers: { ...current.providers, ...(partial.providers || {}) },
+    mcp: { ...current.mcp, ...(partial.mcp || {}) },
     workspace: { ...current.workspace, ...(partial.workspace || {}) },
     permissions: { ...current.permissions, ...(partial.permissions || {}) },
     privacy: { ...current.privacy, ...(partial.privacy || {}) },
