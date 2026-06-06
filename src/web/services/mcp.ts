@@ -54,6 +54,7 @@ const CODEX_BARE_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 const runtimeStateById = new Map<string, RuntimeState>();
 const logsByServerId = new Map<string, McpServerLogEntry[]>();
+let startupCheckPromise: Promise<void> | null = null;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -617,6 +618,29 @@ export async function refreshMcpServers(): Promise<McpServerPublicView[]> {
     }
   }
   return listMcpServers();
+}
+
+export function startMcpServersOnStartup(): void {
+  if (startupCheckPromise) return;
+
+  const enabledServers = Object.values(getServersMap()).filter((server) => server.enabled);
+  if (enabledServers.length === 0) return;
+
+  logger.info("mcp.startup_check.started", { count: enabledServers.length });
+  startupCheckPromise = (async () => {
+    for (const server of enabledServers) {
+      await verifyMcpServer(server);
+    }
+  })()
+    .then(() => {
+      logger.info("mcp.startup_check.completed", { count: enabledServers.length });
+    })
+    .catch((error) => {
+      logger.warn("mcp.startup_check.failed", { error });
+    })
+    .finally(() => {
+      startupCheckPromise = null;
+    });
 }
 
 export async function addMcpServersFromJson(jsonText: string): Promise<McpServerPublicView[]> {

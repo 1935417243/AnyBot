@@ -21,6 +21,7 @@ const STATUS_LABELS = {
     disabled: '已禁用',
 };
 
+const MCP_STATUS_POLL_INTERVAL_MS = 1500;
 const WARNING_ICON = '<svg class="mcp-status-warning-icon" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 1.4 13 12H1L7 1.4Z" fill="currentColor"/><path d="M7 5v3.2M7 10.1h.01" stroke="var(--sidebar)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const SETTINGS_ICON = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>';
 
@@ -40,6 +41,8 @@ export function createSettingsMcpController(options) {
     let addMenuOpen = false;
     let openMenuServerId = '';
     let activeDialog = null;
+    let statusPollTimer = null;
+    let statusPollInFlight = false;
 
     function showError(message) {
         if (options.showError) options.showError(message);
@@ -67,6 +70,7 @@ export function createSettingsMcpController(options) {
         if (tab === 'mcp' && !loaded) {
             fetchServers(false);
         }
+        syncStatusPolling();
     }
 
     function setAddMenuOpen(isOpen) {
@@ -88,6 +92,47 @@ export function createSettingsMcpController(options) {
             throw new Error(data.error || '操作失败');
         }
         return data;
+    }
+
+    function hasStartingServers() {
+        return servers.some(function (server) {
+            return server.enabled && server.status === 'starting';
+        });
+    }
+
+    function stopStatusPolling() {
+        if (!statusPollTimer) return;
+        clearTimeout(statusPollTimer);
+        statusPollTimer = null;
+    }
+
+    function syncStatusPolling() {
+        if (activeTab !== 'mcp' || !hasStartingServers()) {
+            stopStatusPolling();
+            return;
+        }
+        if (statusPollTimer || statusPollInFlight) return;
+        statusPollTimer = setTimeout(pollServerStatuses, MCP_STATUS_POLL_INTERVAL_MS);
+    }
+
+    async function pollServerStatuses() {
+        statusPollTimer = null;
+        if (activeTab !== 'mcp' || !hasStartingServers() || statusPollInFlight) {
+            syncStatusPolling();
+            return;
+        }
+        statusPollInFlight = true;
+        try {
+            var data = await requestJson('/api/mcp/servers');
+            servers = Array.isArray(data.servers) ? data.servers : [];
+            loaded = true;
+            renderServers();
+        } catch {
+            syncStatusPolling();
+        } finally {
+            statusPollInFlight = false;
+            syncStatusPolling();
+        }
     }
 
     async function fetchServers(refreshStatus) {
@@ -258,13 +303,16 @@ export function createSettingsMcpController(options) {
         if (!settingsMcpServerList) return;
         if (loading && !servers.length) {
             settingsMcpServerList.innerHTML = '<div class="mcp-empty-state">正在加载 MCP Servers…</div>';
+            syncStatusPolling();
             return;
         }
         if (!servers.length) {
             settingsMcpServerList.innerHTML = '<div class="mcp-empty-state">尚未配置 MCP Servers</div>';
+            syncStatusPolling();
             return;
         }
         settingsMcpServerList.innerHTML = servers.map(buildServerHtml).join('');
+        syncStatusPolling();
     }
 
     function openConfigDialog(server) {

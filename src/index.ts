@@ -29,6 +29,7 @@ import {
   getSandbox,
 } from "./shared.js";
 import { startDesktopUpdateAutoCheck } from "./web/services/desktop-update.js";
+import { startMcpServersOnStartup } from "./web/services/mcp.js";
 import {
   createActiveAgentStream,
   emitAgentStream,
@@ -243,6 +244,7 @@ async function main(): Promise<void> {
     logger.info("web.started", { host: WEB_HOST, port: WEB_PORT });
     console.log(`AnyBot Web UI: http://${WEB_HOST}:${WEB_PORT}`);
     startDesktopUpdateAutoCheck();
+    startMcpServersOnStartup();
   });
 
   const channels = await startAllChannels(channelCallbacks);
