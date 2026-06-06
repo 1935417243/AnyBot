@@ -1540,16 +1540,19 @@
             flex-shrink: 0;
         }
 
+        .mcp-status-verified,
         .mcp-status-running {
             color: var(--success);
             background: transparent;
         }
 
+        .mcp-status-checking,
         .mcp-status-starting {
             color: #f59e0b;
             background: transparent;
         }
 
+        .mcp-status-checking .mcp-status-dot,
         .mcp-status-starting .mcp-status-dot {
             width: 12px;
             height: 12px;

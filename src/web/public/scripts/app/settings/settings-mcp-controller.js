@@ -14,10 +14,13 @@ const MCP_EXAMPLE_JSON = `{
 }`;
 
 const STATUS_LABELS = {
-    not_started: '未启动',
-    starting: '准备中...',
-    running: '运行中',
-    failed: '启动失败',
+    unchecked: '未检查',
+    checking: '检查中...',
+    verified: '已验证',
+    not_started: '未检查',
+    starting: '检查中...',
+    running: '已验证',
+    failed: '检查失败',
     disabled: '已禁用',
 };
 
@@ -98,9 +101,9 @@ export function createSettingsMcpController(options) {
         return data;
     }
 
-    function hasStartingServers() {
+    function hasCheckingServers() {
         return servers.some(function (server) {
-            return server.enabled && server.status === 'starting';
+            return server.enabled && (server.status === 'checking' || server.status === 'starting');
         });
     }
 
@@ -111,7 +114,7 @@ export function createSettingsMcpController(options) {
     }
 
     function syncStatusPolling() {
-        if (activeTab !== 'mcp' || !hasStartingServers()) {
+        if (activeTab !== 'mcp' || !hasCheckingServers()) {
             stopStatusPolling();
             return;
         }
@@ -121,7 +124,7 @@ export function createSettingsMcpController(options) {
 
     async function pollServerStatuses() {
         statusPollTimer = null;
-        if (activeTab !== 'mcp' || !hasStartingServers() || statusPollInFlight) {
+        if (activeTab !== 'mcp' || !hasCheckingServers() || statusPollInFlight) {
             syncStatusPolling();
             return;
         }
@@ -147,7 +150,7 @@ export function createSettingsMcpController(options) {
         }
         if (refreshStatus) {
             servers = servers.map(function (server) {
-                return server.enabled ? Object.assign({}, server, { status: 'starting' }) : server;
+                return server.enabled ? Object.assign({}, server, { status: 'checking' }) : server;
             });
             renderServers();
         }
@@ -179,10 +182,10 @@ export function createSettingsMcpController(options) {
         renderServers();
     }
 
-    function setLocalStarting(serverId, enabled) {
+    function setLocalChecking(serverId, enabled) {
         servers = servers.map(function (server) {
             if (server.id !== serverId) return server;
-            var next = { status: 'starting', error: '' };
+            var next = { status: 'checking', error: '' };
             if (typeof enabled === 'boolean') next.enabled = enabled;
             return Object.assign({}, server, next);
         });
@@ -192,7 +195,7 @@ export function createSettingsMcpController(options) {
     function showServerOperationStatus(serverId, successMessage, failedMessage) {
         var server = findServer(serverId);
         if (server && server.enabled && server.status === 'failed') {
-            showSettingsStatus(failedMessage || 'MCP Server 启动失败', 'error');
+            showSettingsStatus(failedMessage || 'MCP Server 检查失败', 'error');
             return;
         }
         showSettingsStatus(successMessage);
@@ -200,7 +203,7 @@ export function createSettingsMcpController(options) {
 
     async function toggleServer(serverId, enabled) {
         if (enabled) {
-            setLocalStarting(serverId, true);
+            setLocalChecking(serverId, true);
         } else {
             servers = servers.map(function (server) {
                 return server.id === serverId ? Object.assign({}, server, { enabled: false, status: 'disabled', error: '' }) : server;
@@ -215,7 +218,7 @@ export function createSettingsMcpController(options) {
             });
             updateServers(data);
             if (enabled) {
-                showServerOperationStatus(serverId, 'MCP Server 已启用', 'MCP Server 已启用，启动失败');
+                showServerOperationStatus(serverId, 'MCP Server 已启用', 'MCP Server 已启用，检查失败');
             } else {
                 showSettingsStatus('MCP Server 已禁用');
             }
@@ -225,14 +228,14 @@ export function createSettingsMcpController(options) {
         }
     }
 
-    async function restartServer(serverId, message) {
-        setLocalStarting(serverId);
+    async function checkServer(serverId, message) {
+        setLocalChecking(serverId);
         try {
-            var data = await requestJson('/api/mcp/servers/' + encodeURIComponent(serverId) + '/restart', { method: 'POST' });
+            var data = await requestJson('/api/mcp/servers/' + encodeURIComponent(serverId) + '/check', { method: 'POST' });
             updateServers(data);
-            showServerOperationStatus(serverId, message || 'MCP Server 已重启', 'MCP Server 启动失败');
+            showServerOperationStatus(serverId, message || 'MCP Server 已重新检查', 'MCP Server 检查失败');
         } catch (e) {
-            showError(e.message || '重启 MCP Server 失败');
+            showError(e.message || '检查 MCP Server 失败');
             fetchServers(false);
         }
     }
@@ -275,7 +278,8 @@ export function createSettingsMcpController(options) {
             ? '<button class="mcp-retry-link" type="button" data-mcp-action="retry">重试</button>'
             : '';
         var toggleText = server.enabled ? '禁用' : '启用';
-        var restartDisabled = server.enabled ? '' : ' disabled';
+        var isChecking = status === 'checking' || status === 'starting';
+        var checkDisabled = server.enabled ? '' : ' disabled';
         return '<div class="mcp-server-item" data-server-id="' + escapeAttr(server.id) + '">' +
             '<span class="mcp-server-avatar" aria-hidden="true">' + escapeHtml(getServerInitial(server)) + '</span>' +
             '<div class="mcp-server-main">' +
@@ -290,13 +294,13 @@ export function createSettingsMcpController(options) {
             '<button class="settings-icon-btn mcp-more-btn" type="button" data-mcp-action="menu" aria-haspopup="menu" aria-label="操作" title="操作" aria-expanded="' + (menuOpen ? 'true' : 'false') + '">' + SETTINGS_ICON + '</button>' +
             '<div class="mcp-more-menu" role="menu">' +
             '<button type="button" role="menuitem" data-mcp-action="edit">编辑</button>' +
-            '<button type="button" role="menuitem" data-mcp-action="restart"' + restartDisabled + '>重启</button>' +
+            '<button type="button" role="menuitem" data-mcp-action="check"' + checkDisabled + '>重新检查</button>' +
             '<button type="button" role="menuitem" data-mcp-action="logs">查看日志</button>' +
             '<button type="button" role="menuitem" class="danger" data-mcp-action="delete">删除</button>' +
             '</div>' +
             '</div>' +
             '<label class="settings-switch mcp-server-switch" aria-label="' + escapeAttr(toggleText + ' ' + (server.name || server.id)) + '">' +
-            '<input type="checkbox" data-mcp-action="toggle"' + (server.enabled ? ' checked' : '') + (status === 'starting' ? ' disabled' : '') + '>' +
+            '<input type="checkbox" data-mcp-action="toggle"' + (server.enabled ? ' checked' : '') + (isChecking ? ' disabled' : '') + '>' +
             '<span class="settings-switch-slider"></span>' +
             '</label>' +
             '</div>' +
@@ -462,13 +466,13 @@ export function createSettingsMcpController(options) {
         if (action === 'menu') {
             setOpenMenuServerId(openMenuServerId === serverId ? '' : serverId);
         } else if (action === 'retry') {
-            restartServer(serverId, 'MCP Server 已重试');
+            checkServer(serverId, 'MCP Server 已重新检查');
         } else if (action === 'edit') {
             setOpenMenuServerId('');
             openConfigDialog(server);
-        } else if (action === 'restart') {
+        } else if (action === 'check') {
             setOpenMenuServerId('');
-            restartServer(serverId);
+            checkServer(serverId);
         } else if (action === 'logs') {
             setOpenMenuServerId('');
             openLogsDialog(server);

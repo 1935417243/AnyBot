@@ -2,11 +2,11 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import {
   addMcpServersFromJson,
+  checkMcpServer,
   deleteMcpServer,
   getMcpServerLogs,
   listMcpServers,
   refreshMcpServers,
-  restartMcpServer,
   setMcpServerEnabled,
   updateMcpServerFromJson,
 } from "../services/mcp.js";
@@ -21,6 +21,14 @@ function getRouteParam(value: string | string[] | undefined): string {
 
 export function createMcpRouter(): Router {
   const router = Router();
+
+  async function handleCheckServer(req: Request, res: Response): Promise<void> {
+    try {
+      res.json({ servers: await checkMcpServer(getRouteParam(req.params.id)) });
+    } catch (error) {
+      res.status(400).json({ error: getErrorMessage(error, "检查 MCP Server 失败") });
+    }
+  }
 
   router.get("/mcp/servers", (_req: Request, res: Response) => {
     try {
@@ -68,13 +76,8 @@ export function createMcpRouter(): Router {
     }
   });
 
-  router.post("/mcp/servers/:id/restart", async (req: Request, res: Response) => {
-    try {
-      res.json({ servers: await restartMcpServer(getRouteParam(req.params.id)) });
-    } catch (error) {
-      res.status(400).json({ error: getErrorMessage(error, "重启 MCP Server 失败") });
-    }
-  });
+  router.post("/mcp/servers/:id/check", handleCheckServer);
+  router.post("/mcp/servers/:id/restart", handleCheckServer);
 
   router.get("/mcp/servers/:id/logs", (req: Request, res: Response) => {
     try {

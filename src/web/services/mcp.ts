@@ -4,7 +4,7 @@ import { logger } from "../../logger.js";
 import { getMcpServersMap } from "../../mcp-config.js";
 import { killProcessTree, spawnCommand } from "../../utils/process.js";
 
-export type McpServerRuntimeStatus = "not_started" | "starting" | "running" | "failed" | "disabled";
+export type McpServerRuntimeStatus = "unchecked" | "checking" | "verified" | "failed" | "disabled";
 export type McpLogLevel = "info" | "warn" | "error" | "success";
 
 export interface McpServerLogEntry {
@@ -78,7 +78,7 @@ function setRuntimeState(serverId: string, state: RuntimeState): void {
 
 function getRuntimeState(server: McpServerSettings): RuntimeState {
   if (!server.enabled) return { status: "disabled" };
-  return runtimeStateById.get(server.id) || { status: "not_started" };
+  return runtimeStateById.get(server.id) || { status: "unchecked" };
 }
 
 function getServersMap(): Record<string, McpServerSettings> {
@@ -408,7 +408,7 @@ async function verifyStdioServer(server: McpServerSettings): Promise<VerifyResul
     };
 
     const timeoutTimer = setTimeout(() => {
-      finish({ ok: false, error: `启动超时（${Math.round(timeoutMs / 1000)} 秒），请检查命令或增加 startup_timeout_sec` });
+      finish({ ok: false, error: `检查超时（${Math.round(timeoutMs / 1000)} 秒），请检查命令或增加 startup_timeout_sec` });
     }, timeoutMs);
 
     try {
@@ -565,7 +565,7 @@ async function verifyHttpServer(server: McpServerSettings): Promise<VerifyResult
   } catch (error) {
     clearTimeout(timeout);
     if (error instanceof Error && error.name === "AbortError") {
-      return { ok: false, error: `启动超时（${Math.round(timeoutMs / 1000)} 秒）` };
+      return { ok: false, error: `检查超时（${Math.round(timeoutMs / 1000)} 秒）` };
     }
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
@@ -578,7 +578,7 @@ async function verifyMcpServer(server: McpServerSettings): Promise<VerifyResult>
     return { ok: true };
   }
 
-  setRuntimeState(server.id, { status: "starting", checkedAt: nowIso() });
+  setRuntimeState(server.id, { status: "checking", checkedAt: nowIso() });
   addLog(server.id, "info", "开始检查 MCP Server");
   const type = typeof server.config.type === "string" ? server.config.type : "";
   const result = type === "http" || type === "sse"
@@ -586,13 +586,13 @@ async function verifyMcpServer(server: McpServerSettings): Promise<VerifyResult>
     : await verifyStdioServer(server);
 
   if (result.ok) {
-    setRuntimeState(server.id, { status: "running", checkedAt: nowIso() });
-    addLog(server.id, "success", "MCP Server 启动检查通过");
-    logger.info("mcp.server.running", { id: server.id });
+    setRuntimeState(server.id, { status: "verified", checkedAt: nowIso() });
+    addLog(server.id, "success", "MCP Server 检查通过");
+    logger.info("mcp.server.verified", { id: server.id });
     return { ok: true };
   }
 
-  const error = result.error || "启动失败";
+  const error = result.error || "检查失败";
   setRuntimeState(server.id, { status: "failed", error, checkedAt: nowIso() });
   addLog(server.id, "error", error);
   logger.warn("mcp.server.failed", { id: server.id, error });
@@ -620,7 +620,7 @@ export async function refreshMcpServers(): Promise<McpServerPublicView[]> {
   return listMcpServers();
 }
 
-export function startMcpServersOnStartup(): void {
+export function verifyMcpServersOnStartup(): void {
   if (startupCheckPromise) return;
 
   const enabledServers = Object.values(getServersMap()).filter((server) => server.enabled);
@@ -725,13 +725,13 @@ export async function setMcpServerEnabled(serverId: string, enabled: boolean): P
   return listMcpServers();
 }
 
-export async function restartMcpServer(serverId: string): Promise<McpServerPublicView[]> {
+export async function checkMcpServer(serverId: string): Promise<McpServerPublicView[]> {
   const server = getServersMap()[serverId];
   if (!server) throw new Error("MCP Server 不存在");
-  if (!server.enabled) throw new Error("MCP Server 已禁用，无法重启");
-  addLog(serverId, "info", "正在重启 MCP Server");
+  if (!server.enabled) throw new Error("MCP Server 已禁用，无法检查");
+  addLog(serverId, "info", "正在重新检查 MCP Server");
   const result = await verifyMcpServer(server);
-  if (result.ok) addLog(serverId, "success", "MCP Server 已重启");
+  if (result.ok) addLog(serverId, "success", "MCP Server 已重新检查");
   return listMcpServers();
 }
 
