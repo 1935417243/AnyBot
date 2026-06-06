@@ -1,7 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { getRegisteredChannelTypes, readChannelsConfig } from "../../channels/index.js";
-import { automationScheduler } from "../../automation-scheduler.js";
 import { logger } from "../../logger.js";
 import { getRegisteredProviderTypes } from "../../providers/index.js";
 import * as db from "../db.js";
@@ -15,6 +14,7 @@ import {
   updateAutomation,
   type AutomationInput,
 } from "../services/automations.js";
+import { triggerAutomationRun } from "../services/automation-runner.js";
 
 const LOCAL_CHANNEL_TYPE = "local";
 const RUN_PAGE_SIZE = 10;
@@ -91,7 +91,7 @@ export function createAutomationsRouter(): Router {
         res.status(409).json({ error: "当前自动化已有任务执行中" });
         return;
       }
-      const run = automationScheduler.runOnce(automation);
+      const run = triggerAutomationRun(automation);
       logger.info("automation.run_once.started", { id: automation.id, runId: run.id });
       res.status(202).json({ run });
     } catch (error) {
