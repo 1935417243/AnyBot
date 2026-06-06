@@ -506,12 +506,14 @@ export function createAutomationsPageController(options) {
             return;
         }
         container.innerHTML = runs.map(function (run) {
+            var deliveryBadge = run.deliveryStatus === 'delivered'
+                ? ''
+                : '<span class="automation-run-delivery">' + escapeHtml(deliveryStatusLabel(run.deliveryStatus)) + '</span>';
             return '<div class="automation-run-card" role="button" tabindex="0" data-session-id="' + escapeHtml(run.sessionId || '') + '">' +
                 '<div class="automation-run-main">' +
                 '<div class="automation-run-badges">' +
                 '<span class="automation-run-status ' + runStatusClass(run.status) + '">' + escapeHtml(runStatusLabel(run.status)) + '</span>' +
-                '<span class="automation-run-trigger">' + iconClock() + '自动触发</span>' +
-                '<span class="automation-run-delivery">' + escapeHtml(deliveryStatusLabel(run.deliveryStatus)) + '</span>' +
+                deliveryBadge +
                 '</div>' +
                 '<div class="automation-run-title">' + escapeHtml(automation ? automation.name : '自动化任务') + '</div>' +
                 '</div>' +
