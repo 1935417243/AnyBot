@@ -7,11 +7,11 @@
 ![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 
-AnyBot 是一个本机 AI Coding Agent 控制台与远程入口，可以让你通过桌面 App、Web UI、微信、QQ、Telegram、飞书等渠道控制和管理电脑上的 AI Coding Agent。
+AnyBot 是一个本机 AI Coding Agent 控制台与远程入口，可以让你通过桌面 App、Web UI、微信、QQ、Telegram、飞书、钉钉等渠道控制和管理电脑上的 AI Coding Agent。
 
-本机已安装 Codex CLI 或 Claude Code 时，AnyBot 可以直接调用它们，复用本机已有能力；如果不想使用本机全局模型配置，也可以在 AnyBot 内为 Codex / Claude Code 通道单独配置模型映射，接入 DeepSeek、OpenAI 等兼容模型使用。
+AnyBot 默认使用随 `@openai/codex-sdk` 和 `@anthropic-ai/claude-agent-sdk` 提供的平台 native binary，不要求用户额外全局安装 `codex` 或 Claude Code；如果需要，也可以在设置中指定外部 CLI。Provider、模型映射、环境变量和 MCP 配置都保存在 AnyBot 内部。
 
-无论本机是否安装 Codex CLI / Claude Code，AnyBot 内配置的 Provider、模型映射和环境变量都只在 AnyBot 内生效，不会影响本机全局配置。
+如果不想使用本机全局模型配置，可以在 AnyBot 内为 Codex / Claude Code 单独配置兼容接口和模型映射，接入 DeepSeek、Kimi、MiniMax、VibeAPI 或其它 Anthropic API 兼容服务。AnyBot 内配置只在 AnyBot 内生效，不会影响本机全局配置。
 
 桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
 
@@ -19,17 +19,18 @@ AnyBot 是一个本机 AI Coding Agent 控制台与远程入口，可以让你�
 
 ## 特性
 
-- **多 Provider**：支持 Codex CLI 和 Claude Code，可在 Web UI 或频道命令中切换 Provider 和模型。
-- **兼容模型接入**：支持在 AnyBot 内配置 DeepSeek、OpenAI 等兼容模型 Provider 和模型映射。
+- **多 Provider**：支持 Codex SDK/CLI 和 Claude Code，可在 Web UI 或频道命令中切换 Provider 和模型。
+- **兼容模型接入**：支持 Codex Responses 适配层和 Claude Code Anthropic 兼容接口，可在 AnyBot 内配置 Base URL、API Key 和模型映射。
+- **MCP 服务器**：可在设置中手动添加、启用、禁用、检查和查看 MCP Server 日志。
 - **Agent Web UI**：本地聊天界面，支持 Markdown、代码高亮、流式 Agent 事件、停止响应、上下文压缩和会话历史。
 - **项目工作区**：在侧边栏管理项目，项目会话会把项目目录作为 Provider 工作目录；也支持在单轮消息中额外选择项目。
 - **技能入口**：Web UI 可浏览、启用、禁用、删除技能，并在输入框 `/` 菜单中按当前 Provider 展示可用技能和命令。
 - **附件上传**：Web UI 支持按钮、粘贴图片和拖拽上传，单文件上限 50MB；图片能力取决于当前 Provider。
 - **变更审核**：Agent 修改文件后生成变更快照，可在 Web UI 中查看 diff、通过或撤销。
-- **多频道接入**：支持飞书长连接、QQ Bot WebSocket、Telegram 长轮询和个人微信通道。
+- **多频道接入**：支持飞书长连接、钉钉 Stream、QQ Bot WebSocket、Telegram 长轮询和个人微信通道。
 - **主动推送**：通过 `/api/send` 向已配置 Owner 的频道发送通知。
 - **自动化任务**：在本机按分钟、每天、每周或 Cron 触发 Agent 任务；过程在 Web UI 展示，结果可保存到本地或交付到已启用频道。
-- **桌面体验**：Electron 桌面壳、托盘、开机启动、Windows 安装版应用内更新。
+- **桌面体验**：Electron 桌面壳、托盘、开机启动、Windows 安装版应用内下载更新，其它平台可在关于页检查 GitHub 最新版本并手动下载。
 
 ---
 
@@ -54,13 +55,14 @@ AnyBot 是一个本机 AI Coding Agent 控制台与远程入口，可以让你�
 ```mermaid
 flowchart LR
     User[用户] --> WebUI[Web UI]
-    User --> Channels[飞书 / QQ / Telegram / 微信]
+    User --> Channels[飞书 / 钉钉 / QQ / Telegram / 微信]
     WebUI --> Runner[ChatRunner]
     Channels --> Runner
     Runner --> Providers[Provider 层]
     Providers --> Codex[Codex CLI]
     Providers --> Claude[Claude Code]
     Providers --> ThirdParty[第三方模型]
+    Providers --> MCP[MCP Servers]
     Runner --> Workspace[项目工作区]
     Runner --> Skills[技能]
     Runner --> Review[变更审核]
@@ -80,9 +82,9 @@ flowchart LR
 | Windows | `AnyBot-Setup-x.x.x.exe` | 双击安装后从开始菜单或桌面快捷方式启动 |
 | macOS | `AnyBot-x.x.x-*.dmg` | 打开 `.dmg`，将 `AnyBot.app` 拖到 Applications 后启动 |
 
-桌面 App 不要求用户手动安装 Node.js。启动后会自动打开 AnyBot 窗口，Provider、模型、权限、项目、频道和隐私设置都可以在 Web UI 中配置。
+桌面 App 不要求用户手动安装 Node.js。启动后会自动打开 AnyBot 窗口，Provider、模型、MCP、权限、项目、频道、自动化和隐私设置都可以在 Web UI 中配置。
 
-Windows 安装版支持在 **设置 -> 关于 -> 检测更新** 中检查新版本；macOS 暂时需要手动下载新版 `.dmg` 覆盖安装。
+Windows 安装版支持在 **设置 -> 关于 -> 检测更新** 中检查、下载并重启安装新版本；macOS 暂时需要手动下载新版 `.dmg` 覆盖安装。源码运行或不支持自动更新的平台也可以在关于页检查 GitHub 最新版本。
 
 #### macOS 提示“应用已损坏，无法打开”
 
@@ -100,8 +102,8 @@ sudo xattr -rd com.apple.quarantine "/Applications/AnyBot.app"
 
 | Provider | 运行方式 | 说明 |
 |----------|---------|------|
-| Codex | 默认使用随 `@openai/codex-sdk` 提供的平台 native binary，不要求全局安装 `codex` 命令；启用 **Responses 适配层** 后，只使用 AnyBot 内的兼容服务配置和模型映射 | 支持会话续聊、Sandbox、图片输入 |
-| Claude Code | 默认使用随 `@anthropic-ai/claude-agent-sdk` 提供的平台 native binary，不要求全局安装 Claude Code；需要外部 CLI 时可在高级设置中指定，使用说明见 [Claude Code 文档](https://code.claude.com/docs/en/overview) | 支持会话续聊、Sandbox 映射、Agent 流式事件 |
+| Codex | 默认使用随 `@openai/codex-sdk` 提供的平台 native binary，不要求全局安装 `codex` 命令；启用 **Responses 适配层** 后，只使用 AnyBot 内的兼容服务配置和模型映射 | 支持会话续聊、Sandbox、图片输入、MCP |
+| Claude Code | 默认使用随 `@anthropic-ai/claude-agent-sdk` 提供的平台 native binary，不要求全局安装 Claude Code；需要外部 CLI 时可在高级设置中指定，使用说明见 [Claude Code 文档](https://code.claude.com/docs/en/overview) | 支持会话续聊、Sandbox 映射、Agent 流式事件、MCP |
 
 ### 3. 源码运行
 
@@ -130,23 +132,27 @@ npm run bot:stop
 
 | Provider | 状态 | 图片输入 | 说明 |
 |----------|------|----------|------|
-| `codex` | 可用 | 支持 | 使用 Codex SDK/CLI，支持 Sandbox 模式和 Agent 事件 |
-| `claude-code` | 可用 | 暂不支持 | 使用 Claude Agent SDK，支持会话续聊、权限模式和上下文压缩 |
+| `codex` | 可用 | 支持 | 使用 Codex SDK/CLI，支持 Sandbox、Agent 事件、上下文用量和 MCP |
+| `claude-code` | 可用 | 暂不支持 | 使用 Claude Agent SDK，支持会话续聊、权限模式、上下文压缩、Agent 流式事件和 MCP |
 
 Provider 和模型选择会在 Web UI 中保存；每个 Provider 会记住上次选择的模型。
 
-## DeepSeek 支持
+## 兼容模型支持
 
-AnyBot 可以通过 Codex Responses 适配层接入 DeepSeek 兼容服务。开启后，Codex Provider 会使用 AnyBot 内置的兼容服务配置和模型映射，并使用独立 `CODEX_HOME`，不影响用户全局 `~/.codex` 配置。
+AnyBot 可以在设置页为 Codex 和 Claude Code 单独配置 Anthropic API 兼容服务。当前内置 Base URL 建议项包括 DeepSeek、Kimi、MiniMax 和 VibeAPI；也可以手动填写其它兼容服务地址。
+
+Codex 通过 **Responses 适配层** 接入兼容服务。开启后，Codex Provider 会使用 AnyBot 内置的兼容服务配置和模型映射，并使用独立 `CODEX_HOME`，不影响用户全局 `~/.codex` 配置。
+
+Claude Code 通过 **Anthropic 兼容接口** 接入兼容服务。开启后，Claude Code Provider 会优先使用 AnyBot 内配置的 Base URL、API Key、Auto/Opus/Sonnet/Haiku/Subagent 模型映射和可选外部 CLI 路径。
 
 适用场景：
 
-- 使用 DeepSeek 兼容模型驱动本机 Codex Agent。
+- 使用兼容模型驱动本机 Codex 或 Claude Code Agent。
 - 在 Web UI 中选择稳定模型别名。
-- 通过飞书、QQ、Telegram、个人微信等频道远程调用本机 Agent。
+- 通过飞书、钉钉、QQ、Telegram、个人微信等频道远程调用本机 Agent。
 - 配合项目工作区、技能和自动化任务完成代码分析、定时巡检、文档生成等任务。
 
-在 **设置 -> 提供商 -> Codex** 中开启 **Responses 适配层** 后，聊天框只展示 `gpt-5.5`、`gpt-mini`、`gpt-codex` 三个稳定别名，实际上游模型由设置页映射决定。
+在 **设置 -> 提供商 -> Codex** 中开启 **Responses 适配层** 后，聊天框只展示 `gpt-5.5`、`gpt-mini`、`gpt-codex` 三个稳定别名，实际上游模型由设置页映射决定。Claude Code 兼容接口则按 Auto、Opus、Sonnet、Haiku / Fast、Subagent 等用途维护映射。
 
 ---
 
@@ -161,7 +167,7 @@ Web UI 是当前推荐入口，主要能力包括：
 - 文件上传、图片预览、本地图片访问。
 - Slash picker：按当前 Provider 展示技能、项目和 Provider 原生命令。
 - 变更审核：展示 Agent 改动 diff，支持通过或撤销。
-- Provider、模型、Sandbox/权限、应用外观、日志、数据导入导出和频道配置。
+- Provider、模型、MCP、Sandbox/权限、应用外观、日志、数据导入导出和频道配置。
 - 技能管理：按 Provider 隔离扫描技能目录，支持启用、禁用、删除和打开文件夹。
 - 自动化任务管理：配置触发时间、Provider、模型、项目、技能和交付方式；本地调度器会按配置新建会话并执行任务。
 
@@ -174,9 +180,10 @@ Web UI 是当前推荐入口，主要能力包括：
 | 频道 | 接入方式 | 输入 | 输出 | 备注 |
 |------|----------|------|------|------|
 | 飞书 | 长连接事件订阅 | 文本、图片 | 文本、图片、`FILE:` 文件 | 群聊默认仅 @ 回复，可配置为全部回复 |
-| QQ Bot | WebSocket 网关 | 文本 | 文本 | 支持频道、群聊和 C2C/私聊事件 |
+| 钉钉 | Stream 机器人事件 | 文本、图片、文件 | Markdown、图片、`FILE:` 文件 | 单聊会自动记录 Owner；附件上限 20MB |
+| QQ Bot | WebSocket 网关 | 文本、图片、文件 | Markdown、图片 | 支持频道、群聊和 C2C/私聊事件；非图片文件会返回本机路径 |
 | Telegram | Bot API 长轮询 | 文本、图片 | 文本 | 图片 caption 会作为上下文；长回复自动拆分 |
-| 个人微信 | 微信通道协议 | 文本、图片、文件 | 文本、图片、`FILE:` 文件 | 扫码绑定，不需要 OpenClaw |
+| 个人微信 | 微信通道协议 | 文本、图片、文件 | 文本、图片、`FILE:` 文件 | 扫码绑定 |
 
 所有频道都支持频道命令：`/help`、`/new`、`/provider`、`/model`、`/workspace`。不带 `/` 的 `provider 1`、`model 1`、`workspace 1` 也可用于按序号切换。
 
@@ -201,6 +208,13 @@ Web UI 是当前推荐入口，主要能力包括：
     "appSecret": "",
     "ownerChatId": ""
   },
+  "dingtalk": {
+    "enabled": false,
+    "appId": "",
+    "appSecret": "",
+    "robotCode": "",
+    "ownerChatId": ""
+  },
   "telegram": {
     "enabled": false,
     "token": "",
@@ -221,6 +235,10 @@ Web UI 是当前推荐入口，主要能力包括：
 ### 飞书
 
 在飞书开放平台创建应用后，开启机器人能力和长连接模式，订阅 `im.message.receive_v1`，授予发送消息权限；如需处理图片，还需要读取消息资源相关权限。
+
+### 钉钉
+
+在钉钉开放平台创建 Stream 机器人应用，填写 App Key 和 App Secret。机器人收到消息后会自动缓存 `robotCode`；首次单聊机器人时会自动记录 `ownerChatId`，用于主动推送和自动化交付。
 
 ### QQ Bot
 
@@ -249,6 +267,14 @@ Web UI 的 `/` 入口会按当前 Provider 展示可用技能、项目和命令�
 
 ---
 
+## MCP 服务器
+
+MCP Server 在 **设置 -> 提供商 -> MCP** 中管理，配置保存在 `.data/app-settings.json`。当前支持粘贴 `mcpServers` JSON，或包含 `command` / `url` 的单个 Server 配置；支持 `stdio`、`http` 和 `sse` 类型。
+
+启用的 MCP Server 会在应用启动时校验，也可以在设置页手动刷新、重新检查、查看日志、禁用或删除。校验通过后，同一份 MCP 配置会传给 Codex 和 Claude Code；Codex 会转换为 Codex CLI 的 `mcp_servers` 配置，Claude Code 会转换为 Claude Agent SDK 的 `mcpServers` 配置。
+
+---
+
 ## 主动推送
 
 AnyBot 保留了轻量本地 API，方便脚本把通知推送到已配置 Owner 的频道。常见用法是发送部署结果、定时任务结果或本机自动化提醒。
@@ -259,7 +285,7 @@ curl -X POST http://localhost:19981/api/send \
   -d '{"channel": "telegram", "message": "部署完成"}'
 ```
 
-`channel` 可选 `feishu`、`qqbot`、`telegram`、`weixin`，需要对应频道配置 `ownerChatId`。
+`channel` 可选 `feishu`、`dingtalk`、`qqbot`、`telegram`、`weixin`，需要对应频道配置 `ownerChatId`。
 
 ---
 
@@ -278,22 +304,24 @@ curl -X POST http://localhost:19981/api/send \
 常见文件：
 
 - `.data/chat.db`：会话、消息、项目和自动化存储。
-- `.data/app-settings.json`：应用设置。
+- `.data/app-settings.json`：应用设置、Provider 运行配置和 MCP Server 配置。
 - `.data/model-config.json`：Provider 与模型选择。
 - `.data/runtime-config.json`：Sandbox/权限默认值。
 - `.data/channels.json`：频道配置。
 - `.data/disabled-skills.json`：技能启用状态。
 - `.data/change-reviews/`：变更审核快照。
 - `.data/codex/`：开启 Codex Responses 适配层后的隔离 `CODEX_HOME`，包含 Codex 会话和技能数据。
+- `.data/claude-code/`：开启 Claude Code Anthropic 兼容接口后的隔离 `CLAUDE_CONFIG_DIR`。
 
 ---
 
 ## 工作原理
 
-- `src/index.ts` 启动 Provider、Web 服务和已启用频道。
+- `src/index.ts` 启动 Provider、Web 服务、已启用频道、桌面更新检查和 MCP Server 启动校验。
 - `src/chat-runner.ts` 是 Web UI 和频道进入模型调用的统一编排层，负责 Provider session、项目工作目录、prompt、消息落库、流式事件和变更审核。
 - `src/automation-scheduler.ts` 是本地自动化调度器，负责跳过重启后错过的任务、触发到期任务、记录运行历史并交付最终结果。
 - Web 会话和频道会话都绑定 Provider 原生 session，后续消息通过续聊机制保持上下文。
+- 启用的 MCP Server 会进入 Provider 调用配置，供 Codex 和 Claude Code 在任务中使用。
 - 项目会话会把项目目录作为 Provider 工作目录；普通对话使用默认工作目录。
 - Web UI 上传文件保存到工作目录下的 `tmp/uploads/`。
 - Agent 回复中的本机图片路径和 `FILE: /path/to/file.ext` 只会在支持附件回传的频道中上传发送。
@@ -306,7 +334,7 @@ curl -X POST http://localhost:19981/api/send \
 ```text
 AnyBot/
 ├── src/
-│   ├── index.ts                    # 进程入口：启动 Provider、Web 服务和频道
+│   ├── index.ts                    # 进程入口：启动 Provider、Web 服务、频道、MCP 校验和更新检查
 │   ├── chat-runner.ts              # 会话编排：Provider 调用、流式事件、变更审核和消息落库
 │   ├── automation-scheduler.ts     # 本地自动化调度、运行记录和结果交付
 │   ├── app-settings.ts             # 应用设置读写
@@ -317,7 +345,7 @@ AnyBot/
 │   ├── lark.ts                     # 飞书 API（消息、文件、图片）
 │   ├── message.ts                  # 消息解析（输入输出）
 │   ├── providers/                  # Provider 抽象层
-│   ├── channels/                   # 微信、Telegram、飞书、QQ 等频道集成
+│   ├── channels/                   # 微信、Telegram、飞书、钉钉、QQ 等频道集成
 │   ├── web/                        # Express API、SQLite 存储和 Web UI 静态资源
 │   │   ├── routes/                 # 领域路由
 │   │   ├── services/               # 复用业务逻辑和纯辅助函数
