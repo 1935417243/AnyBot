@@ -1248,6 +1248,7 @@
         }
 
         .settings-tab-panel[data-settings-panel="provider"].active:has(.provider-settings-tab-panel[data-provider-settings-panel="mcp"].active) .provider-settings-subtabs {
+            align-self: flex-start;
             flex-shrink: 0;
         }
 
