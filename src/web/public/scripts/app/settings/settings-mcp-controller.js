@@ -67,6 +67,10 @@ export function createSettingsMcpController(options) {
         settingsProviderSubtabPanels.forEach(function (panel) {
             panel.classList.toggle('active', panel.dataset.providerSettingsPanel === tab);
         });
+        if (tab === 'mcp' && settingsProviderSubtabs[0]) {
+            var settingsPanelBody = settingsProviderSubtabs[0].closest('.settings-panel-body');
+            if (settingsPanelBody) settingsPanelBody.scrollTop = 0;
+        }
         if (tab === 'mcp' && !loaded) {
             fetchServers(false);
         }
