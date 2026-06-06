@@ -267,6 +267,7 @@ export function createAutomationsPageController(options) {
             '<div class="automation-status" id="automation-status"></div>' +
             '<div class="automation-drawer-overlay" id="automation-drawer-overlay"></div>' +
             '<aside class="automation-drawer" id="automation-detail-drawer"></aside>' +
+            '<aside class="automation-drawer automation-runs-drawer" id="automation-runs-drawer"></aside>' +
             '<aside class="automation-editor" id="automation-editor"></aside>';
 
         automationView.appendChild(page);
@@ -343,6 +344,7 @@ export function createAutomationsPageController(options) {
                 '<div class="automation-card-side">' +
                 '<button class="automation-toggle ' + (automation.enabled ? 'on' : '') + '" data-action="toggle" title="' + (automation.enabled ? '停用' : '启用') + '"></button>' +
                 '<button class="automation-icon-btn" data-action="edit" title="编辑">' + iconEdit() + '</button>' +
+                '<button class="automation-icon-btn" data-action="runs" title="运行记录">' + iconHistory() + '</button>' +
                 '<button class="automation-icon-btn danger" data-action="delete" title="删除">' + iconTrash() + '</button>' +
                 '</div>' +
                 '</article>';
@@ -373,6 +375,15 @@ export function createAutomationsPageController(options) {
             });
         });
 
+        listEl.querySelectorAll('[data-action="runs"]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                selectedAutomationId = btn.closest('.automation-card').dataset.id;
+                renderList();
+                openRunsDrawer(selectedAutomationId);
+            });
+        });
+
         listEl.querySelectorAll('[data-action="delete"]').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
@@ -392,6 +403,8 @@ export function createAutomationsPageController(options) {
     function openDetailDrawer(id) {
         var automation = findAutomation(id);
         if (!automation) return;
+        closeRunsDrawer();
+        closeEditor();
         var drawer = document.getElementById('automation-detail-drawer');
         drawer.innerHTML =
             '<div class="automation-drawer-header">' +
@@ -412,7 +425,6 @@ export function createAutomationsPageController(options) {
                 return '<span class="automation-meta green">' + escapeHtml(skill.name) + '</span>';
             }).join('') + '</div>') +
             detailBlock('交付方式', escapeHtml(channelLabel(automation.channelType))) +
-            detailBlock('运行记录', '<div id="automation-run-history" class="automation-run-history">加载中</div>') +
             '</div>' +
             '<div class="automation-drawer-footer">' +
             '<button class="automation-secondary-btn" id="automation-detail-edit" type="button">编辑</button>' +
@@ -421,9 +433,6 @@ export function createAutomationsPageController(options) {
         document.getElementById('automation-detail-edit').addEventListener('click', function () {
             closeDetailDrawer();
             openEditEditor(id);
-        });
-        fetchAutomationRuns(id).then(function () {
-            renderRunHistory(id);
         });
         openOverlay();
         requestAnimationFrame(function () {
@@ -445,25 +454,64 @@ export function createAutomationsPageController(options) {
         return '未交付';
     }
 
+    function openRunsDrawer(id) {
+        var automation = findAutomation(id);
+        if (!automation) return;
+        closeDetailDrawer();
+        closeEditor();
+        var drawer = document.getElementById('automation-runs-drawer');
+        drawer.innerHTML =
+            '<div class="automation-drawer-header">' +
+            '<div>' +
+            '<div class="automation-drawer-title">运行记录</div>' +
+            '<div class="automation-drawer-subtitle">' + escapeHtml(automation.name) + '</div>' +
+            '</div>' +
+            '<button class="automation-drawer-close" id="automation-runs-close" type="button">' + iconClose() + '</button>' +
+            '</div>' +
+            '<div class="automation-drawer-body">' +
+            '<div id="automation-run-history" class="automation-run-history">' +
+            '<div class="automation-choice-empty">加载中</div>' +
+            '</div>' +
+            '</div>';
+        document.getElementById('automation-runs-close').addEventListener('click', closeDrawers);
+        fetchAutomationRuns(id).then(function () {
+            renderRunHistory(id);
+        });
+        openOverlay();
+        requestAnimationFrame(function () {
+            drawer.classList.add('open');
+        });
+    }
+
     function renderRunHistory(id) {
         var container = document.getElementById('automation-run-history');
         if (!container) return;
+        var automation = findAutomation(id);
         var runs = automationRuns[id] || [];
         if (runs.length === 0) {
             container.innerHTML = '<div class="automation-choice-empty">暂无运行记录</div>';
             return;
         }
-        container.innerHTML = runs.slice(0, 5).map(function (run) {
-            var text = run.error || run.output || '';
-            return '<div class="automation-run-item">' +
-                '<div class="automation-run-row">' +
-                '<span class="automation-meta ' + (run.status === 'success' ? 'green' : run.status === 'failed' ? 'red' : 'accent') + '">' + escapeHtml(runStatusLabel(run.status)) + '</span>' +
-                '<span class="automation-meta blue">' + escapeHtml(deliveryStatusLabel(run.deliveryStatus)) + '</span>' +
-                '<span class="automation-run-time">' + escapeHtml(formatTimestamp(run.startedAt || run.createdAt)) + '</span>' +
+        container.innerHTML = runs.map(function (run) {
+            return '<div class="automation-run-card">' +
+                '<div class="automation-run-main">' +
+                '<div class="automation-run-badges">' +
+                '<span class="automation-run-status ' + runStatusClass(run.status) + '">' + escapeHtml(runStatusLabel(run.status)) + '</span>' +
+                '<span class="automation-run-trigger">' + iconClock() + '自动触发</span>' +
+                '<span class="automation-run-delivery">' + escapeHtml(deliveryStatusLabel(run.deliveryStatus)) + '</span>' +
                 '</div>' +
-                (text ? '<div class="automation-run-output">' + escapeHtml(text.slice(0, 160)) + '</div>' : '') +
+                '<div class="automation-run-title">' + escapeHtml(automation ? automation.name : '自动化任务') + '</div>' +
+                '</div>' +
+                '<div class="automation-run-time">' + escapeHtml(formatTimestamp(run.startedAt || run.createdAt)) + '</div>' +
                 '</div>';
         }).join('');
+    }
+
+    function runStatusClass(status) {
+        if (status === 'success') return 'success';
+        if (status === 'failed') return 'failed';
+        if (status === 'running') return 'running';
+        return 'pending';
     }
 
     function detailBlock(label, valueHtml) {
@@ -570,6 +618,7 @@ export function createAutomationsPageController(options) {
         renderSkillDropdown();
         renderChannelDropdown();
         closeDetailDrawer();
+        closeRunsDrawer();
         openOverlay();
         requestAnimationFrame(function () {
             editor.classList.add('open');
@@ -874,14 +923,26 @@ export function createAutomationsPageController(options) {
         if (drawer) drawer.classList.remove('open');
     }
 
+    function closeRunsDrawer() {
+        var drawer = document.getElementById('automation-runs-drawer');
+        if (drawer) drawer.classList.remove('open');
+    }
+
+    function closeEditor() {
+        var editor = document.getElementById('automation-editor');
+        if (editor) editor.classList.remove('open');
+    }
+
     function closeDrawers() {
         var overlay = document.getElementById('automation-drawer-overlay');
         var detailDrawer = document.getElementById('automation-detail-drawer');
+        var runsDrawer = document.getElementById('automation-runs-drawer');
         var editor = document.getElementById('automation-editor');
         if (overlay) overlay.classList.remove('open');
         if (detailDrawer) detailDrawer.classList.remove('open');
+        if (runsDrawer) runsDrawer.classList.remove('open');
         if (editor) editor.classList.remove('open');
-        return !!(detailDrawer && detailDrawer.classList.contains('open')) || !!(editor && editor.classList.contains('open'));
+        return !!(detailDrawer && detailDrawer.classList.contains('open')) || !!(runsDrawer && runsDrawer.classList.contains('open')) || !!(editor && editor.classList.contains('open'));
     }
 
     function handleEscape() {
@@ -897,6 +958,10 @@ export function createAutomationsPageController(options) {
 
     function iconEdit() {
         return '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 11.5h2.2L11 5.2a1.4 1.4 0 0 0-2-2L2.7 9.5v2Z" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round"/><path d="m8.2 4 1.8 1.8" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>';
+    }
+
+    function iconHistory() {
+        return '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.2 4.3A4.8 4.8 0 1 1 2 7" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/><path d="M2.9 2.3v2.2h2.2M7 4.6v2.7l1.8 1.1" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     }
 
     function iconTrash() {
