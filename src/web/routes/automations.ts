@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { getRegisteredChannelTypes, readChannelsConfig } from "../../channels/index.js";
+import { automationScheduler } from "../../automation-scheduler.js";
 import { logger } from "../../logger.js";
 import { getRegisteredProviderTypes } from "../../providers/index.js";
 import * as db from "../db.js";
@@ -8,6 +9,7 @@ import {
   createAutomation,
   deleteAutomation,
   getAutomation,
+  hasRunningAutomationRun,
   listAutomations,
   listAutomationRuns,
   updateAutomation,
@@ -62,6 +64,38 @@ export function createAutomationsRouter(): Router {
       res.json(page);
     } catch (error) {
       res.status(500).json({ error: "读取自动化运行记录失败" });
+    }
+  });
+
+  router.get("/automations/:id/run-status", (req: Request, res: Response) => {
+    try {
+      const automation = getAutomation(req.params.id as string);
+      if (!automation) {
+        res.status(404).json({ error: "自动化不存在" });
+        return;
+      }
+      res.json({ running: hasRunningAutomationRun(automation.id) });
+    } catch (error) {
+      res.status(500).json({ error: "读取自动化执行状态失败" });
+    }
+  });
+
+  router.post("/automations/:id/run", (req: Request, res: Response) => {
+    try {
+      const automation = getAutomation(req.params.id as string);
+      if (!automation) {
+        res.status(404).json({ error: "自动化不存在" });
+        return;
+      }
+      if (hasRunningAutomationRun(automation.id)) {
+        res.status(409).json({ error: "当前自动化已有任务执行中" });
+        return;
+      }
+      const run = automationScheduler.runOnce(automation);
+      logger.info("automation.run_once.started", { id: automation.id, runId: run.id });
+      res.status(202).json({ run });
+    } catch (error) {
+      res.status(500).json({ error: "执行自动化失败" });
     }
   });
 

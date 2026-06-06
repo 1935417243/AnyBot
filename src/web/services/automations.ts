@@ -5,6 +5,8 @@ export type AutomationScheduleType = "minutes" | "hourly" | "daily" | "weekly" |
 export type AutomationRunStatus = "pending" | "running" | "success" | "failed";
 export type AutomationDeliveryStatus = "none" | "local" | "delivered" | "delivery_failed";
 
+const INTERRUPTED_RUN_ERROR = "服务重启，运行状态已中断";
+
 export interface AutomationSkillConfig {
   id: string;
   name: string;
@@ -440,6 +442,14 @@ export function listAutomationRuns(automationId: string, page = 1, pageSize = 10
     pageSize: normalizedPageSize,
     totalPages,
   };
+}
+
+export function hasRunningAutomationRun(automationId: string): boolean {
+  return db.countRunningAutomationRunRows(automationId) > 0;
+}
+
+export function markInterruptedAutomationRuns(): number {
+  return db.markRunningAutomationRunRowsInterrupted(Date.now(), INTERRUPTED_RUN_ERROR);
 }
 
 export function pruneAutomationRuns(automationId: string, keep = 100): void {

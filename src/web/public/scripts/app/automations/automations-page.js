@@ -437,13 +437,15 @@ export function createAutomationsPageController(options) {
             detailBlock('交付方式', escapeHtml(channelLabel(automation.channelType))) +
             '</div>' +
             '<div class="automation-drawer-footer">' +
-            '<button class="automation-secondary-btn" id="automation-detail-edit" type="button">编辑</button>' +
+            '<span class="automation-run-once-wrap" id="automation-detail-run-once-wrap" data-automation-id="' + escapeHtml(id) + '" title="执行一次">' +
+            '<button class="automation-run-once-btn" id="automation-detail-run-once" type="button" data-automation-id="' + escapeHtml(id) + '">' + iconPlay() + '执行一次</button>' +
+            '</span>' +
             '</div>';
         document.getElementById('automation-detail-close').addEventListener('click', closeDrawers);
-        document.getElementById('automation-detail-edit').addEventListener('click', function () {
-            closeDetailDrawer();
-            openEditEditor(id);
+        document.getElementById('automation-detail-run-once').addEventListener('click', function () {
+            runAutomationOnce(id, this);
         });
+        refreshRunOnceButton(id);
         openOverlay();
         requestAnimationFrame(function () {
             drawer.classList.add('open');
@@ -566,6 +568,48 @@ export function createAutomationsPageController(options) {
         }
         closeDrawers();
         await options.openSession(sessionId);
+    }
+
+    async function runAutomationOnce(id, button) {
+        if (button) {
+            setRunOnceButtonRunning(button, true);
+        }
+        try {
+            var res = await fetch('/api/automations/' + encodeURIComponent(id) + '/run', { method: 'POST' });
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok) {
+                showError(data.error || '执行自动化失败');
+                if (button && button.dataset.automationId === id) setRunOnceButtonRunning(button, false);
+                return;
+            }
+            showStatus('已开始执行');
+        } catch (e) {
+            showError('执行自动化失败');
+            if (button && button.dataset.automationId === id) setRunOnceButtonRunning(button, false);
+        }
+    }
+
+    async function refreshRunOnceButton(id) {
+        var button = document.getElementById('automation-detail-run-once');
+        if (!button) return;
+        try {
+            var res = await fetch('/api/automations/' + encodeURIComponent(id) + '/run-status');
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok) return;
+            if (button.dataset.automationId !== id) return;
+            setRunOnceButtonRunning(button, !!data.running);
+        } catch (e) {
+            // 状态读取失败时保留按钮可点击，由执行接口做最终拦截。
+        }
+    }
+
+    function setRunOnceButtonRunning(button, running) {
+        var title = running ? '当前自动化已有任务执行中，完成后可再次执行' : '执行一次';
+        var wrapper = document.getElementById('automation-detail-run-once-wrap');
+        button.disabled = !!running;
+        button.title = title;
+        button.innerHTML = iconPlay() + (running ? '执行中' : '执行一次');
+        if (wrapper) wrapper.title = title;
     }
 
     function detailBlock(label, valueHtml) {
@@ -1012,6 +1056,10 @@ export function createAutomationsPageController(options) {
 
     function iconEdit() {
         return '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 11.5h2.2L11 5.2a1.4 1.4 0 0 0-2-2L2.7 9.5v2Z" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round"/><path d="m8.2 4 1.8 1.8" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>';
+    }
+
+    function iconPlay() {
+        return '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3.4v7.2L10.4 7 5 3.4Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
     }
 
     function iconHistory() {

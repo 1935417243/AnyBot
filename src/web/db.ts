@@ -449,6 +449,21 @@ const stmts = {
     WHERE automation_id = ?
   `),
 
+  countRunningAutomationRuns: db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM automation_runs
+    WHERE automation_id = ? AND status = 'running' AND finished_at IS NULL
+  `),
+
+  markRunningAutomationRunsInterrupted: db.prepare(`
+    UPDATE automation_runs
+    SET status = 'failed',
+        error = ?,
+        finished_at = ?
+    WHERE status = 'running'
+      AND finished_at IS NULL
+  `),
+
   deleteOldAutomationRuns: db.prepare(`
     DELETE FROM automation_runs
     WHERE automation_id = ?
@@ -716,6 +731,16 @@ export function listAutomationRunRows(automationId: string, limit = 50, offset =
 export function countAutomationRunRows(automationId: string): number {
   const row = stmts.countAutomationRuns.get(automationId) as { count?: number } | undefined;
   return Number(row?.count || 0);
+}
+
+export function countRunningAutomationRunRows(automationId: string): number {
+  const row = stmts.countRunningAutomationRuns.get(automationId) as { count?: number } | undefined;
+  return Number(row?.count || 0);
+}
+
+export function markRunningAutomationRunRowsInterrupted(finishedAt: number, error: string): number {
+  const result = stmts.markRunningAutomationRunsInterrupted.run(error, finishedAt);
+  return result.changes;
 }
 
 export function deleteOldAutomationRunRows(automationId: string, keep = 100): void {

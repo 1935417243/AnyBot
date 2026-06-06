@@ -7,6 +7,7 @@ import {
   updateAutomationRun,
   pruneAutomationRuns,
   onAutomationsChanged,
+  markInterruptedAutomationRuns,
   type AutomationConfig,
   type AutomationDeliveryStatus,
 } from "./web/services/automations.js";
@@ -37,6 +38,10 @@ import * as db from "./web/db.js";
 const LOCAL_CHANNEL_TYPE = "local";
 const MAX_TIMEOUT_MS = 2_147_000_000;
 const RUN_HISTORY_KEEP = 100;
+
+interface AutomationRunOptions {
+  updateNextRunAt: boolean;
+}
 
 function createAutomationSession(automation: AutomationConfig): db.ChatSession {
   const now = Date.now();
@@ -85,11 +90,19 @@ export class AutomationScheduler {
   private timer: NodeJS.Timeout | null = null;
   private stopped = false;
   private processing = false;
+  private recoveredInterruptedRuns = false;
   private unsubscribe: (() => void) | null = null;
 
   start(): void {
     if (this.unsubscribe) return;
     this.stopped = false;
+    if (!this.recoveredInterruptedRuns) {
+      this.recoveredInterruptedRuns = true;
+      const interruptedRuns = markInterruptedAutomationRuns();
+      if (interruptedRuns > 0) {
+        logger.warn("automation.run.interrupted_recovered", { count: interruptedRuns });
+      }
+    }
     this.skipMissedRunsOnStartup();
     this.unsubscribe = onAutomationsChanged(() => this.scheduleNext());
     this.scheduleNext();
@@ -173,8 +186,22 @@ export class AutomationScheduler {
     }
   }
 
+  runOnce(automation: AutomationConfig): ReturnType<typeof createAutomationRun> {
+    const run = createAutomationRun(automation.id);
+    void this.executeAutomationRun(automation, run, { updateNextRunAt: false });
+    return run;
+  }
+
   private async runAutomation(automation: AutomationConfig): Promise<void> {
     const run = createAutomationRun(automation.id);
+    await this.executeAutomationRun(automation, run, { updateNextRunAt: true });
+  }
+
+  private async executeAutomationRun(
+    automation: AutomationConfig,
+    run: ReturnType<typeof createAutomationRun>,
+    options: AutomationRunOptions,
+  ): Promise<void> {
     logger.info("automation.run.start", {
       automationId: automation.id,
       runId: run.id,
@@ -250,7 +277,9 @@ export class AutomationScheduler {
         error,
       });
     } finally {
-      updateAutomationNextRunAt(automation.id, computeNextRunAt(automation.schedule, Date.now()));
+      if (options.updateNextRunAt) {
+        updateAutomationNextRunAt(automation.id, computeNextRunAt(automation.schedule, Date.now()));
+      }
       pruneAutomationRuns(automation.id, RUN_HISTORY_KEEP);
     }
   }

@@ -176,6 +176,43 @@
             color: var(--text);
         }
 
+        .automation-run-once-wrap {
+            display: inline-flex;
+        }
+
+        .automation-run-once-btn {
+            min-height: 36px;
+            border-radius: 9px;
+            padding: 0 14px;
+            border: 1px solid rgba(124, 111, 247, 0.28);
+            background: var(--accent-dim);
+            color: var(--accent);
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            white-space: nowrap;
+        }
+
+        .automation-run-once-btn:hover:not(:disabled) {
+            border-color: rgba(124, 111, 247, 0.42);
+            background: rgba(124, 111, 247, 0.16);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .automation-run-once-btn:disabled {
+            cursor: default;
+            border-color: var(--border);
+            background: var(--input-bg);
+            color: var(--text-dim);
+            box-shadow: none;
+        }
+
         .automation-list-head {
             padding: 18px 32px 10px;
             color: var(--text-dim);
