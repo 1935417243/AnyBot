@@ -51,6 +51,10 @@ const MCP_LIST_TOOLS_GRACE_MS = 1500;
 const MAX_MCP_VERIFY_TIMEOUT_MS = 60_000;
 const MAX_LOGS_PER_SERVER = 100;
 const INVALID_SERVER_NAME_PATTERN = /[\u0000-\u001f\u007f]/;
+const MCP_SERVER_NAME_COLLATOR = new Intl.Collator(["zh-CN", "en"], {
+  numeric: true,
+  sensitivity: "base",
+});
 
 const runtimeStateById = new Map<string, RuntimeState>();
 const logsByServerId = new Map<string, McpServerLogEntry[]>();
@@ -282,6 +286,17 @@ function toPublicServer(server: McpServerSettings): McpServerPublicView {
     url,
     configJson: getServerConfigJson(server),
   };
+}
+
+function getServerSortName(server: McpServerSettings): string {
+  return (server.name || server.id).trim() || server.id;
+}
+
+function compareMcpServers(a: McpServerSettings, b: McpServerSettings): number {
+  if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+  const nameOrder = MCP_SERVER_NAME_COLLATOR.compare(getServerSortName(a), getServerSortName(b));
+  if (nameOrder !== 0) return nameOrder;
+  return MCP_SERVER_NAME_COLLATOR.compare(a.id, b.id);
 }
 
 function getVerifyTimeoutMs(config: Record<string, unknown>): number {
@@ -600,7 +615,7 @@ async function verifyMcpServer(server: McpServerSettings): Promise<VerifyResult>
 }
 
 export function listMcpServers(): McpServerPublicView[] {
-  return Object.values(getServersMap()).map(toPublicServer);
+  return Object.values(getServersMap()).sort(compareMcpServers).map(toPublicServer);
 }
 
 export function getMcpServerLogs(serverId: string): McpServerLogEntry[] {
