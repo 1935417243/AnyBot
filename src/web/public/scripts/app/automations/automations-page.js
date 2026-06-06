@@ -11,12 +11,14 @@ const WEEKDAY_LABELS = {
 };
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const LOCAL_CHANNEL_TYPE = 'local';
+const AUTOMATION_RUN_PAGE_SIZE = 10;
 
 export function createAutomationsPageController(options) {
     const automationView = options.automationView;
 
     var automations = [];
     var automationRuns = {};
+    var automationRunPages = {};
     var providersData = null;
     var channelsData = null;
     var projects = [];
@@ -152,14 +154,22 @@ export function createAutomationsPageController(options) {
         }
     }
 
-    async function fetchAutomationRuns(id) {
+    async function fetchAutomationRuns(id, page) {
+        page = Math.max(1, Number(page || 1));
         try {
-            var res = await fetch('/api/automations/' + encodeURIComponent(id) + '/runs');
+            var res = await fetch('/api/automations/' + encodeURIComponent(id) + '/runs?page=' + encodeURIComponent(page));
             var data = await res.json();
             automationRuns[id] = Array.isArray(data.runs) ? data.runs : [];
+            automationRunPages[id] = {
+                page: Number(data.page || page),
+                pageSize: Number(data.pageSize || AUTOMATION_RUN_PAGE_SIZE),
+                total: Number(data.total || automationRuns[id].length),
+                totalPages: Number(data.totalPages || 1),
+            };
         } catch (e) {
             console.error('Failed to fetch automation runs:', e);
             automationRuns[id] = [];
+            automationRunPages[id] = { page: 1, pageSize: AUTOMATION_RUN_PAGE_SIZE, total: 0, totalPages: 1 };
         }
     }
 
@@ -474,7 +484,7 @@ export function createAutomationsPageController(options) {
             '</div>' +
             '</div>';
         document.getElementById('automation-runs-close').addEventListener('click', closeDrawers);
-        fetchAutomationRuns(id).then(function () {
+        fetchAutomationRuns(id, 1).then(function () {
             renderRunHistory(id);
         });
         openOverlay();
@@ -488,6 +498,7 @@ export function createAutomationsPageController(options) {
         if (!container) return;
         var automation = findAutomation(id);
         var runs = automationRuns[id] || [];
+        var pageInfo = automationRunPages[id] || { page: 1, pageSize: AUTOMATION_RUN_PAGE_SIZE, total: runs.length, totalPages: 1 };
         if (runs.length === 0) {
             container.innerHTML = '<div class="automation-choice-empty">暂无运行记录</div>';
             return;
@@ -504,7 +515,7 @@ export function createAutomationsPageController(options) {
                 '</div>' +
                 '<div class="automation-run-time">' + escapeHtml(formatTimestamp(run.startedAt || run.createdAt)) + '</div>' +
                 '</div>';
-        }).join('');
+        }).join('') + renderRunPagination(pageInfo);
         container.querySelectorAll('.automation-run-card').forEach(function (card) {
             card.addEventListener('click', function () {
                 openRunSession(card.dataset.sessionId);
@@ -515,6 +526,26 @@ export function createAutomationsPageController(options) {
                 openRunSession(card.dataset.sessionId);
             });
         });
+        container.querySelectorAll('[data-run-page]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var nextPage = Number(btn.dataset.runPage || 1);
+                btn.disabled = true;
+                fetchAutomationRuns(id, nextPage).then(function () {
+                    renderRunHistory(id);
+                });
+            });
+        });
+    }
+
+    function renderRunPagination(pageInfo) {
+        if (!pageInfo || pageInfo.totalPages <= 1) return '';
+        var page = Number(pageInfo.page || 1);
+        var totalPages = Number(pageInfo.totalPages || 1);
+        return '<div class="automation-run-pagination">' +
+            '<button class="automation-run-page-btn" type="button" data-run-page="' + (page - 1) + '" ' + (page <= 1 ? 'disabled' : '') + '>上一页</button>' +
+            '<span class="automation-run-page-label">' + page + ' / ' + totalPages + '</span>' +
+            '<button class="automation-run-page-btn" type="button" data-run-page="' + (page + 1) + '" ' + (page >= totalPages ? 'disabled' : '') + '>下一页</button>' +
+            '</div>';
     }
 
     function runStatusClass(status) {

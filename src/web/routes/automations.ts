@@ -15,6 +15,13 @@ import {
 } from "../services/automations.js";
 
 const LOCAL_CHANNEL_TYPE = "local";
+const RUN_PAGE_SIZE = 10;
+
+function readPageParam(value: unknown): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
 
 function validateAutomationInput(input: AutomationInput): string | null {
   if (!input.name || typeof input.name !== "string" || !input.name.trim()) return "缺少任务名称";
@@ -51,7 +58,8 @@ export function createAutomationsRouter(): Router {
         res.status(404).json({ error: "自动化不存在" });
         return;
       }
-      res.json({ runs: listAutomationRuns(automation.id) });
+      const page = listAutomationRuns(automation.id, readPageParam(req.query.page), RUN_PAGE_SIZE);
+      res.json(page);
     } catch (error) {
       res.status(500).json({ error: "读取自动化运行记录失败" });
     }

@@ -48,6 +48,14 @@ export interface AutomationRun {
   createdAt: number;
 }
 
+export interface AutomationRunPage {
+  runs: AutomationRun[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export type AutomationInput = Partial<Omit<AutomationConfig, "id" | "createdAt" | "updatedAt" | "nextRunAt">>;
 
 const changeListeners = new Set<() => void>();
@@ -419,8 +427,19 @@ export function updateAutomationRun(run: AutomationRun): AutomationRun {
   return run;
 }
 
-export function listAutomationRuns(automationId: string, limit = 50): AutomationRun[] {
-  return db.listAutomationRunRows(automationId, limit).map(rowToRun);
+export function listAutomationRuns(automationId: string, page = 1, pageSize = 10): AutomationRunPage {
+  const normalizedPageSize = Math.max(1, Math.floor(pageSize));
+  const total = db.countAutomationRunRows(automationId);
+  const totalPages = Math.max(1, Math.ceil(total / normalizedPageSize));
+  const normalizedPage = Math.min(Math.max(1, Math.floor(page)), totalPages);
+  const offset = (normalizedPage - 1) * normalizedPageSize;
+  return {
+    runs: db.listAutomationRunRows(automationId, normalizedPageSize, offset).map(rowToRun),
+    total,
+    page: normalizedPage,
+    pageSize: normalizedPageSize,
+    totalPages,
+  };
 }
 
 export function pruneAutomationRuns(automationId: string, keep = 100): void {

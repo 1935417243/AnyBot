@@ -440,6 +440,13 @@ const stmts = {
     WHERE automation_id = ?
     ORDER BY created_at DESC
     LIMIT ?
+    OFFSET ?
+  `),
+
+  countAutomationRuns: db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM automation_runs
+    WHERE automation_id = ?
   `),
 
   deleteOldAutomationRuns: db.prepare(`
@@ -698,8 +705,17 @@ export function updateAutomationRunRow(row: AutomationRunRow): boolean {
   return result.changes > 0;
 }
 
-export function listAutomationRunRows(automationId: string, limit = 50): AutomationRunRow[] {
-  return stmts.listAutomationRuns.all(automationId, Math.max(1, Math.floor(limit))) as AutomationRunRow[];
+export function listAutomationRunRows(automationId: string, limit = 50, offset = 0): AutomationRunRow[] {
+  return stmts.listAutomationRuns.all(
+    automationId,
+    Math.max(1, Math.floor(limit)),
+    Math.max(0, Math.floor(offset)),
+  ) as AutomationRunRow[];
+}
+
+export function countAutomationRunRows(automationId: string): number {
+  const row = stmts.countAutomationRuns.get(automationId) as { count?: number } | undefined;
+  return Number(row?.count || 0);
 }
 
 export function deleteOldAutomationRunRows(automationId: string, keep = 100): void {
