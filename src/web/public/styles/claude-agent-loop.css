@@ -70,8 +70,8 @@
 
 .claude-thinking-block {
     margin: 8px 0 10px;
-    color: var(--text-muted);
-    font-size: 13px;
+    color: var(--text);
+    font-size: inherit;
     line-height: 1.7;
 }
 
@@ -106,10 +106,9 @@
 }
 
 .claude-thinking-content {
-    margin-top: 8px;
     border-left: 2px solid var(--border);
     padding-left: 12px;
-    color: var(--text-muted);
+    color: var(--text);
 }
 
 .claude-thinking-content > :first-child {
@@ -127,6 +126,41 @@
     font-size: 13px;
     line-height: 1.5;
     margin-bottom: 10px;
+}
+
+.claude-thinking-activity-summary {
+    margin: 8px 0 0;
+}
+
+.claude-activity-summary-row {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    user-select: none;
+}
+
+.claude-activity-summary-row::-webkit-details-marker {
+    display: none;
+}
+
+.claude-thinking-activity-chevron {
+    color: var(--text-muted);
+    font-size: 14px;
+    transform: translateY(1px);
+    transition: transform 0.16s ease;
+}
+
+.claude-thinking-activity-summary[open] .claude-thinking-activity-chevron {
+    transform: rotate(90deg) translateY(1px);
+}
+
+.claude-thinking-activity-items {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin: 8px 0 0 28px;
 }
 
 .claude-activity-icon {

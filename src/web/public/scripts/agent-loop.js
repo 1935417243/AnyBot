@@ -109,6 +109,7 @@
             activeProcessTextSegment: null,
             thinkingSegments: [],
             activeThinkingSegment: null,
+            activeActivitySegment: null,
             tools: new Map(),
             tasks: new Map(),
             taskAliases: new Map(),
@@ -154,13 +155,6 @@
         var processBody = document.createElement('div');
         processBody.className = 'claude-process-body';
 
-        var compactSummary = document.createElement('div');
-        compactSummary.className = 'claude-activity-summary';
-        compactSummary.style.display = 'none';
-        compactSummary.innerHTML =
-            '<span class="claude-activity-icon">›_</span>' +
-            '<span data-role="activity-summary"></span>';
-
         var taskSection = document.createElement('div');
         taskSection.className = 'claude-task-section';
         taskSection.style.display = 'none';
@@ -177,7 +171,6 @@
         var activityList = document.createElement('div');
         activityList.className = 'claude-activity-list';
 
-        processBody.appendChild(compactSummary);
         processBody.appendChild(taskSection);
         processBody.appendChild(activityList);
         process.appendChild(processSummary);
@@ -269,24 +262,89 @@
             if (state.status === 'running' && hasProcessDetails()) process.open = true;
         }
 
-        function updateActivitySummary() {
-            var parts = [];
-            if (state.readFiles.size > 0) parts.push(state.readFiles.size + ' 个文件');
-            if (state.searchCount > 0) parts.push(state.searchCount + ' 次搜索');
-            if (state.listCount > 0) parts.push(state.listCount + ' 个列表');
-            if (state.webCount > 0) parts.push('已搜索网页 ' + state.webCount + ' 次');
-            if (state.tasks.size > 0) parts.push(state.tasks.size + ' 个并行任务');
-            if (state.bashCount > 0) parts.push('已运行 ' + state.bashCount + ' 条命令');
-            if (state.editCount > 0) parts.push('已修改 ' + state.editCount + ' 个文件');
+        function createActivityStats() {
+            return {
+                readFiles: new Set(),
+                searchCount: 0,
+                listCount: 0,
+                bashCount: 0,
+                editCount: 0,
+                webCount: 0,
+                taskIds: new Set(),
+            };
+        }
 
-            if (parts.length === 0) {
-                compactSummary.style.display = 'none';
+        function createActivitySummaryElement() {
+            var el = document.createElement('details');
+            el.className = 'claude-activity-summary claude-thinking-activity-summary';
+            el.style.display = 'none';
+            el.innerHTML =
+                '<summary class="claude-activity-summary-row">' +
+                '<span class="claude-activity-icon">›_</span>' +
+                '<span data-role="activity-summary"></span>' +
+                '<span class="claude-thinking-activity-chevron">›</span>' +
+                '</summary>' +
+                '<div class="claude-thinking-activity-items" data-role="activity-items"></div>';
+            return el;
+        }
+
+        function getActivityStats(segment) {
+            return segment && segment.stats;
+        }
+
+        function recordReadFile(path, segment) {
+            if (!path) return;
+            state.readFiles.add(path);
+            var stats = getActivityStats(segment || state.activeActivitySegment);
+            if (stats) stats.readFiles.add(path);
+        }
+
+        function recordActivityCount(key, segment) {
+            state[key] += 1;
+            var stats = getActivityStats(segment || state.activeActivitySegment);
+            if (stats) stats[key] += 1;
+        }
+
+        function recordTaskActivity(taskId, segment) {
+            var stats = getActivityStats(segment || state.activeActivitySegment);
+            if (stats && taskId) stats.taskIds.add(taskId);
+        }
+
+        function appendSegmentActivityElement(el) {
+            var segment = state.activeActivitySegment;
+            if (!segment || !segment.activityItemsEl) return null;
+            segment.activityItemsEl.appendChild(el);
+            return segment;
+        }
+
+        function updateActivitySummary(segment) {
+            if (arguments.length === 0) segment = state.activeActivitySegment;
+            if (!segment || !segment.stats || !segment.summaryEl) {
+                updateProcessAvailability();
+                return;
+            }
+            var stats = segment.stats;
+            var exploredParts = [];
+            var actionParts = [];
+            if (stats.readFiles.size > 0) exploredParts.push(stats.readFiles.size + ' 个文件');
+            if (stats.searchCount > 0) exploredParts.push(stats.searchCount + ' 次搜索');
+            if (stats.listCount > 0) exploredParts.push(stats.listCount + ' 个列表');
+            if (stats.webCount > 0) actionParts.push('已搜索网页 ' + stats.webCount + ' 次');
+            if (stats.taskIds.size > 0) actionParts.push('已启动 ' + stats.taskIds.size + ' 个并行任务');
+            if (stats.bashCount > 0) actionParts.push('已运行 ' + stats.bashCount + ' 条命令');
+            if (stats.editCount > 0) actionParts.push('已修改 ' + stats.editCount + ' 个文件');
+
+            if (exploredParts.length === 0 && actionParts.length === 0) {
+                segment.summaryEl.style.display = 'none';
                 updateProcessAvailability();
                 return;
             }
 
-            compactSummary.style.display = 'flex';
-            compactSummary.querySelector('[data-role="activity-summary"]').textContent = '已探索 ' + parts.join(',');
+            var parts = [];
+            if (exploredParts.length > 0) parts.push('已探索 ' + exploredParts.join('，'));
+            parts.push.apply(parts, actionParts);
+            segment.summaryEl.style.display = 'block';
+            segment.summaryEl.querySelector('[data-role="activity-summary"]').textContent = parts.join('，');
             updateProcessAvailability();
         }
 
@@ -408,21 +466,25 @@
             state.activeProcessTextSegment = null;
             var segment = state.activeThinkingSegment;
             if (!segment) {
-                var el = document.createElement('details');
+                var el = document.createElement('div');
                 el.className = 'claude-thinking-block';
-                el.open = !isPersisted;
-                var summary = document.createElement('summary');
-                summary.className = 'claude-thinking-summary';
-                summary.innerHTML =
-                    '<span class="claude-thinking-title">思考过程</span>' +
-                    '<span class="claude-thinking-chevron">›</span>';
                 var body = document.createElement('div');
                 body.className = 'claude-thinking-content';
-                el.appendChild(summary);
+                var summaryEl = createActivitySummaryElement();
+                var activityItemsEl = summaryEl.querySelector('[data-role="activity-items"]');
                 el.appendChild(body);
-                segment = { el: el, body: body, text: '' };
+                el.appendChild(summaryEl);
+                segment = {
+                    el: el,
+                    body: body,
+                    summaryEl: summaryEl,
+                    activityItemsEl: activityItemsEl,
+                    stats: createActivityStats(),
+                    text: '',
+                };
                 state.thinkingSegments.push(segment);
                 state.activeThinkingSegment = segment;
+                state.activeActivitySegment = segment;
                 activityList.appendChild(el);
             }
             segment.text += text;
@@ -472,36 +534,36 @@
             updateProcessAvailability();
         }
 
-        function classifyTool(tool) {
+        function classifyTool(tool, activitySegment) {
             var name = tool.name || 'Tool';
             var summary = tool.summary || '';
             if (name === 'Read') {
-                if (summary) state.readFiles.add(summary);
+                recordReadFile(summary, activitySegment);
                 return 'Read ' + summary;
             }
             if (name === 'Grep') {
-                state.searchCount += 1;
+                recordActivityCount('searchCount', activitySegment);
                 return 'Searched for ' + summary;
             }
             if (name === 'Glob') {
-                state.searchCount += 1;
+                recordActivityCount('searchCount', activitySegment);
                 return 'Searched files ' + summary;
             }
             if (name === 'LS') {
-                state.listCount += 1;
+                recordActivityCount('listCount', activitySegment);
                 return 'Listed files in ' + (summary || '.');
             }
             if (name === 'Bash') {
-                state.bashCount += 1;
+                recordActivityCount('bashCount', activitySegment);
                 return '已运行 ' + shellCommandSummary(summary);
             }
             if (name === 'Edit' || name === 'MultiEdit' || name === 'Write' || name === 'NotebookEdit') {
-                state.editCount += 1;
-                if (summary) state.readFiles.add(summary);
+                recordActivityCount('editCount', activitySegment);
+                recordReadFile(summary, activitySegment);
                 return (name === 'Write' ? 'Wrote ' : 'Edited ') + summary;
             }
             if (name === 'WebSearch' || name === 'WebFetch') {
-                state.webCount += 1;
+                recordActivityCount('webCount', activitySegment);
                 return (name === 'WebFetch' ? 'Fetched ' : 'Searched web ') + summary;
             }
             if (name === 'Agent' || name === 'Task') {
@@ -541,7 +603,9 @@
         }
 
         function updateTaskSection() {
-            var tasks = Array.from(state.tasks.values()).map(function (item) { return item.data; });
+            var tasks = Array.from(state.tasks.values()).filter(function (item) {
+                return !item.activitySegment;
+            }).map(function (item) { return item.data; });
             if (tasks.length === 0) {
                 taskSection.style.display = 'none';
                 return;
@@ -624,7 +688,7 @@
                     if (task.prompt) aliased.data.prompt = task.prompt;
                     if (task.status) aliased.data.status = task.status;
                     updateTaskElement(aliased);
-                    updateActivitySummary();
+                    updateActivitySummary(aliased.activitySegment);
                     updateProcessAvailability();
                     return aliased;
                 }
@@ -675,10 +739,13 @@
             };
             state.tasks.set(id, taskState);
             if (task.toolUseId) state.taskAliases.set(task.toolUseId, id);
-            taskList.appendChild(el);
+            var activitySegment = appendSegmentActivityElement(el);
+            recordTaskActivity(id, activitySegment);
+            if (!activitySegment) taskList.appendChild(el);
             appendTaskStep(taskState, task.description || task.prompt || '');
+            taskState.activitySegment = activitySegment;
             updateTaskElement(taskState);
-            updateActivitySummary();
+            updateActivitySummary(activitySegment);
             updateProcessAvailability();
             return taskState;
         }
@@ -706,7 +773,7 @@
             if (event.toolUses) task.toolUses = event.toolUses;
             appendTaskStep(taskState, event.summary || event.description || event.lastToolName || event.error || '');
             updateTaskElement(taskState);
-            updateActivitySummary();
+            updateActivitySummary(taskState.activitySegment);
             updateProcessAvailability();
         }
 
@@ -727,7 +794,7 @@
             if (event.toolUses) task.toolUses = event.toolUses;
             appendTaskStep(taskState, event.summary || event.outputFile || task.status);
             updateTaskElement(taskState);
-            updateActivitySummary();
+            updateActivitySummary(taskState.activitySegment);
             updateProcessAvailability();
         }
 
@@ -750,13 +817,15 @@
                     el: taskState ? taskState.el : document.createElement('div'),
                     text: tool.summary || tool.title || '',
                     isTaskTool: true,
+                    activitySegment: taskState ? taskState.activitySegment : null,
                 };
                 state.tools.set(tool.id, existing);
-                updateActivitySummary();
+                updateActivitySummary(existing.activitySegment);
                 return existing;
             }
 
-            var lineText = classifyTool(tool);
+            var activitySegment = state.activeActivitySegment;
+            var lineText = classifyTool(tool, activitySegment);
             var isShell = tool.name === 'Bash';
             var isExpandableShell = isShell && !isLongShellCommand(tool);
             var el = document.createElement(isExpandableShell ? 'details' : 'div');
@@ -775,10 +844,11 @@
                 el.textContent = lineText;
             }
 
-            activityList.appendChild(el);
-            existing = { data: tool, el: el, text: lineText };
+            var appendedSegment = appendSegmentActivityElement(el);
+            if (!appendedSegment) activityList.appendChild(el);
+            existing = { data: tool, el: el, text: lineText, activitySegment: appendedSegment };
             state.tools.set(tool.id, existing);
-            updateActivitySummary();
+            updateActivitySummary(appendedSegment);
             scrollBottom();
             return existing;
         }
@@ -871,6 +941,7 @@
                 toolState.el.appendChild(err);
             }
             renderDiffs(toolState, event.diffs);
+            updateActivitySummary(toolState.activitySegment);
         }
 
         function completeAnswer(event) {
@@ -988,8 +1059,8 @@
             }
 
             if (event.type === 'file_change') {
-                state.editCount += event.event === 'unlink' ? 0 : 1;
-                if (event.path) state.readFiles.add(event.path);
+                if (event.event !== 'unlink') recordActivityCount('editCount');
+                recordReadFile(event.path);
                 updateActivitySummary();
                 return;
             }
@@ -1010,7 +1081,6 @@
 
             if (event.type === 'tool_end') {
                 markTool(event);
-                updateActivitySummary();
                 scrollBottom();
             }
         }
