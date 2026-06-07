@@ -1,6 +1,5 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import path from "node:path";
-import { promisify } from "node:util";
 import type {
   HookInput,
   SDKMessage,
@@ -13,15 +12,17 @@ import type {
 import { hasBinaryDiffFileType, shouldSuppressDiffFile } from "../diff-file-types.js";
 import type { ProviderContextUsage } from "./types.js";
 
-const execFileAsync = promisify(execFile);
-
 export type ClaudeAgentToolStatus = "running" | "success" | "failed";
 
 export type ClaudeAgentDiff = {
   path: string;
   diff: string;
   diffType: "text" | "binary";
+  diffTruncated?: boolean;
 };
+
+const REALTIME_DIFF_MAX_BYTES = 32 * 1024;
+const REALTIME_DIFF_MAX_LINES = 200;
 
 export type ClaudeAgentStreamEvent =
   | {
@@ -394,16 +395,12 @@ async function collectDiffs(workdir: string, files: string[]): Promise<ClaudeAge
 async function collectDiff(
   workdir: string,
   file: string,
-): Promise<{ diff: string; diffType: "text" | "binary" } | undefined> {
+): Promise<{ diff: string; diffType: "text" | "binary"; diffTruncated?: boolean } | undefined> {
   if (shouldSuppressDiffFile(file)) return undefined;
 
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["diff", "--no-color", "--", file],
-      { cwd: workdir, maxBuffer: 1024 * 1024 },
-    );
-    const diff = sanitizeAgentText(stdout).trimEnd();
+    const preview = await runGitDiffPreview(workdir, file);
+    const diff = sanitizeAgentText(preview.diff).trimEnd();
     if (!diff) return undefined;
     if (hasBinaryDiffFileType(file)) {
       return { diff: "", diffType: "binary" };
@@ -414,10 +411,70 @@ async function collectDiff(
     return {
       diff: diffType === "binary" ? "" : diff,
       diffType,
+      diffTruncated: diffType === "text" && preview.truncated ? true : undefined,
     };
   } catch {
     return undefined;
   }
+}
+
+async function runGitDiffPreview(
+  workdir: string,
+  file: string,
+): Promise<{ diff: string; truncated: boolean }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", ["diff", "--no-color", "--", file], {
+      cwd: workdir,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    let truncated = false;
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (truncated) return;
+
+      const remaining = REALTIME_DIFF_MAX_BYTES - totalBytes;
+      if (remaining <= 0) {
+        truncated = true;
+        child.kill();
+        return;
+      }
+
+      if (chunk.length > remaining) {
+        chunks.push(chunk.subarray(0, remaining));
+        totalBytes += remaining;
+        truncated = true;
+        child.kill();
+        return;
+      }
+
+      chunks.push(chunk);
+      totalBytes += chunk.length;
+    });
+
+    child.on("error", reject);
+    child.on("close", (code, signal) => {
+      if (!truncated && code !== 0) {
+        reject(new Error(`git diff failed: ${code ?? signal ?? "unknown"}`));
+        return;
+      }
+
+      const diff = Buffer.concat(chunks).toString("utf8");
+      resolve(truncateDiffPreview(diff, truncated));
+    });
+  });
+}
+
+function truncateDiffPreview(diff: string, alreadyTruncated: boolean): { diff: string; truncated: boolean } {
+  const lines = diff.split("\n");
+  if (lines.length <= REALTIME_DIFF_MAX_LINES) {
+    return { diff, truncated: alreadyTruncated };
+  }
+  return {
+    diff: lines.slice(0, REALTIME_DIFF_MAX_LINES).join("\n"),
+    truncated: true,
+  };
 }
 
 function normalizeDisplayPath(file: string, workdir: string): string {

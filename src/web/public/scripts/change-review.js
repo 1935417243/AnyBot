@@ -160,11 +160,21 @@
             '<span class="del">' + signedCount(file.deletions, '-') + '</span>';
     }
 
+    function renderTruncatedNotice(file) {
+        if (!file.diffTruncated) return '';
+        return '' +
+            '<div class="change-review-diff-load">' +
+            '<span>Diff 较大，当前仅展示摘要。</span>' +
+            '<button class="change-review-btn secondary" type="button" data-load-full-diff data-file-path="' + escapeAttr(file.path) + '">查看完整 diff</button>' +
+            '</div>';
+    }
+
     function renderFileBody(file) {
         if (!isTextDiffFile(file)) {
             return '<div class="change-review-file-note">媒体或二进制资源已变更，不展示代码 diff。</div>';
         }
         return '' +
+            renderTruncatedNotice(file) +
             '<div class="change-review-diff-wrap">' +
             '<div class="change-review-diff" role="table" aria-label="代码差异">' +
             renderDiff(file.diff) +
@@ -172,10 +182,11 @@
             '</div>';
     }
 
-    function renderFile(file) {
+    function renderFile(file, openPaths) {
         var status = file.status || 'modified';
+        var open = openPaths && openPaths.has(file.path) ? ' open' : '';
         return '' +
-            '<details class="change-review-file">' +
+            '<details class="change-review-file" data-file-path="' + escapeAttr(file.path) + '"' + open + '>' +
             '<summary class="change-review-file-header">' +
             '<span class="change-review-file-main">' +
             '<span class="change-review-file-path" title="' + escapeAttr(file.path) + '">' + escapeHtml(file.path) + '</span>' +
@@ -194,7 +205,7 @@
             '</details>';
     }
 
-    function renderInner(review) {
+    function renderInner(review, openPaths) {
         var disabled = review.status !== 'pending' ? ' disabled' : '';
         var files = Array.isArray(review.files) ? review.files : [];
         return '' +
@@ -207,7 +218,7 @@
             renderReviewCounts(review, files) +
             '</div>' +
             '</div>' +
-            '<div class="change-review-files">' + files.map(renderFile).join('') + '</div>' +
+            '<div class="change-review-files">' + files.map(function (file) { return renderFile(file, openPaths); }).join('') + '</div>' +
             (review.error ? '<div class="change-review-error">' + escapeHtml(review.error) + '</div>' : '') +
             '<div class="change-review-actions">' +
             '<button class="change-review-btn secondary" data-action="revert"' + disabled + '>撤销</button>' +
@@ -227,20 +238,80 @@
         return data.review || null;
     }
 
+    async function loadFullDiff(reviewId, filePath) {
+        var res = await fetch(
+            '/api/change-reviews/' + encodeURIComponent(reviewId) + '/diff?path=' + encodeURIComponent(filePath)
+        );
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok || !data.file) {
+            throw new Error(data.error || '读取完整 diff 失败');
+        }
+        return data.file;
+    }
+
     function render(opts) {
         var review = opts.review;
         if (!review || !review.id || !Array.isArray(review.files) || review.files.length === 0) return null;
 
         var container = document.createElement('div');
+        var openPaths = new Set();
         container.className = 'change-review-card';
         container.dataset.reviewId = review.id;
-        container.innerHTML = renderInner(review);
+        container.innerHTML = renderInner(review, openPaths);
 
         function update(nextReview) {
             review = nextReview || review;
-            container.innerHTML = renderInner(review);
+            container.innerHTML = renderInner(review, openPaths);
             bindActions();
+            bindFileState();
+            bindDiffLoaders();
             if (opts.scrollBottom) opts.scrollBottom();
+        }
+
+        function replaceReviewFile(nextFile) {
+            var files = (Array.isArray(review.files) ? review.files : []).map(function (file) {
+                if (file.path !== nextFile.path) return file;
+                return Object.assign({}, file, nextFile, {
+                    diffTruncated: false,
+                    fullDiffAvailable: false,
+                });
+            });
+            update(Object.assign({}, review, { files: files }));
+        }
+
+        function bindFileState() {
+            container.querySelectorAll('.change-review-file[data-file-path]').forEach(function (el) {
+                el.addEventListener('toggle', function () {
+                    var filePath = el.getAttribute('data-file-path') || '';
+                    if (!filePath) return;
+                    if (el.open) {
+                        openPaths.add(filePath);
+                    } else {
+                        openPaths.delete(filePath);
+                    }
+                });
+            });
+        }
+
+        function bindDiffLoaders() {
+            container.querySelectorAll('[data-load-full-diff]').forEach(function (btn) {
+                btn.addEventListener('click', async function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    var filePath = btn.getAttribute('data-file-path') || '';
+                    if (!filePath) return;
+                    btn.disabled = true;
+                    btn.textContent = '加载中…';
+                    try {
+                        var file = await loadFullDiff(review.id, filePath);
+                        openPaths.add(filePath);
+                        replaceReviewFile(file);
+                    } catch (error) {
+                        btn.disabled = false;
+                        btn.textContent = error.message || '加载失败';
+                    }
+                });
+            });
         }
 
         function bindActions() {
@@ -263,6 +334,8 @@
         }
 
         bindActions();
+        bindFileState();
+        bindDiffLoaders();
         return container;
     }
 

@@ -786,7 +786,10 @@
                         '<div class="claude-inline-diff-note">媒体或二进制资源已变更，不展示代码 diff。</div>';
                 } else {
                     diff.innerHTML =
-                        '<summary>Diff ' + escapeHtml(entry.path) + '</summary>' +
+                        '<summary>Diff ' + escapeHtml(entry.path) + (entry.diffTruncated ? '（摘要）' : '') + '</summary>' +
+                        (entry.diffTruncated
+                            ? '<div class="claude-inline-diff-note">Diff 较大，过程面板仅展示摘要；完整内容请在最终变更审查中查看。</div>'
+                            : '') +
                         '<pre>' + renderDiff(entry.diff) + '</pre>';
                 }
                 toolState.el.appendChild(diff);

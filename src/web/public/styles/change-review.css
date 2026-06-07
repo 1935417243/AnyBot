@@ -245,6 +245,24 @@
     line-height: 1.5;
 }
 
+.change-review-diff-load {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-top: 1px solid var(--change-review-divider);
+    padding: 10px 14px;
+    color: var(--text-muted);
+    background: var(--change-review-diff-bg);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.change-review-diff-load .change-review-btn {
+    flex: 0 0 auto;
+    padding: 5px 10px;
+}
+
 .change-review-diff-wrap {
     max-height: 430px;
     overflow: auto;

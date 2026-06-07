@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import { hasBinaryDiffFileType, shouldSuppressDiffFile } from "../diff-file-types.js";
@@ -18,6 +18,8 @@ export type PublicFileChange = {
   deletions: number;
   diff: string;
   diffType: FileDiffType;
+  diffTruncated?: boolean;
+  fullDiffAvailable?: boolean;
 };
 
 export type PublicChangeReview = {
@@ -67,6 +69,8 @@ const DESKTOP_USER_DATA_REVIEW_FILES = new Set([
   "profile.md",
 ]);
 const MAX_SNAPSHOT_FILE_BYTES = 10 * 1024 * 1024;
+const PUBLIC_DIFF_MAX_BYTES = 128 * 1024;
+const PUBLIC_DIFF_MAX_LINES = 800;
 
 async function ensureReviewDir(): Promise<void> {
   await fs.promises.mkdir(reviewDir, { recursive: true });
@@ -103,6 +107,57 @@ async function runGitBuffer(
     maxBuffer: opts.maxBuffer || 50 * 1024 * 1024,
   });
   return stdout as Buffer;
+}
+
+async function runGitLimited(
+  workdir: string,
+  args: string[],
+  maxBytes: number,
+): Promise<{ stdout: string; truncated: boolean }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", args, {
+      cwd: workdir,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    let truncated = false;
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (truncated) return;
+
+      const remaining = maxBytes - totalBytes;
+      if (remaining <= 0) {
+        truncated = true;
+        child.kill();
+        return;
+      }
+
+      if (chunk.length > remaining) {
+        chunks.push(chunk.subarray(0, remaining));
+        totalBytes += remaining;
+        truncated = true;
+        child.kill();
+        return;
+      }
+
+      chunks.push(chunk);
+      totalBytes += chunk.length;
+    });
+
+    child.on("error", reject);
+    child.on("close", (code, signal) => {
+      if (!truncated && code !== 0 && code !== 1) {
+        reject(new Error(`git diff failed: ${code ?? signal ?? "unknown"}`));
+        return;
+      }
+
+      resolve({
+        stdout: Buffer.concat(chunks).toString("utf8"),
+        truncated,
+      });
+    });
+  });
 }
 
 function splitNul(value: string): string[] {
@@ -330,6 +385,71 @@ async function diffBuffers(relativePath: string, before: Buffer, after: Buffer):
   }
 }
 
+function truncateDiffPreview(diff: string, alreadyTruncated = false): { diff: string; truncated: boolean } {
+  let next = diff;
+  let truncated = alreadyTruncated;
+
+  if (Buffer.byteLength(next, "utf8") > PUBLIC_DIFF_MAX_BYTES) {
+    next = Buffer.from(next, "utf8").subarray(0, PUBLIC_DIFF_MAX_BYTES).toString("utf8");
+    truncated = true;
+  }
+
+  const lines = next.split("\n");
+  if (lines.length > PUBLIC_DIFF_MAX_LINES) {
+    next = lines.slice(0, PUBLIC_DIFF_MAX_LINES).join("\n");
+    truncated = true;
+  }
+
+  return { diff: next.trimEnd(), truncated };
+}
+
+async function diffBuffersPreview(
+  relativePath: string,
+  before: Buffer,
+  after: Buffer,
+): Promise<{ diff: string; truncated: boolean }> {
+  const beforePath = await writeTempFile(before);
+  const afterPath = await writeTempFile(after);
+  try {
+    const raw = await runGitLimited(
+      process.cwd(),
+      ["diff", "--no-index", "--no-color", "--no-ext-diff", "--", beforePath, afterPath],
+      PUBLIC_DIFF_MAX_BYTES,
+    );
+    const normalized = raw.stdout
+      .replace(/^diff --git .*$/m, `diff --git a/${relativePath} b/${relativePath}`)
+      .replace(/^--- .*$/m, `--- a/${relativePath}`)
+      .replace(/^\+\+\+ .*$/m, `+++ b/${relativePath}`)
+      .trimEnd();
+    return truncateDiffPreview(normalized, raw.truncated);
+  } finally {
+    await fs.promises.rm(path.dirname(beforePath), { recursive: true, force: true });
+    await fs.promises.rm(path.dirname(afterPath), { recursive: true, force: true });
+  }
+}
+
+async function countDiffStatsBuffers(before: Buffer, after: Buffer): Promise<{ additions: number; deletions: number }> {
+  const beforePath = await writeTempFile(before);
+  const afterPath = await writeTempFile(after);
+  try {
+    const raw = await runGit(
+      process.cwd(),
+      ["diff", "--no-index", "--numstat", "--", beforePath, afterPath],
+      { allowFailure: true, maxBuffer: 1024 * 1024 },
+    );
+    const line = raw.split("\n").find(Boolean) || "";
+    const match = /^(\d+|-)\s+(\d+|-)\s+/.exec(line);
+    if (!match || match[1] === "-" || match[2] === "-") return { additions: 0, deletions: 0 };
+    return {
+      additions: Number(match[1]) || 0,
+      deletions: Number(match[2]) || 0,
+    };
+  } finally {
+    await fs.promises.rm(path.dirname(beforePath), { recursive: true, force: true });
+    await fs.promises.rm(path.dirname(afterPath), { recursive: true, force: true });
+  }
+}
+
 function countDiffLines(diff: string): { additions: number; deletions: number } {
   let additions = 0;
   let deletions = 0;
@@ -343,14 +463,19 @@ function countDiffLines(diff: string): { additions: number; deletions: number } 
 function getPublicReview(review: StoredChangeReview): PublicChangeReview {
   const visibleFiles = review.files.filter((file) => shouldReviewFile(review.workdir, file.path));
   const publicFiles = visibleFiles.map((file) => {
-    const isBinary = hasBinaryDiffExtension(file.path);
+    const isBinary = hasBinaryDiffExtension(file.path) || file.diffType === "binary";
+    const preview = isBinary
+      ? { diff: "", truncated: false }
+      : truncateDiffPreview(file.diff, !!file.diffTruncated);
     return {
       path: file.path,
       status: file.status,
       additions: file.additions,
       deletions: file.deletions,
-      diff: isBinary ? "" : file.diff,
+      diff: preview.diff,
       diffType: isBinary ? "binary" as const : file.diffType || inferDiffTypeFromDiff(file.diff),
+      diffTruncated: preview.truncated || undefined,
+      fullDiffAvailable: preview.truncated || undefined,
     };
   });
   return {
@@ -473,12 +598,17 @@ export async function collectChangeReview(
     const beforeForDiff = beforeBuffer || Buffer.alloc(0);
     const afterForDiff = afterBuffer || Buffer.alloc(0);
     let diffType = detectDiffType(filePath, beforeForDiff, afterForDiff);
-    let diff = diffType === "text" ? await diffBuffers(filePath, beforeForDiff, afterForDiff) : "";
+    const preview = diffType === "text"
+      ? await diffBuffersPreview(filePath, beforeForDiff, afterForDiff)
+      : { diff: "", truncated: false };
+    let diff = preview.diff;
     if (diffType === "text" && inferDiffTypeFromDiff(diff) === "binary") {
       diffType = "binary";
       diff = "";
     }
-    const counts = countDiffLines(diff);
+    const counts = diffType === "text"
+      ? await countDiffStatsBuffers(beforeForDiff, afterForDiff)
+      : countDiffLines(diff);
 
     files.push({
       path: filePath,
@@ -487,6 +617,8 @@ export async function collectChangeReview(
       deletions: counts.deletions,
       diff,
       diffType,
+      diffTruncated: preview.truncated || undefined,
+      fullDiffAvailable: preview.truncated || undefined,
       beforeContentBase64: beforeSnapshot.exists ? beforeSnapshot.contentBase64 : null,
       afterContentBase64: afterSnapshot.exists ? afterSnapshot.contentBase64 : null,
     });
@@ -515,6 +647,43 @@ export async function getChangeReview(id: string): Promise<PublicChangeReview | 
   if (!review) return null;
   const publicReview = getPublicReview(review);
   return publicReview.files.length > 0 ? publicReview : null;
+}
+
+export async function getChangeReviewFileDiff(
+  id: string,
+  filePath: string,
+): Promise<PublicFileChange | null> {
+  const review = await loadStoredReview(id);
+  if (!review) return null;
+
+  const file = review.files.find((item) => item.path === filePath);
+  if (!file || !shouldReviewFile(review.workdir, file.path)) return null;
+
+  const isBinary = hasBinaryDiffExtension(file.path) || file.diffType === "binary";
+  if (isBinary) {
+    return {
+      path: file.path,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      diff: "",
+      diffType: "binary",
+    };
+  }
+
+  const beforeBuffer = file.beforeContentBase64 ? decodeBase64(file.beforeContentBase64) : Buffer.alloc(0);
+  const afterBuffer = file.afterContentBase64 ? decodeBase64(file.afterContentBase64) : Buffer.alloc(0);
+  const diff = await diffBuffers(file.path, beforeBuffer, afterBuffer);
+  const diffType = inferDiffTypeFromDiff(diff);
+
+  return {
+    path: file.path,
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+    diff: diffType === "binary" ? "" : diff,
+    diffType,
+  };
 }
 
 export async function approveChangeReview(id: string): Promise<PublicChangeReview> {

@@ -172,6 +172,7 @@ export function createSettingsMcpController(options) {
                 settingsMcpRefreshBtn.disabled = false;
                 settingsMcpRefreshBtn.textContent = '刷新';
             }
+            renderServers();
         }
     }
 
