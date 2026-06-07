@@ -81,6 +81,7 @@ export type ClaudeAgentStreamEvent =
         title: string;
         summary: string;
         input?: string;
+        commandTruncated?: boolean;
         files?: string[];
         startedAt: number;
         status: "running";

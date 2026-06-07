@@ -7,6 +7,7 @@ const MAX_PERSISTED_AGENT_EVENTS = 240;
 const MAX_PERSISTED_EVENT_TEXT = 2000;
 const MAX_PERSISTED_DIFF_TEXT = 4000;
 const MAX_PERSISTED_THINKING_TEXT = 4000;
+const MAX_PERSISTED_SHELL_COMMAND_TEXT = 300;
 
 export type AgentStreamEvent =
   | ClaudeAgentStreamEvent
@@ -44,10 +45,21 @@ function truncateForHistory(value: string | undefined, max = MAX_PERSISTED_EVENT
   return `${value.slice(0, max)}\n...[已截断 ${value.length - max} 字符]`;
 }
 
-function compactAgentEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEvent | null {
-  if (event.type === "answer_delta" || event.type === "process_delta" || event.type === "tool_progress") return null;
-  if (event.type === "thinking_delta") return null;
-  if (event.type === "tool_start") {
+function truncateShellCommandForHistory(value: string | undefined): string | undefined {
+  if (!value) return value;
+  if (value.length <= MAX_PERSISTED_SHELL_COMMAND_TEXT) return value;
+  const oneLine = value.replace(/\s+/g, " ").trim();
+  return oneLine.slice(0, MAX_PERSISTED_SHELL_COMMAND_TEXT);
+}
+
+function compactToolStartEvent(event: Extract<ClaudeAgentStreamEvent, { type: "tool_start" }>): ClaudeAgentStreamEvent {
+  const isLongBashCommand =
+    event.tool.name === "Bash" &&
+    [event.tool.summary, event.tool.input].some((value) =>
+      typeof value === "string" && value.length > MAX_PERSISTED_SHELL_COMMAND_TEXT
+    );
+
+  if (!isLongBashCommand) {
     return {
       ...event,
       tool: {
@@ -55,6 +67,29 @@ function compactAgentEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEven
         input: truncateForHistory(event.tool.input),
       },
     };
+  }
+
+  const summary = truncateShellCommandForHistory(event.tool.summary)
+    || truncateShellCommandForHistory(event.tool.input)
+    || "";
+
+  return {
+    ...event,
+    tool: {
+      ...event.tool,
+      title: summary ? `${event.tool.name} · ${summary}` : event.tool.name,
+      summary,
+      input: truncateShellCommandForHistory(event.tool.input),
+      commandTruncated: true,
+    },
+  };
+}
+
+function compactAgentEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEvent | null {
+  if (event.type === "answer_delta" || event.type === "process_delta" || event.type === "tool_progress") return null;
+  if (event.type === "thinking_delta") return null;
+  if (event.type === "tool_start") {
+    return compactToolStartEvent(event);
   }
   if (event.type === "tool_end") {
     return {

@@ -1,5 +1,7 @@
 (function () {
     var LARGE_MESSAGE_PREVIEW_CHARS = 20000;
+    var LONG_SHELL_COMMAND_CHARS = 300;
+    var SHELL_COMMAND_SUMMARY_CHARS = 220;
 
     function escapeHtml(value) {
         return String(value || '')
@@ -14,6 +16,33 @@
         var mins = Math.floor(seconds / 60);
         var secs = seconds % 60;
         return mins > 0 ? mins + 'm ' + secs + 's' : secs + 's';
+    }
+
+    function truncateText(value, maxChars) {
+        var text = String(value || '');
+        if (text.length <= maxChars) return text;
+        return text.slice(0, Math.max(0, maxChars - 1)).trimEnd() + '…';
+    }
+
+    function isLongShellCommand(tool) {
+        if (!tool) return false;
+        if (tool.commandTruncated) return true;
+        return String(tool.summary || '').length > LONG_SHELL_COMMAND_CHARS;
+    }
+
+    function shellCommandSummary(command) {
+        var text = String(command || '').trim();
+        if (!text) return '';
+        if (text.length <= SHELL_COMMAND_SUMMARY_CHARS) return text.replace(/\s+/g, ' ');
+        var firstLine = text.split(/\r?\n/)[0].trim();
+        var basis = firstLine || text.replace(/\s+/g, ' ');
+        return truncateText(basis.replace(/\s+/g, ' '), SHELL_COMMAND_SUMMARY_CHARS);
+    }
+
+    function renderShellCommand(command) {
+        var text = String(command || '');
+        if (!text) return '';
+        return '<pre><code>$ ' + escapeHtml(text) + '</code></pre>';
     }
 
     function renderMarkdown(text) {
@@ -464,7 +493,7 @@
             }
             if (name === 'Bash') {
                 state.bashCount += 1;
-                return '已运行 ' + summary;
+                return '已运行 ' + shellCommandSummary(summary);
             }
             if (name === 'Edit' || name === 'MultiEdit' || name === 'Write' || name === 'NotebookEdit') {
                 state.editCount += 1;
@@ -729,11 +758,12 @@
 
             var lineText = classifyTool(tool);
             var isShell = tool.name === 'Bash';
-            var el = document.createElement(isShell ? 'details' : 'div');
-            el.className = 'claude-activity-item running' + (isShell ? ' shell' : '');
+            var isExpandableShell = isShell && !isLongShellCommand(tool);
+            var el = document.createElement(isExpandableShell ? 'details' : 'div');
+            el.className = 'claude-activity-item running' + (isShell ? ' shell' : '') + (!isExpandableShell && isShell ? ' shell-compact' : '');
             el.dataset.toolId = tool.id;
 
-            if (isShell) {
+            if (isExpandableShell) {
                 el.open = false;
                 el.innerHTML =
                     '<summary>' +
@@ -763,7 +793,7 @@
             var status = event.status === 'success' ? '成功' : '失败';
             var body = '';
             body += '<div class="claude-shell-title">Shell</div>';
-            if (command) body += '<pre><code>$ ' + escapeHtml(command) + '</code></pre>';
+            if (command) body += renderShellCommand(command);
             if (stdout) {
                 body += '<pre><code>' + escapeHtml(stdout) + '</code></pre>';
             } else if (!stderr && event.status === 'success') {
