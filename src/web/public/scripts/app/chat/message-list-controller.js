@@ -1,5 +1,4 @@
 import { createMessageRenderer } from './message-renderer.js';
-import { escapeAttr, escapeHtml } from '../utils/html.js';
 
 export function createMessageListController(config) {
     var BOTTOM_THRESHOLD_PX = 64;
@@ -13,7 +12,6 @@ export function createMessageListController(config) {
 
     var messageRenderer = createMessageRenderer({
         messagesEl: messagesEl,
-        conversationHeaderHtml: conversationHeaderHtml,
         largeMessagePreviewChars: config.largeMessagePreviewChars,
         imageExts: config.imageExts,
         renderMarkdown: config.renderMarkdown,
@@ -103,37 +101,12 @@ export function createMessageListController(config) {
         return value || '新对话';
     }
 
-    function conversationHeaderHtml() {
-        return '' +
-            '<header class="conversation-header" aria-label="当前会话">' +
-            '<div class="conversation-header-inner">' +
-            '<div id="conversation-title" class="conversation-title" title="' + escapeAttr(currentConversationTitle) + '">' +
-            escapeHtml(currentConversationTitle) +
-            '</div>' +
-            '</div>' +
-            '</header>';
-    }
-
-    function ensureConversationHeader() {
-        if (document.getElementById('conversation-title')) return;
-        messagesEl.insertAdjacentHTML('afterbegin', conversationHeaderHtml());
-    }
-
     function updateConversationHeaderTitle(title) {
         currentConversationTitle = normalizeConversationTitle(title);
-        ensureConversationHeader();
         var titleEl = document.getElementById('conversation-title');
         if (!titleEl) return;
         titleEl.textContent = currentConversationTitle;
         titleEl.title = currentConversationTitle;
-    }
-
-    function getFirstMessageContentNode() {
-        for (var i = 0; i < messagesEl.children.length; i++) {
-            var child = messagesEl.children[i];
-            if (!child.classList.contains('conversation-header')) return child;
-        }
-        return null;
     }
 
     async function fetchFullMessageContent(messageId) {
@@ -203,7 +176,7 @@ export function createMessageListController(config) {
         btn.textContent = isLoadingOlderMessages ? '加载中...' : '加载更早消息';
         btn.disabled = isLoadingOlderMessages;
         btn.addEventListener('click', loadOlderMessages);
-        messagesEl.insertBefore(btn, getFirstMessageContentNode());
+        messagesEl.insertBefore(btn, messagesEl.firstChild);
     }
 
     function renderMessageRecord(m, beforeNode, opts) {
@@ -266,7 +239,6 @@ export function createMessageListController(config) {
         currentSessionHasMoreMessages = !!hasMoreMessages;
         isLoadingOlderMessages = false;
         messagesEl.innerHTML = '';
-        ensureConversationHeader();
         isBatchRenderingMessages = true;
         try {
             if (!messages || messages.length === 0) {

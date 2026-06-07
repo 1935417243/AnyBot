@@ -282,6 +282,7 @@
 
         #messages {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
             padding: 0 0 16px;
             display: flex;
@@ -292,8 +293,7 @@
         }
 
         .conversation-header {
-            position: sticky;
-            top: 0;
+            position: relative;
             z-index: 4;
             flex: 0 0 44px;
             min-height: 44px;

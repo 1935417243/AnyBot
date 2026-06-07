@@ -32,7 +32,6 @@ export function createMessageRenderer(config) {
 
     function showEmptyState() {
         config.messagesEl.innerHTML =
-            config.conversationHeaderHtml() +
             '<div id="empty-state">' +
             '<div class="empty-icon">Ab</div>' +
             '<div class="empty-title">AnyBot 已就绪</div>' +
