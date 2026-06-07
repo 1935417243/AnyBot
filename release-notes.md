@@ -5,9 +5,8 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（0.1.29）
-- 优化思考过程的处理与展示，提升对话过程中的连贯性
-- 优化对话性能，提升消息处理与连续对话体验
+### 本次更新（0.1.30）
+- 修复 Windows 下 MCP 识别异常的问题，提升 MCP 配置加载与启动校验的兼容性
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
