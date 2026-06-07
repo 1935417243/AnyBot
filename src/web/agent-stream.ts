@@ -149,7 +149,6 @@ function compactAgentEventForClient(event: AgentStreamEvent): AgentStreamEvent {
 export function compactAgentEvents(events: ClaudeAgentStreamEvent[]): ClaudeAgentStreamEvent[] {
   const compacted: ClaudeAgentStreamEvent[] = [];
   let pendingThinking = "";
-  let pendingThinkingOmitted = 0;
 
   const flushThinking = () => {
     if (!pendingThinking) return;
@@ -158,19 +157,18 @@ export function compactAgentEvents(events: ClaudeAgentStreamEvent[]): ClaudeAgen
       text: pendingThinking,
     });
     pendingThinking = "";
-    pendingThinkingOmitted = 0;
   };
 
   for (const event of events) {
     if (event.type === "thinking_delta") {
       const remaining = MAX_PERSISTED_THINKING_TEXT - pendingThinking.length;
-      if (pendingThinkingOmitted > 0) {
-        pendingThinkingOmitted += event.text.length;
-      } else if (event.text.length <= remaining) {
+      if (remaining <= 0) {
+        continue;
+      }
+      if (event.text.length <= remaining) {
         pendingThinking += event.text;
       } else {
         pendingThinking += event.text.slice(0, remaining);
-        pendingThinkingOmitted += event.text.length - remaining;
       }
       continue;
     }
