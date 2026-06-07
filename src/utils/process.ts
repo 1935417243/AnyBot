@@ -31,7 +31,10 @@ function executableCandidates(command: string, env: NodeJS.ProcessEnv): string[]
     .split(";")
     .map((ext) => ext.trim())
     .filter(Boolean);
-  return [command, ...extensions.map((ext) => `${command}${ext}`)];
+  // On Windows prefer PATHEXT variants first, because a bare extension-less file
+  // (e.g. the Unix shell script `npx` shipped alongside `npx.cmd`) cannot be spawned
+  // by Windows and would cause ENOENT even though the file exists.
+  return [...extensions.map((ext) => `${command}${ext}`), command];
 }
 
 function canRun(filePath: string): boolean {
