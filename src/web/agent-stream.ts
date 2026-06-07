@@ -42,7 +42,7 @@ function writeSse(res: Response, event: string, data: unknown): void {
 function truncateForHistory(value: string | undefined, max = MAX_PERSISTED_EVENT_TEXT): string | undefined {
   if (!value) return value;
   if (value.length <= max) return value;
-  return `${value.slice(0, max)}\n...[已截断 ${value.length - max} 字符]`;
+  return value.slice(0, max);
 }
 
 function truncateShellCommandForHistory(value: string | undefined): string | undefined {
@@ -139,6 +139,13 @@ function compactAgentEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEven
   return event;
 }
 
+function compactAgentEventForClient(event: AgentStreamEvent): AgentStreamEvent {
+  if (event.type === "tool_start" && event.tool.name === "Bash") {
+    return compactToolStartEvent(event);
+  }
+  return event;
+}
+
 export function compactAgentEvents(events: ClaudeAgentStreamEvent[]): ClaudeAgentStreamEvent[] {
   const compacted: ClaudeAgentStreamEvent[] = [];
   let pendingThinking = "";
@@ -148,10 +155,7 @@ export function compactAgentEvents(events: ClaudeAgentStreamEvent[]): ClaudeAgen
     if (!pendingThinking) return;
     compacted.push({
       type: "thinking_delta",
-      text:
-        pendingThinkingOmitted > 0
-          ? `${pendingThinking}\n...[已截断 ${pendingThinkingOmitted} 字符]`
-          : pendingThinking,
+      text: pendingThinking,
     });
     pendingThinking = "";
     pendingThinkingOmitted = 0;
@@ -227,10 +231,11 @@ export function createActiveAgentStream(sessionId: string): ActiveAgentStream {
 }
 
 export function emitAgentStream(active: ActiveAgentStream, event: AgentStreamEvent): void {
-  active.events.push(event);
+  const clientEvent = compactAgentEventForClient(event);
+  active.events.push(clientEvent);
   for (const client of active.clients) {
     if (client.writableEnded) continue;
-    writeSse(client, event.type, event);
+    writeSse(client, clientEvent.type, clientEvent);
   }
 }
 
