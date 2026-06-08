@@ -1298,6 +1298,7 @@
 
         .mcp-page-header {
             position: relative;
+            z-index: 2;
             padding: 18px 20px;
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
