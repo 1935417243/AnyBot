@@ -5,8 +5,11 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（0.1.30）
-- 修复 Windows 下 MCP 识别异常的问题，提升 MCP 配置加载与启动校验的兼容性
+### 本次更新（0.1.31）
+- 优化大聊天记录场景下的加载与交互性能
+- 支持拉取 Git 仓库，便于添加远程项目
+- 优化 MCP 添加流程的图层展示
+- 优化标题 Tab 的交互体验
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
