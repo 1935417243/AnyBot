@@ -890,7 +890,8 @@ export function createAnyBotApp(dom, deps) {
         projectToggle.addEventListener('click', function () {
             requireSidebarController().toggleProjects();
         });
-        addProjectBtn.addEventListener('click', function () {
+        addProjectBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
             return requireSidebarController().addProject();
         });
         historyToggle.addEventListener('click', function () {

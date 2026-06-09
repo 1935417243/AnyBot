@@ -97,6 +97,9 @@ export function createSidebarController(options) {
     var isRealtimeLifecycleBound = false;
     var sidebarTooltipEl = null;
     var sidebarTooltipTarget = null;
+    var addProjectMenuEl = null;
+    var addProjectMenuCleanup = null;
+    var cloneProjectOverlayEl = null;
 
     function createSessionPageState() {
         return {
@@ -420,6 +423,545 @@ export function createSidebarController(options) {
         if (options.getCurrentView() !== "chat") options.showChatView();
         renderProjects();
         if (shouldExpand) ensureProjectSessionsLoaded(projectId);
+    }
+
+    function closeAddProjectMenu() {
+        if (addProjectMenuCleanup) addProjectMenuCleanup();
+        addProjectMenuCleanup = null;
+        if (addProjectMenuEl) {
+            addProjectMenuEl.remove();
+            addProjectMenuEl = null;
+        }
+        if (addProjectBtn) addProjectBtn.setAttribute("aria-expanded", "false");
+    }
+
+    function positionAddProjectMenu() {
+        if (!addProjectMenuEl || !addProjectBtn) return;
+        var rect = addProjectBtn.getBoundingClientRect();
+        var width = 184;
+        var left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+        addProjectMenuEl.style.left = left + "px";
+        addProjectMenuEl.style.top = (rect.bottom + 6) + "px";
+    }
+
+    function createAddProjectMenuItem(label, detail, iconHtml) {
+        var button = document.createElement("button");
+        button.className = "project-add-menu-item";
+        button.type = "button";
+        button.setAttribute("role", "menuitem");
+        button.innerHTML =
+            '<span class="project-add-menu-icon">' + iconHtml + '</span>' +
+            '<span class="project-add-menu-text">' +
+            '<span class="project-add-menu-title">' + label + '</span>' +
+            '<span class="project-add-menu-detail">' + detail + '</span>' +
+            '</span>';
+        return button;
+    }
+
+    function openAddProjectMenu() {
+        if (!addProjectBtn) return;
+        closeAddProjectMenu();
+
+        var menu = document.createElement("div");
+        menu.className = "project-add-menu";
+        menu.setAttribute("role", "menu");
+        menu.setAttribute("aria-label", "添加项目方式");
+
+        var folderItem = createAddProjectMenuItem(
+            "选择本地文件夹",
+            "添加已有目录",
+            '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.2 12.7V3.6c0-.6.5-1.1 1.1-1.1h3l1.3 1.5h5c.6 0 1.1.5 1.1 1.1v7.6H2.2Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/></svg>'
+        );
+        var gitItem = createAddProjectMenuItem(
+            "从 Git 地址克隆",
+            "下载远程仓库",
+            '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v7.4M5.4 6.8 8 9.4l2.6-2.6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 11.5v1.2c0 .5.4.9.9.9h8.2c.5 0 .9-.4.9-.9v-1.2" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></svg>'
+        );
+
+        folderItem.addEventListener("click", function () {
+            closeAddProjectMenu();
+            addLocalProject();
+        });
+        gitItem.addEventListener("click", function () {
+            closeAddProjectMenu();
+            openCloneProjectDialog();
+        });
+
+        menu.appendChild(folderItem);
+        menu.appendChild(gitItem);
+        document.body.appendChild(menu);
+        addProjectMenuEl = menu;
+        addProjectBtn.setAttribute("aria-expanded", "true");
+        positionAddProjectMenu();
+        requestAnimationFrame(function () {
+            menu.classList.add("open");
+        });
+
+        function onDocumentClick(e) {
+            if (!addProjectMenuEl) return;
+            if (addProjectMenuEl.contains(e.target)) return;
+            if (addProjectBtn && (e.target === addProjectBtn || addProjectBtn.contains(e.target))) return;
+            closeAddProjectMenu();
+        }
+
+        function onKeydown(e) {
+            if (e.key === "Escape") closeAddProjectMenu();
+        }
+
+        function onResize() {
+            positionAddProjectMenu();
+        }
+
+        document.addEventListener("click", onDocumentClick);
+        document.addEventListener("keydown", onKeydown);
+        window.addEventListener("resize", onResize);
+        addProjectMenuCleanup = function () {
+            document.removeEventListener("click", onDocumentClick);
+            document.removeEventListener("keydown", onKeydown);
+            window.removeEventListener("resize", onResize);
+        };
+    }
+
+    function isHttpsGitUrl(value) {
+        return /^https:\/\//i.test(String(value || "").trim());
+    }
+
+    function getHttpsGitHost(value) {
+        var text = String(value || "").trim();
+        if (!isHttpsGitUrl(text)) return "";
+        try {
+            return new URL(text).host.toLowerCase();
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function isSshGitUrl(value) {
+        var text = String(value || "").trim();
+        return /^ssh:\/\//i.test(text) || /^[^@\s]+@[^:\s]+:.+/.test(text);
+    }
+
+    function isSupportedGitUrl(value) {
+        return isHttpsGitUrl(value) || isSshGitUrl(value);
+    }
+
+    function inferGitProjectName(value) {
+        var text = String(value || "").trim();
+        if (!text) return "";
+        try {
+            if (/^https:\/\//i.test(text) || /^ssh:\/\//i.test(text)) {
+                var parsed = new URL(text);
+                text = parsed.pathname || text;
+            } else if (isSshGitUrl(text)) {
+                text = text.slice(text.indexOf(":") + 1);
+            }
+        } catch (_) {}
+        text = text.split("?")[0].split("#")[0].replace(/[\\/]+$/, "");
+        var name = text.split(/[\\/]/).pop() || "";
+        if (/\.git$/i.test(name)) name = name.slice(0, -4);
+        try {
+            name = decodeURIComponent(name);
+        } catch (_) {}
+        return name;
+    }
+
+    function readJsonResponse(res) {
+        return res.json().catch(function () {
+            return {};
+        });
+    }
+
+    function closeCloneProjectDialog() {
+        var overlay = cloneProjectOverlayEl;
+        if (!overlay) return;
+        document.removeEventListener("keydown", overlay._projectCloneKeydown);
+        cloneProjectOverlayEl = null;
+        overlay.classList.remove("open");
+        setTimeout(function () {
+            overlay.remove();
+        }, 160);
+    }
+
+    function openCloneProjectDialog() {
+        if (cloneProjectOverlayEl) closeCloneProjectDialog();
+
+        var overlay = document.createElement("div");
+        overlay.className = "project-clone-overlay";
+        overlay.innerHTML =
+            '<form class="project-clone-dialog" role="dialog" aria-modal="true" aria-labelledby="project-clone-title">' +
+            '<div class="project-clone-header">' +
+            '<div>' +
+            '<div class="project-clone-title" id="project-clone-title">从 Git 地址克隆</div>' +
+            '<div class="project-clone-subtitle">克隆完成后会自动添加为项目。</div>' +
+            '</div>' +
+            '<button class="project-clone-close" type="button" data-action="close" aria-label="关闭">×</button>' +
+            '</div>' +
+            '<div class="project-clone-body">' +
+            '<label class="project-clone-field">' +
+            '<span>Git 地址</span>' +
+            '<input class="project-clone-input" data-field="url" autocomplete="off" spellcheck="false" placeholder="https://github.com/org/repo.git">' +
+            '</label>' +
+            '<label class="project-clone-field">' +
+            '<span>保存目录</span>' +
+            '<div class="project-clone-path-row">' +
+            '<input class="project-clone-input" data-field="parentPath" readonly placeholder="请选择保存目录">' +
+            '<button class="project-clone-secondary compact" type="button" data-action="pick-directory">选择目录</button>' +
+            '</div>' +
+            '</label>' +
+            '<label class="project-clone-field">' +
+            '<span>项目名</span>' +
+            '<input class="project-clone-input" data-field="projectName" autocomplete="off" spellcheck="false" placeholder="repo">' +
+            '</label>' +
+            '<div class="project-clone-auth" hidden>' +
+            '<label class="project-clone-field">' +
+            '<span>用户名（可选）</span>' +
+            '<input class="project-clone-input" data-field="username" autocomplete="username" spellcheck="false" placeholder="可不填">' +
+            '</label>' +
+            '<label class="project-clone-field">' +
+            '<span>密码</span>' +
+            '<input class="project-clone-input" data-field="password" type="password" autocomplete="current-password" spellcheck="false" placeholder="输入密码">' +
+            '</label>' +
+            '</div>' +
+            '<div class="project-clone-progress" data-field="progress" hidden>' +
+            '<div class="project-clone-progress-track" data-field="progressTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="1">' +
+            '<div class="project-clone-progress-bar" data-field="progressBar"></div>' +
+            '<div class="project-clone-progress-text" data-field="progressText">连接仓库 1%</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="project-clone-error" data-field="error" hidden></div>' +
+            '</div>' +
+            '<div class="project-clone-actions">' +
+            '<button class="project-clone-secondary" type="button" data-action="cancel">取消</button>' +
+            '<button class="project-clone-primary" type="submit" data-action="submit" disabled>克隆并添加</button>' +
+            '</div>' +
+            '</form>';
+
+        var form = overlay.querySelector(".project-clone-dialog");
+        var urlInput = overlay.querySelector('[data-field="url"]');
+        var parentInput = overlay.querySelector('[data-field="parentPath"]');
+        var projectNameInput = overlay.querySelector('[data-field="projectName"]');
+        var usernameInput = overlay.querySelector('[data-field="username"]');
+        var passwordInput = overlay.querySelector('[data-field="password"]');
+        var authSection = overlay.querySelector(".project-clone-auth");
+        var progressEl = overlay.querySelector('[data-field="progress"]');
+        var progressTrackEl = overlay.querySelector('[data-field="progressTrack"]');
+        var progressBarEl = overlay.querySelector('[data-field="progressBar"]');
+        var progressTextEl = overlay.querySelector('[data-field="progressText"]');
+        var errorEl = overlay.querySelector('[data-field="error"]');
+        var pickDirectoryBtn = overlay.querySelector('[data-action="pick-directory"]');
+        var submitBtn = overlay.querySelector('[data-action="submit"]');
+        var cancelBtn = overlay.querySelector('[data-action="cancel"]');
+        var closeBtn = overlay.querySelector('[data-action="close"]');
+        var projectNameTouched = false;
+        var parentPathTouched = false;
+        var savedCredential = null;
+        var currentCredentialHost = "";
+        var credentialLookupId = 0;
+        var isSubmitting = false;
+
+        function values() {
+            return {
+                url: urlInput.value.trim(),
+                parentPath: parentInput.value.trim(),
+                projectName: projectNameInput.value.trim(),
+                username: usernameInput.value.trim(),
+                password: passwordInput.value,
+            };
+        }
+
+        function setCloneError(message) {
+            errorEl.textContent = message || "";
+            errorEl.hidden = !message;
+        }
+
+        function getProjectNameError(projectName) {
+            if (!projectName) return "请输入项目名";
+            if (projectName === "." || projectName === ".." || /[\\/]/.test(projectName)) return "项目名不能包含路径分隔符";
+            return "";
+        }
+
+        function hasSavedPasswordForCurrentHost(current) {
+            var host = getHttpsGitHost(current.url);
+            return !!(
+                savedCredential &&
+                savedCredential.host === host &&
+                savedCredential.hasPassword &&
+                current.username &&
+                current.username === savedCredential.username
+            );
+        }
+
+        function updateCloneDialogState() {
+            var current = values();
+            var hasUrl = !!current.url;
+            var isHttps = isHttpsGitUrl(current.url);
+            var isSsh = isSshGitUrl(current.url);
+            var isSupported = isHttps || isSsh;
+            var credentialsDisabled = isSubmitting || (hasUrl && !isHttps);
+            var projectNameError = getProjectNameError(current.projectName);
+            var credentialsComplete = !isHttps ||
+                (!current.username && !current.password) ||
+                (current.username && current.password) ||
+                (!current.username && current.password) ||
+                (current.username && !current.password && hasSavedPasswordForCurrentHost(current));
+
+            urlInput.disabled = isSubmitting;
+            parentInput.disabled = true;
+            projectNameInput.disabled = isSubmitting;
+            usernameInput.disabled = credentialsDisabled;
+            passwordInput.disabled = credentialsDisabled;
+            pickDirectoryBtn.disabled = isSubmitting;
+            cancelBtn.disabled = isSubmitting;
+            closeBtn.disabled = isSubmitting;
+            authSection.hidden = !isHttps;
+            progressEl.hidden = !isSubmitting;
+            submitBtn.disabled = isSubmitting || !current.url || !isSupported || !current.parentPath || !!projectNameError || !credentialsComplete;
+        }
+
+        async function loadSavedCredentialForUrl(url) {
+            var host = getHttpsGitHost(url);
+            credentialLookupId += 1;
+            var requestId = credentialLookupId;
+
+            if (host !== currentCredentialHost) {
+                currentCredentialHost = host;
+                savedCredential = null;
+                usernameInput.value = "";
+                passwordInput.value = "";
+            }
+
+            if (!host) {
+                updateCloneDialogState();
+                return;
+            }
+
+            try {
+                var res = await fetch("/api/projects/git-credential?url=" + encodeURIComponent(url));
+                var data = await readJsonResponse(res);
+                if (requestId !== credentialLookupId || host !== currentCredentialHost) return;
+                if (!res.ok || !data.found || data.host !== host) {
+                    savedCredential = null;
+                    updateCloneDialogState();
+                    return;
+                }
+                savedCredential = {
+                    host: data.host,
+                    username: data.username || "",
+                    hasPassword: !!data.hasPassword,
+                };
+                if (savedCredential.username) usernameInput.value = savedCredential.username;
+                passwordInput.value = data.password || "";
+                updateCloneDialogState();
+            } catch (_) {
+                if (requestId !== credentialLookupId) return;
+                savedCredential = null;
+                updateCloneDialogState();
+            }
+        }
+
+        async function loadDefaultSaveDirectory() {
+            try {
+                var res = await fetch("/api/projects/default-save-directory");
+                var data = await readJsonResponse(res);
+                if (!res.ok || parentPathTouched || !data.path) return;
+                parentInput.value = data.path;
+                updateCloneDialogState();
+            } catch (_) {}
+        }
+
+        function setCloneLoading(loading) {
+            isSubmitting = loading;
+            submitBtn.textContent = loading ? "克隆中..." : "克隆并添加";
+            if (loading) setCloneProgress(1, "连接仓库");
+            updateCloneDialogState();
+        }
+
+        function setCloneProgress(percent, message) {
+            var value = Math.max(1, Math.min(100, Math.round(Number(percent) || 1)));
+            var label = String(message || "克隆中").trim() || "克隆中";
+            progressBarEl.style.width = value + "%";
+            progressTrackEl.setAttribute("aria-valuenow", String(value));
+            progressTextEl.textContent = label + " " + value + "%";
+        }
+
+        function handleCloneStreamEvent(event) {
+            if (!event || typeof event !== "object") return null;
+            if (event.type === "progress") {
+                setCloneProgress(event.percent, event.message);
+                return null;
+            }
+            if (event.type === "done") {
+                setCloneProgress(100, "完成");
+                return event.project || null;
+            }
+            if (event.type === "error") {
+                throw new Error(event.error || "克隆项目失败");
+            }
+            return null;
+        }
+
+        async function cloneProjectWithProgress(payload) {
+            var res = await fetch("/api/projects/clone/stream", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+                var data = await readJsonResponse(res);
+                throw new Error(data.error || "克隆项目失败");
+            }
+            if (!res.body || !window.TextDecoder) {
+                var fallbackData = await readJsonResponse(res);
+                if (fallbackData.error) throw new Error(fallbackData.error);
+                return fallbackData.project || fallbackData;
+            }
+
+            var reader = res.body.getReader();
+            var decoder = new TextDecoder("utf-8");
+            var buffer = "";
+            var project = null;
+
+            while (true) {
+                var result = await reader.read();
+                if (result.done) break;
+                buffer += decoder.decode(result.value, { stream: true });
+                var lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+                lines.forEach(function (line) {
+                    var text = line.trim();
+                    if (!text) return;
+                    var event = JSON.parse(text);
+                    var eventProject = handleCloneStreamEvent(event);
+                    if (eventProject) project = eventProject;
+                });
+            }
+
+            buffer += decoder.decode();
+            if (buffer.trim()) {
+                var event = JSON.parse(buffer.trim());
+                var eventProject = handleCloneStreamEvent(event);
+                if (eventProject) project = eventProject;
+            }
+
+            if (!project) throw new Error("克隆项目失败");
+            return project;
+        }
+
+        urlInput.addEventListener("input", function () {
+            if (!projectNameTouched) {
+                var inferred = inferGitProjectName(urlInput.value);
+                if (inferred) projectNameInput.value = inferred;
+            }
+            setCloneError("");
+            loadSavedCredentialForUrl(urlInput.value);
+            updateCloneDialogState();
+        });
+
+        projectNameInput.addEventListener("input", function () {
+            projectNameTouched = true;
+            setCloneError("");
+            updateCloneDialogState();
+        });
+
+        usernameInput.addEventListener("input", function () {
+            setCloneError("");
+            updateCloneDialogState();
+        });
+
+        passwordInput.addEventListener("input", function () {
+            setCloneError("");
+            updateCloneDialogState();
+        });
+
+        pickDirectoryBtn.addEventListener("click", async function () {
+            setCloneError("");
+            pickDirectoryBtn.disabled = true;
+            try {
+                var res = await fetch("/api/projects/pick-save-directory", { method: "POST" });
+                var data = await readJsonResponse(res);
+                if (!res.ok) throw new Error(data.error || "选择保存目录失败");
+                if (!data.canceled) {
+                    parentPathTouched = true;
+                    parentInput.value = data.path || "";
+                }
+            } catch (e) {
+                setCloneError(e.message || "选择保存目录失败");
+            } finally {
+                updateCloneDialogState();
+            }
+        });
+
+        form.addEventListener("submit", async function (e) {
+            e.preventDefault();
+            var current = values();
+            var projectNameError = getProjectNameError(current.projectName);
+            if (!current.url) {
+                setCloneError("请输入 Git 地址");
+                return;
+            }
+            if (!current.parentPath) {
+                setCloneError("请选择保存目录");
+                return;
+            }
+            if (projectNameError) {
+                setCloneError(projectNameError);
+                return;
+            }
+            if (current.username && !current.password && !hasSavedPasswordForCurrentHost(current)) {
+                setCloneError("请输入密码");
+                return;
+            }
+
+            setCloneError("");
+            setCloneLoading(true);
+            try {
+                var payload = {
+                    url: current.url,
+                    parentPath: current.parentPath,
+                    projectName: current.projectName,
+                };
+                if (isHttpsGitUrl(current.url) && (current.username || current.password)) {
+                    if (current.username) payload.username = current.username;
+                    if (current.password) payload.password = current.password;
+                }
+                var data = await cloneProjectWithProgress(payload);
+                closeCloneProjectDialog();
+                activeProjectId = data.id;
+                expandProject(data.id);
+                await Promise.all([fetchProjects(), fetchSessions()]);
+                selectProject(data.id);
+            } catch (error) {
+                setCloneError(error.message || "克隆项目失败");
+            } finally {
+                if (cloneProjectOverlayEl) setCloneLoading(false);
+            }
+        });
+
+        function requestClose() {
+            if (isSubmitting) return;
+            closeCloneProjectDialog();
+        }
+
+        cancelBtn.addEventListener("click", requestClose);
+        closeBtn.addEventListener("click", requestClose);
+        overlay.addEventListener("click", function (e) {
+            if (e.target === overlay) requestClose();
+        });
+
+        overlay._projectCloneKeydown = function (e) {
+            if (e.key === "Escape") requestClose();
+        };
+        document.addEventListener("keydown", overlay._projectCloneKeydown);
+        document.body.appendChild(overlay);
+        cloneProjectOverlayEl = overlay;
+        updateCloneDialogState();
+        loadDefaultSaveDirectory();
+        requestAnimationFrame(function () {
+            overlay.classList.add("open");
+        });
+        setTimeout(function () {
+            urlInput.focus();
+        }, 0);
     }
 
     function confirmProjectDelete(project) {
@@ -978,7 +1520,7 @@ export function createSidebarController(options) {
         });
     }
 
-    async function addProject() {
+    async function addLocalProject() {
         try {
             if (addProjectBtn) addProjectBtn.disabled = true;
             var res = await fetch("/api/projects/pick", { method: "POST" });
@@ -994,6 +1536,15 @@ export function createSidebarController(options) {
         } finally {
             if (addProjectBtn) addProjectBtn.disabled = false;
         }
+    }
+
+    function addProject() {
+        if (addProjectBtn && addProjectBtn.disabled) return;
+        if (addProjectMenuEl) {
+            closeAddProjectMenu();
+            return;
+        }
+        openAddProjectMenu();
     }
 
     return {
