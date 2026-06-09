@@ -101,8 +101,12 @@ export type ClaudeAgentStreamEvent =
         stdout?: string;
         stderr?: string;
         text?: string;
+        stdoutTruncated?: boolean;
+        stderrTruncated?: boolean;
+        textTruncated?: boolean;
       };
       error?: string;
+      errorTruncated?: boolean;
       files?: string[];
       diffs?: ClaudeAgentDiff[];
     }

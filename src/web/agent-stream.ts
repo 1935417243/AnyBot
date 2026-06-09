@@ -8,6 +8,10 @@ const MAX_PERSISTED_EVENT_TEXT = 2000;
 const MAX_PERSISTED_DIFF_TEXT = 4000;
 const MAX_PERSISTED_THINKING_TEXT = 4000;
 const MAX_PERSISTED_SHELL_COMMAND_TEXT = 300;
+const MAX_CLIENT_EVENT_TEXT = 4000;
+const MAX_CLIENT_DIFF_TEXT = 4000;
+const MAX_CLIENT_TASK_TEXT = 1200;
+const MAX_CLIENT_DELTA_TEXT = 8000;
 
 export type AgentStreamEvent =
   | ClaudeAgentStreamEvent
@@ -30,6 +34,10 @@ type ActiveAgentStream = {
   clients: Set<Response>;
   startedAt: number;
   done: boolean;
+  clientThinkingChars: number;
+  clientThinkingTruncated: boolean;
+  clientProcessChars: number;
+  clientProcessTruncated: boolean;
 };
 
 const activeAgentStreams = new Map<string, ActiveAgentStream>();
@@ -43,6 +51,83 @@ function truncateForHistory(value: string | undefined, max = MAX_PERSISTED_EVENT
   if (!value) return value;
   if (value.length <= max) return value;
   return value.slice(0, max);
+}
+
+function truncateForClient(value: string | undefined, max = MAX_CLIENT_EVENT_TEXT): { text?: string; truncated: boolean } {
+  if (!value) return { text: value, truncated: false };
+  if (value.length <= max) return { text: value, truncated: false };
+  return { text: value.slice(0, max), truncated: true };
+}
+
+function truncateDeltaForClient(
+  active: ActiveAgentStream,
+  event: Extract<ClaudeAgentStreamEvent, { type: "thinking_delta" | "process_delta" }>,
+): ClaudeAgentStreamEvent | null {
+  const text = event.text || "";
+  if (!text) return null;
+  const isThinking = event.type === "thinking_delta";
+  const used = isThinking ? active.clientThinkingChars : active.clientProcessChars;
+  const alreadyTruncated = isThinking ? active.clientThinkingTruncated : active.clientProcessTruncated;
+  const remaining = MAX_CLIENT_DELTA_TEXT - used;
+
+  if (remaining <= 0) {
+    if (alreadyTruncated) return null;
+    if (isThinking) {
+      active.clientThinkingTruncated = true;
+    } else {
+      active.clientProcessTruncated = true;
+    }
+    return { ...event, text: "\n\n...[过程较长，已折叠]" };
+  }
+
+  if (text.length <= remaining) {
+    if (isThinking) {
+      active.clientThinkingChars += text.length;
+    } else {
+      active.clientProcessChars += text.length;
+    }
+    return event;
+  }
+
+  if (isThinking) {
+    active.clientThinkingChars = MAX_CLIENT_DELTA_TEXT;
+    active.clientThinkingTruncated = true;
+  } else {
+    active.clientProcessChars = MAX_CLIENT_DELTA_TEXT;
+    active.clientProcessTruncated = true;
+  }
+  return { ...event, text: `${text.slice(0, remaining)}\n\n...[过程较长，已折叠]` };
+}
+
+function compactToolEndEventForClient(event: Extract<ClaudeAgentStreamEvent, { type: "tool_end" }>): ClaudeAgentStreamEvent {
+  const stdout = truncateForClient(event.output?.stdout);
+  const stderr = truncateForClient(event.output?.stderr);
+  const text = truncateForClient(event.output?.text);
+  const error = truncateForClient(event.error);
+
+  return {
+    ...event,
+    output: event.output
+      ? {
+          stdout: stdout.text,
+          stderr: stderr.text,
+          text: text.text,
+          stdoutTruncated: stdout.truncated || undefined,
+          stderrTruncated: stderr.truncated || undefined,
+          textTruncated: text.truncated || undefined,
+        }
+      : undefined,
+    error: error.text,
+    errorTruncated: error.truncated || undefined,
+    diffs: event.diffs?.map((diff) => {
+      const compact = truncateForClient(diff.diff, MAX_CLIENT_DIFF_TEXT);
+      return {
+        ...diff,
+        diff: compact.text || "",
+        diffTruncated: diff.diffTruncated || compact.truncated || undefined,
+      };
+    }),
+  };
 }
 
 function truncateShellCommandForHistory(value: string | undefined): string | undefined {
@@ -139,9 +224,43 @@ function compactAgentEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEven
   return event;
 }
 
-function compactAgentEventForClient(event: AgentStreamEvent): AgentStreamEvent {
+function compactAgentEventForClient(active: ActiveAgentStream, event: AgentStreamEvent): AgentStreamEvent | null {
+  if (event.type === "thinking_delta" || event.type === "process_delta") {
+    return truncateDeltaForClient(active, event);
+  }
   if (event.type === "tool_start" && event.tool.name === "Bash") {
     return compactToolStartEvent(event);
+  }
+  if (event.type === "tool_end") {
+    return compactToolEndEventForClient(event);
+  }
+  if (event.type === "task_start") {
+    return {
+      ...event,
+      task: {
+        ...event.task,
+        description: truncateForClient(event.task.description, MAX_CLIENT_TASK_TEXT).text || "",
+        prompt: truncateForClient(event.task.prompt, MAX_CLIENT_TASK_TEXT).text,
+      },
+    };
+  }
+  if (event.type === "task_progress") {
+    return {
+      ...event,
+      description: truncateForClient(event.description, MAX_CLIENT_TASK_TEXT).text,
+      summary: truncateForClient(event.summary, MAX_CLIENT_TASK_TEXT).text,
+      error: truncateForClient(event.error, MAX_CLIENT_TASK_TEXT).text,
+    };
+  }
+  if (event.type === "task_end") {
+    return {
+      ...event,
+      summary: truncateForClient(event.summary, MAX_CLIENT_TASK_TEXT).text,
+      outputFile: truncateForClient(event.outputFile, MAX_CLIENT_TASK_TEXT).text,
+    };
+  }
+  if (event.type === "file_change") {
+    return { ...event, diff: undefined };
   }
   return event;
 }
@@ -223,13 +342,18 @@ export function createActiveAgentStream(sessionId: string): ActiveAgentStream {
     clients: new Set(),
     startedAt: Date.now(),
     done: false,
+    clientThinkingChars: 0,
+    clientThinkingTruncated: false,
+    clientProcessChars: 0,
+    clientProcessTruncated: false,
   };
   activeAgentStreams.set(sessionId, active);
   return active;
 }
 
 export function emitAgentStream(active: ActiveAgentStream, event: AgentStreamEvent): void {
-  const clientEvent = compactAgentEventForClient(event);
+  const clientEvent = compactAgentEventForClient(active, event);
+  if (!clientEvent) return;
   active.events.push(clientEvent);
   for (const client of active.clients) {
     if (client.writableEnded) continue;

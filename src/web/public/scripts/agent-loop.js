@@ -1,5 +1,7 @@
 (function () {
     var LARGE_MESSAGE_PREVIEW_CHARS = 20000;
+    var STREAMING_ANSWER_PREVIEW_CHARS = 12000;
+    var STREAMING_RENDER_INTERVAL_MS = 90;
     var LONG_SHELL_COMMAND_CHARS = 300;
     var SHELL_COMMAND_SUMMARY_CHARS = 220;
 
@@ -22,6 +24,12 @@
         var text = String(value || '');
         if (text.length <= maxChars) return text;
         return text.slice(0, Math.max(0, maxChars - 1)).trimEnd() + '…';
+    }
+
+    function previewStreamingText(value, maxChars, note) {
+        var text = String(value || '');
+        if (text.length <= maxChars) return text;
+        return text.slice(0, maxChars).trimEnd() + '\n\n...[' + note + ']';
     }
 
     function isLongShellCommand(tool) {
@@ -127,6 +135,7 @@
             fullAnswerLoader: opts.fullContentLoader || null,
         };
         var hasAttachedCompletionMeta = false;
+        var scheduledAnswerRender = null;
 
         var row = document.createElement('div');
         row.className = 'message-row ai';
@@ -349,6 +358,7 @@
         }
 
         function renderAnswer() {
+            clearScheduledAnswerRender();
             finalEl.classList.remove('streaming');
             var answerText = String(state.answerText || '');
             var isLarge = state.answerIsTruncated || answerText.length > LARGE_MESSAGE_PREVIEW_CHARS;
@@ -392,10 +402,12 @@
         }
 
         function renderStreamingAnswer() {
+            if (state.status !== 'running') return;
             var answerText = String(state.answerText || '');
             if (!answerText) return;
+            var visibleText = previewStreamingText(answerText, STREAMING_ANSWER_PREVIEW_CHARS, '回复较长，完成后显示完整内容');
             finalEl.classList.add('streaming');
-            finalEl.innerHTML = renderMarkdown(answerText);
+            finalEl.innerHTML = renderMarkdown(visibleText);
             enhanceLocalFileLinks(finalEl);
             finalEl.querySelectorAll('pre code').forEach(function (block) {
                 if (typeof hljs !== 'undefined') hljs.highlightElement(block);
@@ -403,10 +415,40 @@
             scrollBottom();
         }
 
+        function clearScheduledAnswerRender() {
+            if (!scheduledAnswerRender) return;
+            clearTimeout(scheduledAnswerRender);
+            scheduledAnswerRender = null;
+        }
+
+        function scheduleStreamingAnswerRender() {
+            if (isPersisted) {
+                renderStreamingAnswer();
+                return;
+            }
+            if (scheduledAnswerRender) return;
+            scheduledAnswerRender = setTimeout(function () {
+                scheduledAnswerRender = null;
+                renderStreamingAnswer();
+            }, STREAMING_RENDER_INTERVAL_MS);
+        }
+
+        function scheduleSegmentRender(segment, renderFn) {
+            if (isPersisted) {
+                renderFn(segment);
+                return;
+            }
+            if (segment.renderTimer) return;
+            segment.renderTimer = setTimeout(function () {
+                segment.renderTimer = null;
+                renderFn(segment);
+            }, STREAMING_RENDER_INTERVAL_MS);
+        }
+
         function appendAnswerText(text) {
             if (!text || isPersisted) return;
             state.answerText += text;
-            renderStreamingAnswer();
+            scheduleStreamingAnswerRender();
         }
 
         function renderChangeReview() {
@@ -445,7 +487,7 @@
                 activityList.appendChild(el);
             }
             segment.text += text;
-            renderProcessTextSegment(segment);
+            scheduleSegmentRender(segment, renderProcessTextSegment);
             updateProcessAvailability();
         }
 
@@ -488,7 +530,7 @@
                 activityList.appendChild(el);
             }
             segment.text += text;
-            renderThinkingSegment(segment);
+            scheduleSegmentRender(segment, renderThinkingSegment);
             updateProcessAvailability();
         }
 
@@ -860,17 +902,25 @@
             var output = event.output || {};
             var stdout = output.stdout || output.text || '';
             var stderr = output.stderr || '';
+            var stdoutTruncated = output.stdoutTruncated || output.textTruncated;
             var status = event.status === 'success' ? '成功' : '失败';
             var body = '';
             body += '<div class="claude-shell-title">Shell</div>';
             if (command) body += renderShellCommand(command);
             if (stdout) {
                 body += '<pre><code>' + escapeHtml(stdout) + '</code></pre>';
+                if (stdoutTruncated) body += '<div class="claude-inline-diff-note">输出较长，已折叠。</div>';
             } else if (!stderr && event.status === 'success') {
                 body += '<div class="claude-shell-empty">无输出</div>';
             }
-            if (stderr) body += '<pre class="stderr"><code>' + escapeHtml(stderr) + '</code></pre>';
-            if (event.error) body += '<pre class="stderr"><code>' + escapeHtml(event.error) + '</code></pre>';
+            if (stderr) {
+                body += '<pre class="stderr"><code>' + escapeHtml(stderr) + '</code></pre>';
+                if (output.stderrTruncated) body += '<div class="claude-inline-diff-note">错误输出较长，已折叠。</div>';
+            }
+            if (event.error) {
+                body += '<pre class="stderr"><code>' + escapeHtml(event.error) + '</code></pre>';
+                if (event.errorTruncated) body += '<div class="claude-inline-diff-note">错误信息较长，已折叠。</div>';
+            }
             body += '<div class="claude-shell-status">' + (event.status === 'success' ? '✓ ' : '✕ ') + status + '</div>';
             shell.innerHTML = body;
         }
