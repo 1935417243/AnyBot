@@ -5,11 +5,9 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（0.1.31）
-- 优化大聊天记录场景下的加载与交互性能
-- 支持拉取 Git 仓库，便于添加远程项目
-- 优化 MCP 添加流程的图层展示
-- 优化标题 Tab 的交互体验
+### 本次更新（0.1.32）
+- 支持阿里 Token Plan
+- 优化暗夜模式优化
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
