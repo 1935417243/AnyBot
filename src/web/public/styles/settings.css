@@ -279,7 +279,7 @@
 
         .sandbox-option-desc {
             color: var(--text-muted);
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 500;
             line-height: 1.35;
         }
@@ -320,9 +320,9 @@
 
         .settings-combobox.disabled .settings-combobox-trigger,
         .settings-combobox-trigger:disabled {
-            color: var(--text-dim);
+            color: var(--text-muted);
             cursor: not-allowed;
-            opacity: 0.65;
+            opacity: 0.75;
         }
 
         .settings-combobox.disabled .settings-combobox-trigger:hover,
@@ -477,7 +477,7 @@
         .settings-combobox-option-status {
             margin-left: auto;
             flex-shrink: 0;
-            color: var(--text-dim);
+            color: var(--text-muted);
             font-size: 12px;
             font-weight: 600;
         }
@@ -1038,8 +1038,8 @@
         }
 
         .provider-model-suggest-source {
-            color: var(--text-dim);
-            font-size: 11px;
+            color: var(--text-muted);
+            font-size: 12px;
             flex-shrink: 0;
         }
 
