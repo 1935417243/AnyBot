@@ -28,6 +28,9 @@ export type ProviderModelsResult = {
 function buildProviderModelsRequest(baseUrl: string): { modelsUrl: string; provider: string } {
   const parsed = new URL(baseUrl);
   const lower = baseUrl.toLowerCase();
+  if (lower.includes("token-plan.cn-beijing.maas.aliyuncs.com")) {
+    return { modelsUrl: new URL("/compatible-mode/v1/models", parsed.origin).toString(), provider: "阿里Token Plan" };
+  }
   if (lower.includes("vibeapi")) {
     return { modelsUrl: new URL("/v1/models", parsed.origin).toString(), provider: "VibeAPI" };
   }
@@ -37,7 +40,7 @@ function buildProviderModelsRequest(baseUrl: string): { modelsUrl: string; provi
   if (lower.includes("api.minimaxi.com")) {
     return { modelsUrl: new URL("/anthropic/v1/models", parsed.origin).toString(), provider: "MiniMax" };
   }
-  throw new Error("仅支持 VibeAPI、DeepSeek 或 MiniMax Base URL 自动获取模型");
+  throw new Error("仅支持 阿里Token Plan、VibeAPI、DeepSeek 或 MiniMax Base URL 自动获取模型");
 }
 
 function getProviderModelCacheKey(modelsUrl: string, apiKey: string): string {
@@ -61,6 +64,11 @@ function extractProviderModelIds(payload: unknown): string[] {
   return Array.from(new Set(ids));
 }
 
+function filterProviderModelIds(provider: string, models: string[]): string[] {
+  if (provider !== "阿里Token Plan") return models;
+  return models.filter((model) => !model.toLowerCase().includes("image"));
+}
+
 export async function fetchProviderModels(baseUrl: string, apiKey: string): Promise<ProviderModelsResult> {
   if (!baseUrl || !apiKey) {
     throw new ProviderModelFetchError("缺少 Base URL 或 API Key", 400);
@@ -76,7 +84,8 @@ export async function fetchProviderModels(baseUrl: string, apiKey: string): Prom
     const msg = error instanceof Error && (
       error.message.includes("VibeAPI") ||
       error.message.includes("DeepSeek") ||
-      error.message.includes("MiniMax")
+      error.message.includes("MiniMax") ||
+      error.message.includes("阿里Token Plan")
     )
       ? error.message
       : "Base URL 无效";
@@ -117,7 +126,7 @@ export async function fetchProviderModels(baseUrl: string, apiKey: string): Prom
       throw new ProviderModelFetchError(upstreamError, response.status);
     }
 
-    const models = extractProviderModelIds(payload);
+    const models = filterProviderModelIds(provider, extractProviderModelIds(payload));
     if (models.length === 0) {
       throw new ProviderModelFetchError("模型列表为空或格式不支持", 502);
     }

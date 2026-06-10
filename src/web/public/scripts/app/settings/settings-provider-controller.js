@@ -26,9 +26,15 @@ export function createSettingsProviderController(options) {
     let remoteProviderModelFetchSeq = 0;
 
     const DEFAULT_PROVIDER_TIMEOUT_MINUTES = 30;
+    const ALIYUN_TOKEN_PLAN_BASE_URL = 'https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic';
     const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
     const KIMI_CODING_MODEL = 'kimi-for-coding';
     const PROVIDER_BASE_URL_SUGGESTIONS = [
+        {
+            id: 'aliyun-token-plan',
+            label: '阿里Token Plan',
+            value: ALIYUN_TOKEN_PLAN_BASE_URL,
+        },
         {
             id: 'deepseek',
             label: 'DeepSeek',
@@ -195,6 +201,7 @@ export function createSettingsProviderController(options) {
 
     function getRemoteProviderModelSource(baseUrl) {
         var lower = String(baseUrl || '').toLowerCase();
+        if (lower.indexOf('token-plan.cn-beijing.maas.aliyuncs.com') !== -1) return '阿里Token Plan';
         if (lower.indexOf('vibeapi') !== -1) return 'VibeAPI';
         if (lower.indexOf('api.deepseek.com') !== -1) return 'DeepSeek';
         if (lower.indexOf('api.minimaxi.com') !== -1) return 'MiniMax';
@@ -492,7 +499,7 @@ export function createSettingsProviderController(options) {
         menu.innerHTML = '';
         PROVIDER_BASE_URL_SUGGESTIONS.forEach(function (suggestion) {
             var option = document.createElement('button');
-            option.className = 'provider-model-suggest-option';
+            option.className = 'provider-model-suggest-option provider-base-url-suggest-option';
             option.type = 'button';
             option.setAttribute('role', 'option');
             option.dataset.value = suggestion.value;

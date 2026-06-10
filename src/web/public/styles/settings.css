@@ -1043,6 +1043,18 @@
             flex-shrink: 0;
         }
 
+        .provider-base-url-suggest-option .provider-model-suggest-name {
+            flex: 0 0 132px;
+        }
+
+        .provider-base-url-suggest-option .provider-model-suggest-source {
+            min-width: 0;
+            flex: 1 1 auto;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
         .settings-secondary-btn.compact,
         .settings-primary-btn.compact,
         .settings-danger-btn.compact {

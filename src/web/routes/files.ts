@@ -9,16 +9,39 @@ import * as db from "../db.js";
 import { getUploadDir, isHtmlFile, isImageFile, listMentionableFiles, resolveLocalFilePath } from "../services/files.js";
 import { getSessionWorkdir } from "../services/projects.js";
 
+function getUploadDateDir(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getUploadFileExtension(originalName: string): string {
+  const ext = path.extname(path.basename(originalName || ""));
+  return ext.replace(/[^a-zA-Z0-9.]/g, "").slice(0, 24);
+}
+
+function getAvailableUploadFilename(uploadDir: string, originalName: string): string {
+  const ext = getUploadFileExtension(originalName);
+
+  for (;;) {
+    const random = Math.random().toString(36).slice(2, 10);
+    const candidate = `${Date.now()}${random}${ext}`;
+    if (!fs.existsSync(path.join(uploadDir, candidate))) {
+      return candidate;
+    }
+  }
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    fs.mkdirSync(getUploadDir(), { recursive: true });
-    cb(null, getUploadDir());
+    const uploadDir = path.join(getUploadDir(), getUploadDateDir());
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g, "_");
-    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    cb(null, `${base}-${unique}${ext}`);
+    cb(null, getAvailableUploadFilename(path.join(getUploadDir(), getUploadDateDir()), file.originalname));
   },
 });
 
