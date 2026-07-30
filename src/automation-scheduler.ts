@@ -10,11 +10,15 @@ import { runAutomation } from "./web/services/automation-runner.js";
 import { logger } from "./logger.js";
 
 const MAX_TIMEOUT_MS = 2_147_000_000;
+const MIN_DELAY_MS = 1_000;
+const MIN_ERROR_RETRY_MS = 5_000;
+const MAX_ERROR_RETRY_MS = 5 * 60_000;
 
 export class AutomationScheduler {
   private timer: NodeJS.Timeout | null = null;
   private stopped = false;
   private processing = false;
+  private consecutiveFailures = 0;
   private recoveredInterruptedRuns = false;
   private unsubscribe: (() => void) | null = null;
 
@@ -49,6 +53,9 @@ export class AutomationScheduler {
 
   private scheduleNext(): void {
     if (this.stopped) return;
+    // The running tick re-arms the timer from its finally block; scheduling
+    // here would just spin on the still-due automation until the run ends.
+    if (this.processing) return;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -60,14 +67,20 @@ export class AutomationScheduler {
       return;
     }
 
-    const delay = Math.max(0, next.nextRunAt - Date.now());
+    const backoffMs = this.consecutiveFailures > 0
+      ? Math.min(MIN_ERROR_RETRY_MS * 2 ** (this.consecutiveFailures - 1), MAX_ERROR_RETRY_MS)
+      : 0;
+    const delay = Math.min(
+      Math.max(next.nextRunAt - Date.now(), backoffMs, MIN_DELAY_MS),
+      MAX_TIMEOUT_MS,
+    );
     this.timer = setTimeout(() => {
       this.timer = null;
       this.tick().catch((error) => {
         logger.error("automation.scheduler.tick_failed", { error });
         this.scheduleNext();
       });
-    }, Math.min(delay, MAX_TIMEOUT_MS));
+    }, delay);
     this.timer.unref();
 
     logger.info("automation.scheduler.next", {
@@ -92,10 +105,7 @@ export class AutomationScheduler {
   }
 
   private async tick(): Promise<void> {
-    if (this.processing) {
-      this.scheduleNext();
-      return;
-    }
+    if (this.processing) return;
     this.processing = true;
     try {
       while (!this.stopped) {
@@ -105,6 +115,10 @@ export class AutomationScheduler {
           await runAutomation(automation, { updateNextRunAt: true });
         }
       }
+      this.consecutiveFailures = 0;
+    } catch (error) {
+      this.consecutiveFailures += 1;
+      throw error;
     } finally {
       this.processing = false;
       this.scheduleNext();
