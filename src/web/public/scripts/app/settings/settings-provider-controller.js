@@ -28,7 +28,7 @@ export function createSettingsProviderController(options) {
     const DEFAULT_PROVIDER_TIMEOUT_MINUTES = 30;
     const ALIYUN_TOKEN_PLAN_BASE_URL = 'https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic';
     const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
-    const KIMI_CODING_MODEL = 'kimi-for-coding';
+    const KIMI_CODING_MODELS = ['kimi-for-coding', 'k3', 'k3-256k', 'kimi-for-coding-highspeed'];
     const OLLAMA_BASE_URL = 'http://localhost:11434';
     const OLLAMA_PLACEHOLDER_API_KEY = 'ollama';
     const PROVIDER_BASE_URL_SUGGESTIONS = [
@@ -66,8 +66,7 @@ export function createSettingsProviderController(options) {
     const PROVIDER_MODEL_SUGGESTION_STRATEGIES = [
         {
             label: 'Kimi',
-            models: [KIMI_CODING_MODEL],
-            fixedModel: KIMI_CODING_MODEL,
+            models: KIMI_CODING_MODELS,
             matchUrl: isKimiCodingBaseUrl,
         },
     ];
