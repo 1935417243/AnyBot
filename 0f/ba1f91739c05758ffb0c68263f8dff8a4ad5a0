@@ -1,0 +1,19 @@
+src/automation-scheduler.ts
+  s_84c5ebc2871215::t_a3c25dc0a4025f 13-15,21,56-58,70-76,83,108,118-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "0fba1f91739c05758ffb0c68263f8dff8a4ad5a0",
+  "prompts": {},
+  "sessions": {
+    "s_84c5ebc2871215": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0380c693-3f27-4841-9489-2ef4efdc8caa",
+        "model": "k3"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
