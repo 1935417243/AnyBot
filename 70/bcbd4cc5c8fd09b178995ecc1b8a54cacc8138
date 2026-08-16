@@ -1,0 +1,30 @@
+src/web/public/index.html
+  h_7a561dec792e5b 28,49,51,53,218-273,330-344,346,348-359,361-368
+src/web/public/scripts/app/app/create-app.js
+  h_7a561dec792e5b 26,140,143,145-153,168,769,781-789,818-822,830-831,852-853,857-858,970
+src/web/public/scripts/app/app/dom.js
+  h_7a561dec792e5b 103,106,108-117
+src/web/public/scripts/app/app/view-router.js
+  h_7a561dec792e5b 21,25,44,46-47,49,71-73,91-92,99-100,120
+src/web/public/scripts/app/plugins/mcp-controller.js
+  h_7a561dec792e5b 31-38,52-53,60-62,68-74,77-79,109,119,139-141,157,163-165,191,194,216,241,304,306,316,327,329,334,338,401,515,519-520,534,544-545,549-550,556-557,565-567,573-574
+src/web/public/scripts/app/plugins/plugins-page.js
+  h_7a561dec792e5b 1-91
+src/web/public/scripts/app/skills/skills-page.js
+  h_7a561dec792e5b 5,47,104,109,241
+src/web/public/styles/plugins.css
+  h_7a561dec792e5b 1-645
+src/web/public/styles/sidebar.css
+  h_7a561dec792e5b 80,106,114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "70bcbd4cc5c8fd09b178995ecc1b8a54cacc8138",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
