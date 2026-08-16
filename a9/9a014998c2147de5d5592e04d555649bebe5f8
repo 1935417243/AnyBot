@@ -1,0 +1,26 @@
+code-review-findings.md
+  h_7a561dec792e5b 41,128
+src/web/public/scripts/app/settings/settings-provider-controller.js
+  h_7a561dec792e5b 34-35,377-401,404,408-410
+src/web/routes/channels.ts
+  h_7a561dec792e5b 6,12,21,35-38,40
+src/web/routes/data.ts
+  h_7a561dec792e5b 18-23,81,83-86,90,94,113-116,127-129
+src/web/routes/settings.ts
+  h_7a561dec792e5b 8,22,38,57,71-86
+src/web/services/provider-models.ts
+  h_7a561dec792e5b 5,84-87
+src/web/services/secrets.ts
+  h_7a561dec792e5b 1-186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "a99a014998c2147de5d5592e04d555649bebe5f8",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
