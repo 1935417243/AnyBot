@@ -1,0 +1,18 @@
+src/web/public/scripts/app/app/create-app.js
+  h_7a561dec792e5b 272-275,656-657
+src/web/public/scripts/app/chat/session-controller.js
+  h_7a561dec792e5b 43,69
+src/web/public/scripts/app/sidebar/sidebar-controller.js
+  h_7a561dec792e5b 1247-1249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "6febc9ace7c2c12b33771e6a84c1b8e8f3323281",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
