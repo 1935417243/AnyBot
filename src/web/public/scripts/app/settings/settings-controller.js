@@ -1,5 +1,4 @@
 import { createSettingsProviderController } from './settings-provider-controller.js';
-import { createSettingsMcpController } from './settings-mcp-controller.js';
 import { buildSettingsComboboxOptionHtml } from '../ui/settings-combobox.js';
 import { showConfirmDialog } from '../ui/confirm-dialog.js';
 import { escapeHtml } from '../utils/html.js';
@@ -46,16 +45,9 @@ export function createSettingsController(options) {
     const settingsProviderModelMenu = options.settingsProviderModelMenu;
     const settingsProviderModelSelect = options.settingsProviderModelSelect;
     const settingsProviderModelTrigger = options.settingsProviderModelTrigger;
-    const settingsProviderSubtabs = options.settingsProviderSubtabs;
-    const settingsProviderSubtabPanels = options.settingsProviderSubtabPanels;
     const settingsProviderTimeoutFields = options.settingsProviderTimeoutFields;
     const settingsProviderSelect = options.settingsProviderSelect;
     const settingsProviderTrigger = options.settingsProviderTrigger;
-    const settingsMcpRefreshBtn = options.settingsMcpRefreshBtn;
-    const settingsMcpAddControl = options.settingsMcpAddControl;
-    const settingsMcpAddBtn = options.settingsMcpAddBtn;
-    const settingsMcpAddMenu = options.settingsMcpAddMenu;
-    const settingsMcpServerList = options.settingsMcpServerList;
     const settingsSaveBtn = options.settingsSaveBtn;
     const settingsSaveStatus = options.settingsSaveStatus;
     const settingsTabPanels = options.settingsTabPanels || [];
@@ -90,7 +82,6 @@ export function createSettingsController(options) {
     let desktopUpdateRefreshTimer = null;
     let sessionModelSelections = {};
     let settingsProviderController = null;
-    let settingsMcpController = null;
     let currentThemeSetting = readStoredTheme();
 
     function createNewChat(projectId, chatOptions) {
@@ -513,18 +504,6 @@ export function createSettingsController(options) {
         showSettingsStatus: showSettingsStatus,
     });
 
-    settingsMcpController = createSettingsMcpController({
-        settingsProviderSubtabs: settingsProviderSubtabs,
-        settingsProviderSubtabPanels: settingsProviderSubtabPanels,
-        settingsMcpRefreshBtn: settingsMcpRefreshBtn,
-        settingsMcpAddControl: settingsMcpAddControl,
-        settingsMcpAddBtn: settingsMcpAddBtn,
-        settingsMcpAddMenu: settingsMcpAddMenu,
-        settingsMcpServerList: settingsMcpServerList,
-        showError: showError,
-        showSettingsStatus: showSettingsStatus,
-    });
-
     async function fetchAppSettings() {
         try {
             var res = await fetch('/api/app-settings');
@@ -808,7 +787,6 @@ export function createSettingsController(options) {
         });
         if (settingsTitle) settingsTitle.textContent = SETTINGS_TAB_META[tab][0];
         if (settingsSubtitle) settingsSubtitle.textContent = SETTINGS_TAB_META[tab][1];
-        if (tab !== 'provider' && settingsMcpController) settingsMcpController.closeMenus();
         if (tab === 'about') {
             fetchDesktopUpdateStatus();
         } else {
@@ -853,7 +831,6 @@ export function createSettingsController(options) {
     function closeSettingsPanel() {
         setSettingsThemeMenuOpen(false);
         if (settingsProviderController) settingsProviderController.closeProviderControls();
-        if (settingsMcpController) settingsMcpController.closeMenus();
         showChatView();
     }
 
@@ -1172,14 +1149,12 @@ export function createSettingsController(options) {
             closeModelDropdown();
         }
         if (settingsProviderController) settingsProviderController.handleDocumentClick(e);
-        if (settingsMcpController) settingsMcpController.handleDocumentClick(e);
         if (settingsThemeCombobox && !settingsThemeCombobox.contains(e.target)) {
             setSettingsThemeMenuOpen(false);
         }
     }
 
     function handleDocumentEscape() {
-        if (settingsMcpController && settingsMcpController.handleEscape()) return true;
         if (settingsProviderController && settingsProviderController.handleTransientEscape()) return true;
         if (settingsThemeCombobox && settingsThemeCombobox.classList.contains('open')) {
             setSettingsThemeMenuOpen(false);

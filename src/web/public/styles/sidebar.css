@@ -77,7 +77,7 @@
         }
 
         #new-chat-btn,
-        #skills-btn,
+        #plugins-btn,
         #channels-btn,
         #automations-btn {
             width: 100%;
@@ -103,7 +103,7 @@
         }
 
         #new-chat-btn:hover,
-        #skills-btn:hover,
+        #plugins-btn:hover,
         #channels-btn:hover,
         #automations-btn:hover {
             background: var(--sidebar-hover);
@@ -111,7 +111,7 @@
         }
 
         #new-chat-btn svg,
-        #skills-btn svg,
+        #plugins-btn svg,
         #channels-btn svg,
         #automations-btn svg {
             flex-shrink: 0;

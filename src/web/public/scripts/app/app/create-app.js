@@ -23,7 +23,7 @@ import { getChannelMeta } from '../channels/channel-meta.js';
 import { createChannelsPageController } from '../channels/channels-page.js';
 import { createSidebarController } from '../sidebar/sidebar-controller.js';
 import { createSettingsController } from '../settings/settings-controller.js';
-import { createSkillsPageController } from '../skills/skills-page.js';
+import { createPluginsPageController } from '../plugins/plugins-page.js';
 import { copyCode } from '../ui/code-copy.js';
 import { openImageModal } from '../ui/image-modal.js';
 import { createToastController } from '../ui/toast.js';
@@ -104,13 +104,6 @@ export function createAnyBotApp(dom, deps) {
         settingsProviderCompatToggleFields,
         settingsProviderBinFields,
         settingsProviderExtraFields,
-        settingsProviderSubtabs,
-        settingsProviderSubtabPanels,
-        settingsMcpRefreshBtn,
-        settingsMcpAddControl,
-        settingsMcpAddBtn,
-        settingsMcpAddMenu,
-        settingsMcpServerList,
         settingsDefaultWorkdir,
         settingsWorkdirOpenBtn,
         settingsWorkdirPickBtn,
@@ -144,11 +137,20 @@ export function createAnyBotApp(dom, deps) {
         dropOverlay,
         chatView,
         channelView,
-        skillsView,
+        pluginsView,
         automationView,
         channelsBtn,
-        skillsBtn,
+        pluginsBtn,
         automationsBtn,
+        pluginsTabs,
+        pluginsTabPanels,
+        pluginsSkillsPanel,
+        pluginsCloseBtn,
+        pluginsMcpRefreshBtn,
+        pluginsMcpAddControl,
+        pluginsMcpAddBtn,
+        pluginsMcpAddMenu,
+        pluginsMcpServerList,
     } = dom;
 
     let contextUsageController = null;
@@ -163,7 +165,7 @@ export function createAnyBotApp(dom, deps) {
     let sidebarController = null;
     let settingsController = null;
     let channelsPageController = null;
-    let skillsPageController = null;
+    let pluginsPageController = null;
     let automationsPageController = null;
     let viewRouter = null;
     let attachmentController = null;
@@ -322,16 +324,9 @@ export function createAnyBotApp(dom, deps) {
         settingsProviderModelMenu: settingsProviderModelMenu,
         settingsProviderModelSelect: settingsProviderModelSelect,
         settingsProviderTimeoutFields: settingsProviderTimeoutFields,
-        settingsProviderSubtabs: settingsProviderSubtabs,
-        settingsProviderSubtabPanels: settingsProviderSubtabPanels,
         settingsProviderModelTrigger: settingsProviderModelTrigger,
         settingsProviderSelect: settingsProviderSelect,
         settingsProviderTrigger: settingsProviderTrigger,
-        settingsMcpRefreshBtn: settingsMcpRefreshBtn,
-        settingsMcpAddControl: settingsMcpAddControl,
-        settingsMcpAddBtn: settingsMcpAddBtn,
-        settingsMcpAddMenu: settingsMcpAddMenu,
-        settingsMcpServerList: settingsMcpServerList,
         settingsSaveBtn: settingsSaveBtn,
         settingsSaveStatus: settingsSaveStatus,
         settingsTabPanels: settingsTabPanels,
@@ -771,7 +766,7 @@ export function createAnyBotApp(dom, deps) {
         showError: showError,
     });
 
-    skillsPageController = createSkillsPageController({
+    pluginsPageController = createPluginsPageController({
         getActiveSlashProviderType: function () {
             return slashItemsStore ? slashItemsStore.getConfiguredProviderType() : '';
         },
@@ -783,7 +778,15 @@ export function createAnyBotApp(dom, deps) {
         },
         showChatView: showChatView,
         showError: showError,
-        skillsView: skillsView,
+        pluginsTabs: pluginsTabs,
+        pluginsTabPanels: pluginsTabPanels,
+        pluginsSkillsPanel: pluginsSkillsPanel,
+        pluginsCloseBtn: pluginsCloseBtn,
+        pluginsMcpRefreshBtn: pluginsMcpRefreshBtn,
+        pluginsMcpAddControl: pluginsMcpAddControl,
+        pluginsMcpAddBtn: pluginsMcpAddBtn,
+        pluginsMcpAddMenu: pluginsMcpAddMenu,
+        pluginsMcpServerList: pluginsMcpServerList,
     });
 
     automationsPageController = createAutomationsPageController({
@@ -812,8 +815,11 @@ export function createAnyBotApp(dom, deps) {
         fetchAutomations: function () {
             return automationsPageController.fetchInitialData();
         },
-        fetchSkills: function () {
-            return skillsPageController.fetchSkills();
+        fetchPluginsData: function () {
+            return pluginsPageController.fetchData();
+        },
+        deactivatePluginsPage: function () {
+            return pluginsPageController.deactivate();
         },
         handleAutomationsEscape: function () {
             return automationsPageController.handleEscape();
@@ -821,8 +827,8 @@ export function createAnyBotApp(dom, deps) {
         handleChannelsEscape: function () {
             return channelsPageController.handleEscape();
         },
-        handleSkillsKeydown: function (e) {
-            return skillsPageController.handleKeydown(e);
+        handlePluginsKeydown: function (e) {
+            return pluginsPageController.handleKeydown(e);
         },
         hasChannelsData: function () {
             return channelsPageController.hasChannelsData();
@@ -843,13 +849,13 @@ export function createAnyBotApp(dom, deps) {
         renderProjects: function () {
             requireSidebarController().renderProjects();
         },
-        renderSkillsPage: function () {
-            return skillsPageController.render();
+        renderPluginsPage: function () {
+            return pluginsPageController.render();
         },
         settingsBtn: settingsBtn,
         settingsView: settingsView,
-        skillsBtn: skillsBtn,
-        skillsView: skillsView,
+        pluginsBtn: pluginsBtn,
+        pluginsView: pluginsView,
     });
 
     function getCurrentView() {
@@ -961,6 +967,7 @@ export function createAnyBotApp(dom, deps) {
             }
             if (permissionModeController) permissionModeController.handleDocumentClick(e);
             if (homeHeroController) homeHeroController.handleDocumentClick(e);
+            if (pluginsPageController) pluginsPageController.handleDocumentClick(e);
             requireSettingsController().handleDocumentClick(e);
         });
 

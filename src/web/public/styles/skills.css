@@ -1,53 +1,3 @@
-        #skills-view {
-            flex: 1;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .skills-page {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .skills-header {
-            padding: 28px 32px 0;
-            flex-shrink: 0;
-        }
-
-        .skills-header-top {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 6px;
-        }
-
-        .skills-header-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(74, 222, 128, 0.12);
-            color: #4ade80;
-            flex-shrink: 0;
-        }
-
-        .skills-header-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--text);
-        }
-
-        .skills-header-count {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
         .skills-toolbar {
             display: flex;
             align-items: center;
@@ -334,16 +284,6 @@
         .skill-detail-content::-webkit-scrollbar-thumb {
             background: var(--scrollbar);
             border-radius: 99px;
-        }
-
-        .skills-footer {
-            display: none;
-            padding: 12px 32px;
-            border-top: 1px solid var(--border);
-            align-items: center;
-            justify-content: space-between;
-            flex-shrink: 0;
-            background: var(--bg);
         }
 
         .skills-save-status {

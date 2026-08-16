@@ -2,7 +2,7 @@ import { createSkillCard, showSkillsSaveStatus } from './skill-card.js';
 import { escapeHtml } from '../utils/html.js';
 
 export function createSkillsPageController(options) {
-    const skillsView = options.skillsView;
+    const skillsPanel = options.skillsPanel;
 
     var skillsData = null;
     var skillsDataProvider = '';
@@ -19,10 +19,6 @@ export function createSkillsPageController(options) {
 
     function invalidateSlashItemsData(providerType) {
         if (options.invalidateSlashItemsData) options.invalidateSlashItemsData(providerType);
-    }
-
-    function showChatView() {
-        if (options.showChatView) options.showChatView();
     }
 
     function showError(message) {
@@ -48,25 +44,8 @@ export function createSkillsPageController(options) {
     }
 
     function renderSkillsView() {
-        skillsView.innerHTML = '';
+        skillsPanel.innerHTML = '';
         if (!skillsData) return;
-
-        var page = document.createElement('div');
-        page.className = 'skills-page';
-
-        var header = document.createElement('div');
-        header.className = 'skills-header';
-        header.innerHTML =
-            '<div class="skills-header-top">' +
-            '<div class="skills-header-icon">' +
-            '<svg width="22" height="22" viewBox="0 0 14 14" fill="none"><path d="M7 1L8.5 4.5L12.5 5L9.75 7.5L10.5 11.5L7 9.5L3.5 11.5L4.25 7.5L1.5 5L5.5 4.5L7 1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-            '</div>' +
-            '<div>' +
-            '<div class="skills-header-title">技能管理</div>' +
-            '<div class="skills-header-count">' + skillsData.skills.length + ' 个技能可用</div>' +
-            '</div>' +
-            '</div>';
-        page.appendChild(header);
 
         var toolbar = document.createElement('div');
         toolbar.className = 'skills-toolbar';
@@ -122,30 +101,12 @@ export function createSkillsPageController(options) {
         toolbar.appendChild(refreshBtn);
         if (downloadOfficialBtn) toolbar.appendChild(downloadOfficialBtn);
         toolbar.appendChild(openFolderBtn);
-        page.appendChild(toolbar);
+        skillsPanel.appendChild(toolbar);
 
         var listContainer = document.createElement('div');
         listContainer.className = 'skills-list';
         listContainer.id = 'skills-list-container';
-        page.appendChild(listContainer);
-
-        var footer = document.createElement('div');
-        footer.className = 'skills-footer';
-        footer.innerHTML =
-            '<div class="skills-save-status" id="skills-save-status">' +
-            '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-            '所有更改已保存' +
-            '</div>' +
-            '<div class="skills-footer-actions">' +
-            '<button class="skills-footer-btn" id="skills-close-btn">关闭</button>' +
-            '</div>';
-        page.appendChild(footer);
-
-        skillsView.appendChild(page);
-
-        document.getElementById('skills-close-btn').addEventListener('click', function () {
-            showChatView();
-        });
+        skillsPanel.appendChild(listContainer);
 
         renderSkillsList();
     }
@@ -214,8 +175,6 @@ export function createSkillsPageController(options) {
                     skillsData.skills = skillsData.skills.filter(function (s) { return s.id !== deletedSkill.id; });
                 }
                 invalidateSlashItemsData(providerType);
-                var countEl = document.querySelector('.skills-header-count');
-                if (countEl && skillsData) countEl.textContent = skillsData.skills.length + ' 个技能可用';
                 showSkillsSaveStatus('已删除: ' + deletedSkill.name);
             },
         });
@@ -279,7 +238,7 @@ export function createSkillsPageController(options) {
     }
 
     function setDownloadToolbarButtonsDisabled(disabled) {
-        var buttons = skillsView.querySelectorAll('.skills-toolbar-btn[aria-label="下载官方技能"]');
+        var buttons = skillsPanel.querySelectorAll('.skills-toolbar-btn[aria-label="下载官方技能"]');
         buttons.forEach(function (button) {
             button.disabled = disabled;
         });

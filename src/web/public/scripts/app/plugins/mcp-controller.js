@@ -28,16 +28,14 @@ const MCP_STATUS_POLL_INTERVAL_MS = 1500;
 const WARNING_ICON = '<svg class="mcp-status-warning-icon" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 1.4 13 12H1L7 1.4Z" fill="currentColor"/><path d="M7 5v3.2M7 10.1h.01" stroke="var(--sidebar)" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const SETTINGS_ICON = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>';
 
-export function createSettingsMcpController(options) {
-    const settingsProviderSubtabs = options.settingsProviderSubtabs || [];
-    const settingsProviderSubtabPanels = options.settingsProviderSubtabPanels || [];
-    const settingsMcpRefreshBtn = options.settingsMcpRefreshBtn;
-    const settingsMcpAddControl = options.settingsMcpAddControl;
-    const settingsMcpAddBtn = options.settingsMcpAddBtn;
-    const settingsMcpAddMenu = options.settingsMcpAddMenu;
-    const settingsMcpServerList = options.settingsMcpServerList;
+export function createMcpController(options) {
+    const mcpRefreshBtn = options.mcpRefreshBtn;
+    const mcpAddControl = options.mcpAddControl;
+    const mcpAddBtn = options.mcpAddBtn;
+    const mcpAddMenu = options.mcpAddMenu;
+    const mcpServerList = options.mcpServerList;
 
-    let activeTab = 'config';
+    let active = false;
     let servers = [];
     let loaded = false;
     let loading = false;
@@ -51,40 +49,34 @@ export function createSettingsMcpController(options) {
         if (options.showError) options.showError(message);
     }
 
-    function showSettingsStatus(message, tone) {
-        if (options.showSettingsStatus) options.showSettingsStatus(message, tone);
+    function showStatus(message) {
+        if (options.showStatus) options.showStatus(message);
     }
 
     function getStatusLabel(status) {
         return STATUS_LABELS[status] || STATUS_LABELS.not_started;
     }
 
-    function setProviderSettingsTab(tab) {
-        if (tab !== 'mcp') tab = 'config';
-        activeTab = tab;
-        settingsProviderSubtabs.forEach(function (item) {
-            var active = item.dataset.providerSettingsTab === tab;
-            item.classList.toggle('active', active);
-            item.setAttribute('aria-selected', active ? 'true' : 'false');
-        });
-        settingsProviderSubtabPanels.forEach(function (panel) {
-            panel.classList.toggle('active', panel.dataset.providerSettingsPanel === tab);
-        });
-        if (tab === 'mcp' && settingsProviderSubtabs[0]) {
-            var settingsPanelBody = settingsProviderSubtabs[0].closest('.settings-panel-body');
-            if (settingsPanelBody) settingsPanelBody.scrollTop = 0;
-        }
-        if (tab === 'mcp' && !loaded) {
+    function activate() {
+        active = true;
+        if (!loaded) {
             fetchServers(false);
         }
         syncStatusPolling();
     }
 
+    function deactivate() {
+        active = false;
+        stopStatusPolling();
+        setAddMenuOpen(false);
+        setOpenMenuServerId('');
+    }
+
     function setAddMenuOpen(isOpen) {
         addMenuOpen = !!isOpen;
-        if (!settingsMcpAddControl || !settingsMcpAddBtn) return;
-        settingsMcpAddControl.classList.toggle('open', addMenuOpen);
-        settingsMcpAddBtn.setAttribute('aria-expanded', addMenuOpen ? 'true' : 'false');
+        if (!mcpAddControl || !mcpAddBtn) return;
+        mcpAddControl.classList.toggle('open', addMenuOpen);
+        mcpAddBtn.setAttribute('aria-expanded', addMenuOpen ? 'true' : 'false');
     }
 
     function setOpenMenuServerId(serverId) {
@@ -114,7 +106,7 @@ export function createSettingsMcpController(options) {
     }
 
     function syncStatusPolling() {
-        if (activeTab !== 'mcp' || !hasCheckingServers()) {
+        if (!active || !hasCheckingServers()) {
             stopStatusPolling();
             return;
         }
@@ -124,7 +116,7 @@ export function createSettingsMcpController(options) {
 
     async function pollServerStatuses() {
         statusPollTimer = null;
-        if (activeTab !== 'mcp' || !hasCheckingServers() || statusPollInFlight) {
+        if (!active || !hasCheckingServers() || statusPollInFlight) {
             syncStatusPolling();
             return;
         }
@@ -144,9 +136,9 @@ export function createSettingsMcpController(options) {
 
     async function fetchServers(refreshStatus) {
         loading = true;
-        if (settingsMcpRefreshBtn) {
-            settingsMcpRefreshBtn.disabled = true;
-            settingsMcpRefreshBtn.textContent = refreshStatus ? '刷新中…' : '加载中…';
+        if (mcpRefreshBtn) {
+            mcpRefreshBtn.disabled = true;
+            mcpRefreshBtn.textContent = refreshStatus ? '刷新中…' : '加载中…';
         }
         if (refreshStatus) {
             servers = servers.map(function (server) {
@@ -162,15 +154,15 @@ export function createSettingsMcpController(options) {
             servers = Array.isArray(data.servers) ? data.servers : [];
             loaded = true;
             renderServers();
-            if (refreshStatus) showSettingsStatus('MCP Servers 已刷新');
+            if (refreshStatus) showStatus('MCP Servers 已刷新');
         } catch (e) {
             showError(e.message || '读取 MCP Servers 失败');
             renderServers();
         } finally {
             loading = false;
-            if (settingsMcpRefreshBtn) {
-                settingsMcpRefreshBtn.disabled = false;
-                settingsMcpRefreshBtn.textContent = '刷新';
+            if (mcpRefreshBtn) {
+                mcpRefreshBtn.disabled = false;
+                mcpRefreshBtn.textContent = '刷新';
             }
             renderServers();
         }
@@ -196,10 +188,10 @@ export function createSettingsMcpController(options) {
     function showServerOperationStatus(serverId, successMessage, failedMessage) {
         var server = findServer(serverId);
         if (server && server.enabled && server.status === 'failed') {
-            showSettingsStatus(failedMessage || 'MCP Server 检查失败', 'error');
+            showError(failedMessage || 'MCP Server 检查失败');
             return;
         }
-        showSettingsStatus(successMessage);
+        showStatus(successMessage);
     }
 
     async function toggleServer(serverId, enabled) {
@@ -221,7 +213,7 @@ export function createSettingsMcpController(options) {
             if (enabled) {
                 showServerOperationStatus(serverId, 'MCP Server 已启用', 'MCP Server 已启用，检查失败');
             } else {
-                showSettingsStatus('MCP Server 已禁用');
+                showStatus('MCP Server 已禁用');
             }
         } catch (e) {
             showError(e.message || '切换 MCP Server 失败');
@@ -246,7 +238,7 @@ export function createSettingsMcpController(options) {
         try {
             var data = await requestJson('/api/mcp/servers/' + encodeURIComponent(serverId), { method: 'DELETE' });
             updateServers(data);
-            showSettingsStatus('MCP Server 已删除');
+            showStatus('MCP Server 已删除');
         } catch (e) {
             showError(e.message || '删除 MCP Server 失败');
         }
@@ -309,9 +301,9 @@ export function createSettingsMcpController(options) {
     }
 
     function positionOpenServerMenu() {
-        if (!settingsMcpServerList || !openMenuServerId) return;
+        if (!mcpServerList || !openMenuServerId) return;
         var openControl = null;
-        Array.prototype.some.call(settingsMcpServerList.querySelectorAll('.mcp-server-item'), function (item) {
+        Array.prototype.some.call(mcpServerList.querySelectorAll('.mcp-server-item'), function (item) {
             if (item.dataset.serverId !== openMenuServerId) return false;
             openControl = item.querySelector('.mcp-more-control');
             return true;
@@ -321,7 +313,7 @@ export function createSettingsMcpController(options) {
 
         var menu = openControl.querySelector('.mcp-more-menu');
         if (!menu) return;
-        var listRect = settingsMcpServerList.getBoundingClientRect();
+        var listRect = mcpServerList.getBoundingClientRect();
         var controlRect = openControl.getBoundingClientRect();
         var menuRect = menu.getBoundingClientRect();
         var spaceBelow = listRect.bottom - controlRect.bottom;
@@ -332,18 +324,18 @@ export function createSettingsMcpController(options) {
     }
 
     function renderServers() {
-        if (!settingsMcpServerList) return;
+        if (!mcpServerList) return;
         if (loading && !servers.length) {
-            settingsMcpServerList.innerHTML = '<div class="mcp-empty-state">正在加载 MCP Servers…</div>';
+            mcpServerList.innerHTML = '<div class="mcp-empty-state">正在加载 MCP Servers…</div>';
             syncStatusPolling();
             return;
         }
         if (!servers.length) {
-            settingsMcpServerList.innerHTML = '<div class="mcp-empty-state">尚未配置 MCP Servers</div>';
+            mcpServerList.innerHTML = '<div class="mcp-empty-state">尚未配置 MCP Servers</div>';
             syncStatusPolling();
             return;
         }
-        settingsMcpServerList.innerHTML = servers.map(buildServerHtml).join('');
+        mcpServerList.innerHTML = servers.map(buildServerHtml).join('');
         positionOpenServerMenu();
         syncStatusPolling();
     }
@@ -406,7 +398,7 @@ export function createSettingsMcpController(options) {
                 });
                 updateServers(data);
                 closeActiveDialog();
-                showSettingsStatus(isEdit ? 'MCP Server 已保存' : 'MCP Server 已添加');
+                showStatus(isEdit ? 'MCP Server 已保存' : 'MCP Server 已添加');
             } catch (e) {
                 setDialogError(e.message || '配置不可用');
             } finally {
@@ -520,12 +512,12 @@ export function createSettingsMcpController(options) {
     }
 
     function handleDocumentClick(e) {
-        if (settingsMcpAddControl && !settingsMcpAddControl.contains(e.target)) {
+        if (mcpAddControl && !mcpAddControl.contains(e.target)) {
             setAddMenuOpen(false);
         }
         if (!openMenuServerId) return;
-        var openControl = settingsMcpServerList
-            ? settingsMcpServerList.querySelector('.mcp-more-control.open')
+        var openControl = mcpServerList
+            ? mcpServerList.querySelector('.mcp-more-control.open')
             : null;
         if (!openControl || !openControl.contains(e.target)) {
             setOpenMenuServerId('');
@@ -539,7 +531,7 @@ export function createSettingsMcpController(options) {
         }
         if (addMenuOpen) {
             setAddMenuOpen(false);
-            if (settingsMcpAddBtn) settingsMcpAddBtn.focus();
+            if (mcpAddBtn) mcpAddBtn.focus();
             return true;
         }
         if (openMenuServerId) {
@@ -549,26 +541,20 @@ export function createSettingsMcpController(options) {
         return false;
     }
 
-    settingsProviderSubtabs.forEach(function (item) {
-        item.addEventListener('click', function () {
-            setProviderSettingsTab(item.dataset.providerSettingsTab || 'config');
-        });
-    });
-
-    if (settingsMcpRefreshBtn) {
-        settingsMcpRefreshBtn.addEventListener('click', function () {
+    if (mcpRefreshBtn) {
+        mcpRefreshBtn.addEventListener('click', function () {
             fetchServers(true);
         });
     }
-    if (settingsMcpAddBtn) {
-        settingsMcpAddBtn.addEventListener('click', function (e) {
+    if (mcpAddBtn) {
+        mcpAddBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             setOpenMenuServerId('');
             setAddMenuOpen(!addMenuOpen);
         });
     }
-    if (settingsMcpAddMenu) {
-        settingsMcpAddMenu.addEventListener('click', function (e) {
+    if (mcpAddMenu) {
+        mcpAddMenu.addEventListener('click', function (e) {
             var item = e.target.closest('[data-mcp-add-mode="manual"]');
             if (!item) return;
             e.stopPropagation();
@@ -576,21 +562,18 @@ export function createSettingsMcpController(options) {
             openConfigDialog(null);
         });
     }
-    if (settingsMcpServerList) {
-        settingsMcpServerList.addEventListener('click', handleServerListClick);
-        settingsMcpServerList.addEventListener('change', handleServerListChange);
+    if (mcpServerList) {
+        mcpServerList.addEventListener('click', handleServerListClick);
+        mcpServerList.addEventListener('change', handleServerListChange);
     }
 
     renderServers();
 
     return {
-        closeMenus: function () {
-            setAddMenuOpen(false);
-            setOpenMenuServerId('');
-        },
+        activate: activate,
+        deactivate: deactivate,
         fetchServers: fetchServers,
         handleDocumentClick: handleDocumentClick,
         handleEscape: handleEscape,
-        setProviderSettingsTab: setProviderSettingsTab,
     };
 }

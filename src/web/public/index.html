@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="styles/channels.css">
     <link rel="stylesheet" href="styles/automations.css">
     <link rel="stylesheet" href="styles/skills.css">
+    <link rel="stylesheet" href="styles/plugins.css">
     <link rel="stylesheet" href="styles/settings-network.css">
     <link rel="stylesheet" href="styles/attachments.css">
     <link rel="stylesheet" href="styles/claude-agent-loop.css">
@@ -45,11 +46,11 @@
             </svg>
             新对话
         </button>
-        <button id="skills-btn">
+        <button id="plugins-btn">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 1L8.5 4.5L12.5 5L9.75 7.5L10.5 11.5L7 9.5L3.5 11.5L4.25 7.5L1.5 5L5.5 4.5L7 1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5.5 1.5h3v2a1.5 1.5 0 1 0 3 0v-2h1a1 1 0 0 1 1 1v3h-2a1.5 1.5 0 1 0 0 3h2v3a1 1 0 0 1-1 1h-3v-2a1.5 1.5 0 1 0-3 0v2h-3a1 1 0 0 1-1-1v-3h2a1.5 1.5 0 1 0 0-3h-2v-3a1 1 0 0 1 1-1h1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            技能
+            插件
         </button>
         <button id="channels-btn">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -214,7 +215,62 @@
     </div>
 
     <div id="channel-view" style="display:none;"></div>
-    <div id="skills-view" style="display:none;"></div>
+    <div id="plugins-view" style="display:none;">
+        <div class="plugins-page">
+            <div class="plugins-header">
+                <div class="plugins-header-top">
+                    <div class="plugins-header-icon">
+                        <svg width="22" height="22" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                            <path d="M5.5 1.5h3v2a1.5 1.5 0 1 0 3 0v-2h1a1 1 0 0 1 1 1v3h-2a1.5 1.5 0 1 0 0 3h2v3a1 1 0 0 1-1 1h-3v-2a1.5 1.5 0 1 0-3 0v2h-3a1 1 0 0 1-1-1v-3h2a1.5 1.5 0 1 0 0-3h-2v-3a1 1 0 0 1 1-1h1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="plugins-header-title">插件</div>
+                        <div class="plugins-header-subtitle">管理技能与 MCP 服务器扩展</div>
+                    </div>
+                </div>
+                <div class="settings-subtabs plugins-subtabs" role="tablist" aria-label="插件分类">
+                    <button class="settings-subtab active" id="plugins-skills-tab" type="button" role="tab" aria-selected="true" data-plugins-tab="skills">技能</button>
+                    <button class="settings-subtab" id="plugins-mcp-tab" type="button" role="tab" aria-selected="false" data-plugins-tab="mcp">MCP</button>
+                </div>
+            </div>
+            <div class="plugins-tab-panel active" id="plugins-skills-panel" data-plugins-panel="skills" role="tabpanel" aria-labelledby="plugins-skills-tab"></div>
+            <div class="plugins-tab-panel" id="plugins-mcp-panel" data-plugins-panel="mcp" role="tabpanel" aria-labelledby="plugins-mcp-tab">
+                <div class="settings-section-card mcp-settings-card">
+                    <div class="mcp-page-header">
+                        <div>
+                            <div class="mcp-page-title">配置和管理 MCP 服务器</div>
+                        </div>
+                        <div class="mcp-header-actions">
+                            <button class="settings-secondary-btn compact" id="plugins-mcp-refresh-btn" type="button">刷新</button>
+                            <div class="mcp-add-control" id="plugins-mcp-add-control">
+                                <button class="settings-primary-btn compact mcp-add-btn" id="plugins-mcp-add-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+                                    <span class="mcp-add-plus" aria-hidden="true">+</span>
+                                    <span>添加</span>
+                                    <svg class="mcp-add-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                        <path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                                <div class="mcp-add-menu" id="plugins-mcp-add-menu" role="menu">
+                                    <button type="button" role="menuitem" data-mcp-add-mode="manual">手动配置</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mcp-server-list" id="plugins-mcp-server-list"></div>
+                </div>
+            </div>
+            <div class="plugins-footer">
+                <div class="skills-save-status" id="skills-save-status">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    所有更改已保存
+                </div>
+                <div class="skills-footer-actions">
+                    <button class="skills-footer-btn" id="plugins-close-btn" type="button">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div id="automations-view" style="display:none;"></div>
     <div id="settings-view" class="settings-view" style="display:none;">
         <div class="settings-page">
@@ -271,77 +327,46 @@
                         </section>
 
                         <section class="settings-tab-panel" data-settings-panel="provider" role="tabpanel">
-                            <div class="settings-subtabs provider-settings-subtabs" role="tablist" aria-label="提供商配置区域">
-                                <button class="settings-subtab active" id="settings-provider-config-tab" type="button" role="tab" aria-selected="true" data-provider-settings-tab="config">配置</button>
-                                <button class="settings-subtab" id="settings-provider-mcp-tab" type="button" role="tab" aria-selected="false" data-provider-settings-tab="mcp">MCP</button>
-                            </div>
-                            <div class="provider-settings-tab-panel active" data-provider-settings-panel="config" role="tabpanel" aria-labelledby="settings-provider-config-tab">
-                                <div class="settings-section-card provider-settings-config-card">
-                                    <div class="settings-section-title">提供商</div>
-                                    <div class="provider-settings-config-scroll">
-                                        <div class="settings-field">
-                                            <span class="settings-field-label" id="settings-provider-label">默认提供商</span>
-                                            <div class="settings-combobox" id="settings-provider-combobox">
-                                                <button class="settings-combobox-trigger" id="settings-provider-trigger" type="button"
-                                                        aria-haspopup="listbox" aria-expanded="false"
-                                                        aria-labelledby="settings-provider-label settings-provider-current">
-                                                    <span class="settings-combobox-value" id="settings-provider-current">加载中…</span>
-                                                    <svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                                        <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                                                    </svg>
-                                                </button>
-                                                <div class="settings-combobox-menu" id="settings-provider-menu" role="listbox" aria-labelledby="settings-provider-label"></div>
-                                            </div>
-                                            <select class="settings-select" id="settings-provider-select" aria-hidden="true" tabindex="-1"></select>
+                            <div class="settings-section-card provider-settings-config-card">
+                                <div class="settings-section-title">提供商</div>
+                                <div class="provider-settings-config-scroll">
+                                    <div class="settings-field">
+                                        <span class="settings-field-label" id="settings-provider-label">默认提供商</span>
+                                        <div class="settings-combobox" id="settings-provider-combobox">
+                                            <button class="settings-combobox-trigger" id="settings-provider-trigger" type="button"
+                                                    aria-haspopup="listbox" aria-expanded="false"
+                                                    aria-labelledby="settings-provider-label settings-provider-current">
+                                                <span class="settings-combobox-value" id="settings-provider-current">加载中…</span>
+                                                <svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                            </button>
+                                            <div class="settings-combobox-menu" id="settings-provider-menu" role="listbox" aria-labelledby="settings-provider-label"></div>
                                         </div>
-                                        <div class="settings-field">
-                                            <span class="settings-field-label" id="settings-provider-model-label">默认模型</span>
-                                            <div class="settings-combobox" id="settings-provider-model-combobox">
-                                                <button class="settings-combobox-trigger" id="settings-provider-model-trigger" type="button"
-                                                        aria-haspopup="listbox" aria-expanded="false"
-                                                        aria-labelledby="settings-provider-model-label settings-provider-model-current">
-                                                    <span class="settings-combobox-value" id="settings-provider-model-current">加载中…</span>
-                                                    <svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                                        <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                                                    </svg>
-                                                </button>
-                                                <div class="settings-combobox-menu" id="settings-provider-model-menu" role="listbox" aria-labelledby="settings-provider-model-label"></div>
-                                            </div>
-                                            <select class="settings-select" id="settings-provider-model-select" aria-hidden="true" tabindex="-1"></select>
-                                        </div>
-                                        <div class="settings-field" id="settings-provider-timeout-fields"></div>
-                                        <div id="settings-provider-compat-toggle-fields"></div>
-                                        <div id="settings-provider-bin-fields"></div>
-                                        <div id="settings-provider-extra-fields"></div>
-                                        <div class="settings-button-row provider-save-row">
-                                            <button class="settings-secondary-btn compact" id="settings-save-btn" type="button">保存配置</button>
-                                        </div>
+                                        <select class="settings-select" id="settings-provider-select" aria-hidden="true" tabindex="-1"></select>
                                     </div>
-                                </div>
-                            </div>
-                            <div class="provider-settings-tab-panel" data-provider-settings-panel="mcp" role="tabpanel" aria-labelledby="settings-provider-mcp-tab">
-                                <div class="settings-section-card mcp-settings-card">
-                                    <div class="mcp-page-header">
-                                        <div>
-                                            <div class="mcp-page-title">配置和管理 MCP 服务器</div>
+                                    <div class="settings-field">
+                                        <span class="settings-field-label" id="settings-provider-model-label">默认模型</span>
+                                        <div class="settings-combobox" id="settings-provider-model-combobox">
+                                            <button class="settings-combobox-trigger" id="settings-provider-model-trigger" type="button"
+                                                    aria-haspopup="listbox" aria-expanded="false"
+                                                    aria-labelledby="settings-provider-model-label settings-provider-model-current">
+                                                <span class="settings-combobox-value" id="settings-provider-model-current">加载中…</span>
+                                                <svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                            </button>
+                                            <div class="settings-combobox-menu" id="settings-provider-model-menu" role="listbox" aria-labelledby="settings-provider-model-label"></div>
                                         </div>
-                                        <div class="mcp-header-actions">
-                                            <button class="settings-secondary-btn compact" id="settings-mcp-refresh-btn" type="button">刷新</button>
-                                            <div class="mcp-add-control" id="settings-mcp-add-control">
-                                                <button class="settings-primary-btn compact mcp-add-btn" id="settings-mcp-add-btn" type="button" aria-haspopup="menu" aria-expanded="false">
-                                                    <span class="mcp-add-plus" aria-hidden="true">+</span>
-                                                    <span>添加</span>
-                                                    <svg class="mcp-add-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                                        <path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                    </svg>
-                                                </button>
-                                                <div class="mcp-add-menu" id="settings-mcp-add-menu" role="menu">
-                                                    <button type="button" role="menuitem" data-mcp-add-mode="manual">手动配置</button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <select class="settings-select" id="settings-provider-model-select" aria-hidden="true" tabindex="-1"></select>
                                     </div>
-                                    <div class="mcp-server-list" id="settings-mcp-server-list"></div>
+                                    <div class="settings-field" id="settings-provider-timeout-fields"></div>
+                                    <div id="settings-provider-compat-toggle-fields"></div>
+                                    <div id="settings-provider-bin-fields"></div>
+                                    <div id="settings-provider-extra-fields"></div>
+                                    <div class="settings-button-row provider-save-row">
+                                        <button class="settings-secondary-btn compact" id="settings-save-btn" type="button">保存配置</button>
+                                    </div>
                                 </div>
                             </div>
                         </section>

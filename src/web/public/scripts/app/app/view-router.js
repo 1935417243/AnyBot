@@ -18,10 +18,11 @@ export function createViewRouter(options) {
         closeSkillPicker();
         options.chatView.style.display = 'none';
         options.channelView.style.display = 'none';
-        options.skillsView.style.display = 'none';
+        options.pluginsView.style.display = 'none';
         options.automationView.style.display = 'none';
         options.settingsView.style.display = 'none';
         options.settingsBtn.classList.remove('active');
+        if (currentView === 'plugins' && options.deactivatePluginsPage) options.deactivatePluginsPage();
     }
 
     function showChatView() {
@@ -40,12 +41,12 @@ export function createViewRouter(options) {
         if (options.renderChannelsPage) options.renderChannelsPage();
     }
 
-    function showSkillsPage() {
+    function showPluginsPage() {
         hideAllViews();
-        currentView = 'skills';
-        options.skillsView.style.display = 'flex';
+        currentView = 'plugins';
+        options.pluginsView.style.display = 'flex';
         renderHistory();
-        if (options.renderSkillsPage) options.renderSkillsPage();
+        if (options.renderPluginsPage) options.renderPluginsPage();
     }
 
     function showAutomationsPage() {
@@ -67,9 +68,9 @@ export function createViewRouter(options) {
         showChannelsPage();
     }
 
-    async function openSkillsPage() {
-        if (options.fetchSkills) await options.fetchSkills();
-        showSkillsPage();
+    async function openPluginsPage() {
+        if (options.fetchPluginsData) await options.fetchPluginsData();
+        showPluginsPage();
     }
 
     async function openAutomationsPage() {
@@ -87,16 +88,16 @@ export function createViewRouter(options) {
         if (e.key === 'Escape' && options.handleChannelsEscape && options.handleChannelsEscape()) {
             return;
         }
-        if (currentView !== 'skills') return;
-        if (options.handleSkillsKeydown) options.handleSkillsKeydown(e);
+        if (currentView !== 'plugins') return;
+        if (options.handlePluginsKeydown) options.handlePluginsKeydown(e);
     }
 
     function bindNavigation() {
         options.channelsBtn.addEventListener('click', function () {
             openChannelsPage();
         });
-        options.skillsBtn.addEventListener('click', function () {
-            openSkillsPage();
+        options.pluginsBtn.addEventListener('click', function () {
+            openPluginsPage();
         });
         options.automationsBtn.addEventListener('click', function () {
             openAutomationsPage();
@@ -116,6 +117,6 @@ export function createViewRouter(options) {
         showChannelsPage: showChannelsPage,
         showAutomationsPage: showAutomationsPage,
         showSettingsView: showSettingsView,
-        showSkillsPage: showSkillsPage,
+        showPluginsPage: showPluginsPage,
     };
 }
