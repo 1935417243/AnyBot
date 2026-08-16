@@ -75,6 +75,7 @@ export function getAppDom(documentRef) {
         settingsDefaultWorkdir: byId(documentRef, 'settings-default-workdir'),
         settingsWorkdirOpenBtn: byId(documentRef, 'settings-workdir-open-btn'),
         settingsWorkdirPickBtn: byId(documentRef, 'settings-workdir-pick-btn'),
+        settingsWorkdirClearBtn: byId(documentRef, 'settings-workdir-clear-btn'),
         settingsProjectsEntryBtn: byId(documentRef, 'settings-projects-entry-btn'),
         settingsLogRetentionDays: byId(documentRef, 'settings-log-retention-days'),
         settingsOpenLogsBtn: byId(documentRef, 'settings-open-logs-btn'),

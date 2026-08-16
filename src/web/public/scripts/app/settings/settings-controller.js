@@ -1,6 +1,7 @@
 import { createSettingsProviderController } from './settings-provider-controller.js';
 import { createSettingsMcpController } from './settings-mcp-controller.js';
 import { buildSettingsComboboxOptionHtml } from '../ui/settings-combobox.js';
+import { showConfirmDialog } from '../ui/confirm-dialog.js';
 import { escapeHtml } from '../utils/html.js';
 
 const GITHUB_LATEST_RELEASE_URL = 'https://github.com/1935417243/AnyBot/releases/latest';
@@ -77,6 +78,7 @@ export function createSettingsController(options) {
     const sidebarUpdateBtn = options.sidebarUpdateBtn;
     const settingsWorkdirOpenBtn = options.settingsWorkdirOpenBtn;
     const settingsWorkdirPickBtn = options.settingsWorkdirPickBtn;
+    const settingsWorkdirClearBtn = options.settingsWorkdirClearBtn;
     const systemThemeQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
 
     let modelConfig = null;
@@ -896,6 +898,27 @@ export function createSettingsController(options) {
     if (settingsWorkdirOpenBtn) {
         settingsWorkdirOpenBtn.addEventListener('click', function () {
             runSettingsAction('/api/app-settings/default-workdir/open', 'POST', '已打开工作区文件夹');
+        });
+    }
+    if (settingsWorkdirClearBtn) {
+        settingsWorkdirClearBtn.addEventListener('click', async function () {
+            var confirmed = await showConfirmDialog({
+                title: '清空工作区',
+                message: '将删除默认工作目录中除 AGENTS.md、MEMORY.md、PROFILE.md、SOUL.md 之外的所有文件和文件夹，此操作不可撤销。',
+                confirmText: '清空工作区',
+            });
+            if (!confirmed) return;
+            try {
+                var res = await fetch('/api/app-settings/default-workdir', { method: 'DELETE' });
+                var data = await res.json().catch(function () { return {}; });
+                if (!res.ok) {
+                    showError(data.error || '清空工作区失败');
+                    return;
+                }
+                showSettingsStatus('工作区已清空，已删除 ' + (data.removed || 0) + ' 项');
+            } catch (e) {
+                showError('清空工作区失败');
+            }
         });
     }
     if (settingsDefaultWorkdir) {

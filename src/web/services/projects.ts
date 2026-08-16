@@ -84,6 +84,22 @@ export function normalizeProjectPath(inputPath: string): string {
   return resolved;
 }
 
+const WORKSPACE_CLEAR_KEEP_FILES: ReadonlySet<string> = new Set([...WORKSPACE_MEMORY_FILES, "SOUL.md"]);
+
+export function clearWorkspaceFiles(targetDir: string): number {
+  const dir = path.resolve(targetDir);
+  if (dir === path.parse(dir).root) {
+    throw new Error("不能清空根目录");
+  }
+  let removed = 0;
+  for (const entry of fs.readdirSync(dir)) {
+    if (WORKSPACE_CLEAR_KEEP_FILES.has(entry)) continue;
+    fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+    removed += 1;
+  }
+  return removed;
+}
+
 export function migrateWorkspaceMemoryFiles(sourceDir: string, targetDir: string): string[] {
   const from = path.resolve(sourceDir);
   const to = path.resolve(targetDir);

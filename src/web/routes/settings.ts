@@ -6,6 +6,7 @@ import { getWorkdir } from "../../shared.js";
 import { openDirectory } from "../../utils/open-directory.js";
 import { getUploadDir } from "../services/files.js";
 import {
+  clearWorkspaceFiles,
   migrateWorkspaceMemoryFiles,
   normalizeProjectPath,
   pickProjectFolder,
@@ -88,6 +89,17 @@ export function createSettingsRouter(): Router {
       res.json({ ok: true, path: workdir });
     } catch (error) {
       res.status(500).json({ error: "打开工作区文件夹失败" });
+    }
+  });
+
+  router.delete("/app-settings/default-workdir", (_req: Request, res: Response) => {
+    try {
+      const workdir = getWorkdir();
+      const removed = clearWorkspaceFiles(workdir);
+      logger.info("workspace.cleared", { workdir, removed });
+      res.json({ ok: true, removed });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "清空工作区失败" });
     }
   });
 

@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="styles/attachments.css">
     <link rel="stylesheet" href="styles/claude-agent-loop.css">
     <link rel="stylesheet" href="styles/change-review.css">
+    <link rel="stylesheet" href="styles/confirm-dialog.css">
 </head>
 <body>
 
@@ -414,6 +415,7 @@
                                     <input class="settings-inline-input" id="settings-default-workdir" type="text" spellcheck="false" readonly aria-readonly="true" title="默认工作目录只能通过选择器变更">
                                     <button class="settings-secondary-btn compact" id="settings-workdir-open-btn" type="button">打开</button>
                                     <button class="settings-secondary-btn compact" id="settings-workdir-pick-btn" type="button">变更</button>
+                                    <button class="settings-danger-btn compact" id="settings-workdir-clear-btn" type="button" title="删除工作目录中除 AGENTS.md、MEMORY.md、PROFILE.md、SOUL.md 之外的所有文件">清空</button>
                                 </div>
                             </div>
                         </section>
