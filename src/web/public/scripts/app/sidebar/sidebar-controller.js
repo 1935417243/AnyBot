@@ -1065,7 +1065,11 @@ export function createSidebarController(options) {
 
         try {
             var res = await fetch("/api/projects/" + encodeURIComponent(project.id), { method: "DELETE" });
-            if (!res.ok) throw new Error("delete project failed");
+            if (!res.ok) {
+                var errData = null;
+                try { errData = await res.json(); } catch (parseErr) {}
+                throw new Error((errData && errData.error) || "删除项目失败");
+            }
 
             if (activeProjectId === project.id) activeProjectId = null;
             expandedProjectIds.delete(project.id);
@@ -1084,7 +1088,7 @@ export function createSidebarController(options) {
 
             await refreshDirectory();
         } catch (e) {
-            options.showError("删除项目失败");
+            options.showError((e && e.message) || "删除项目失败");
         }
     }
 

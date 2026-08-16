@@ -31,6 +31,7 @@
   3. 校验 `Origin`/`Sec-Fetch-Site`;
   4. `git-credential` 接口永不返回明文密码,UI 自动填充改为后端静默注入(已有 askpass 机制);
   5. `/api/data/export` 默认脱敏。
+- **状态**:✅已修复(2026-08-16)
 
 ### 2. 密钥明文返回给前端
 
@@ -102,6 +103,7 @@
 - **位置**:`src/web/routes/sessions.ts:177-182`、`src/web/db.ts:88,114`(FK ON)
 - **问题**:删除正在跑的会话后,进行中的 turn 在 `db.addMessage`(`chat-runner.ts:389`)处抛 `SQLITE_CONSTRAINT_FOREIGNKEY`,用户看到约束错误且该轮回复丢失。删除项目(级联删会话)同理。
 - **修复建议**:删除前检查 `hasActiveRun/hasActiveAgentStream`,返回 423 或先 abort。
+- **状态**:✅ 已修复(2026-08-16)。`DELETE /api/sessions/:id`(`routes/sessions.ts`)先校验会话存在(404),再检查 `hasActiveRun/hasActiveAgentStream`,在跑则返回 423;`DELETE /api/projects/:id`(`routes/projects.ts`)对该项目的所有会话做同样检查,任一在跑即 423。前端删除会话(`session-controller.js`)和删除项目(`sidebar-controller.js`)均检查 `res.ok` 并展示后端返回的错误信息,423 时提示"请先停止后再删除",不再静默把会话/项目从 UI 移除。
 
 #### 11. QQ 频道 WebSocket 断线后永久死亡
 

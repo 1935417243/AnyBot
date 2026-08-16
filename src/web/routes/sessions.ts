@@ -2,8 +2,8 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { getProvider } from "../../providers/index.js";
 import { generateId } from "../../shared.js";
-import { getActiveRunInfo } from "../active-runs.js";
-import { getActiveAgentStreamInfo } from "../agent-stream.js";
+import { getActiveRunInfo, hasActiveRun } from "../active-runs.js";
+import { getActiveAgentStreamInfo, hasActiveAgentStream } from "../agent-stream.js";
 import * as db from "../db.js";
 import { emitSessionsChanged } from "../events.js";
 import { prepareMessagesForClient, readMessagePageQuery } from "../services/messages.js";
@@ -176,6 +176,14 @@ export function createSessionsRouter(): Router {
 
   router.delete("/sessions/:id", (req: Request, res: Response) => {
     const id = req.params.id as string;
+    if (!db.getSessionMetadata(id)) {
+      res.status(404).json({ error: "会话不存在" });
+      return;
+    }
+    if (hasActiveRun(id) || hasActiveAgentStream(id)) {
+      res.status(423).json({ error: "当前会话正在处理中，请先停止后再删除" });
+      return;
+    }
     db.deleteSession(id);
     emitSessionsChanged(id, "session_deleted");
     res.json({ ok: true });

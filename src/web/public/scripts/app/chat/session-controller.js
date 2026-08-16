@@ -375,7 +375,12 @@ export function createSessionController(config) {
 
     async function deleteSession(id) {
         try {
-            await fetch('/api/sessions/' + id, {method: 'DELETE'});
+            var res = await fetch('/api/sessions/' + id, {method: 'DELETE'});
+            if (!res.ok) {
+                var errData = null;
+                try { errData = await res.json(); } catch (parseErr) {}
+                throw new Error((errData && errData.error) || '删除失败');
+            }
             if (config.removeSessionSummary) config.removeSessionSummary(id);
             if (currentSessionId === id) {
                 currentSessionId = null;
@@ -392,7 +397,7 @@ export function createSessionController(config) {
             }
             await config.fetchSessions();
         } catch (e) {
-            config.showError('删除失败');
+            config.showError((e && e.message) || '删除失败');
         }
     }
 

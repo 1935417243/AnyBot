@@ -1,6 +1,8 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { getWorkdir } from "../../shared.js";
+import { hasActiveRun } from "../active-runs.js";
+import { hasActiveAgentStream } from "../agent-stream.js";
 import * as db from "../db.js";
 import {
   cloneProjectFromGit,
@@ -139,6 +141,18 @@ export function createProjectsRouter(): Router {
     const projectId = req.params.id as string;
     if (!db.getProject(projectId)) {
       res.status(404).json({ error: "项目不存在" });
+      return;
+    }
+
+    const hasBusySession = db
+      .listSessions()
+      .some(
+        (session) =>
+          session.projectId === projectId &&
+          (hasActiveRun(session.id) || hasActiveAgentStream(session.id)),
+      );
+    if (hasBusySession) {
+      res.status(423).json({ error: "项目下有会话正在处理中，请先停止后再删除" });
       return;
     }
 
