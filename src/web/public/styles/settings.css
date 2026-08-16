@@ -234,56 +234,6 @@
             box-shadow: 0 1px 6px var(--panel-shadow);
         }
 
-        .sandbox-segmented {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 6px;
-        }
-
-        .sandbox-option {
-            min-width: 0;
-            min-height: 72px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--input-bg);
-            color: var(--text);
-            cursor: pointer;
-            font-family: 'Sora', sans-serif;
-            padding: 10px;
-            text-align: left;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            gap: 5px;
-            transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
-        }
-
-        .sandbox-option:hover,
-        .sandbox-option:focus-visible {
-            border-color: var(--border-hover);
-            background: var(--sidebar-hover);
-            outline: none;
-        }
-
-        .sandbox-option.active {
-            background: var(--sidebar-active);
-            border-color: rgba(124, 111, 247, 0.45);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-
-        .sandbox-option-name {
-            font-size: 13px;
-            font-weight: 700;
-            line-height: 1.25;
-        }
-
-        .sandbox-option-desc {
-            color: var(--text-muted);
-            font-size: 12px;
-            font-weight: 500;
-            line-height: 1.35;
-        }
-
         .settings-combobox {
             position: relative;
             z-index: 20;
@@ -447,24 +397,9 @@
             border-color: rgba(124, 111, 247, 0.22);
         }
 
-        .settings-combobox-option.theme-option,
-        .settings-combobox-option.sandbox-option {
+        .settings-combobox-option.theme-option {
             box-shadow: none;
             justify-content: flex-start;
-        }
-
-        .settings-combobox-option.sandbox-option {
-            min-height: 58px;
-            flex-direction: row;
-            align-items: flex-start;
-            padding: 9px 10px;
-        }
-
-        .sandbox-option-copy {
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
         }
 
         .settings-combobox-option-label {
@@ -1932,17 +1867,6 @@
             grid-template-columns: 96px minmax(0, 1fr);
             align-items: center;
             gap: 16px;
-        }
-
-        .settings-view .sandbox-option {
-            min-height: 42px;
-            align-items: center;
-            padding: 8px 10px;
-            text-align: center;
-        }
-
-        .settings-view .sandbox-option-desc {
-            display: none;
         }
 
         @media (max-width: 760px) {

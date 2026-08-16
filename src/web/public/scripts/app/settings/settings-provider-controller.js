@@ -142,7 +142,6 @@ export function createSettingsProviderController(options) {
 
     function closeOtherSettingsMenus() {
         if (options.closeThemeMenu) options.closeThemeMenu(false);
-        if (options.closeSandboxMenu) options.closeSandboxMenu(false);
     }
 
     function getSelectedSettingsProvider() {

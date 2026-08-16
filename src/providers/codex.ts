@@ -721,13 +721,10 @@ export class CodexProvider implements IProvider {
 
   listModels(): ProviderModel[] {
     if (this.codexCompatEnabled) {
-      const describeMapping = (fallback: string, mapped?: string) =>
-        mapped ? `映射到 ${mapped}` : fallback;
-
       return [
-        { id: "gpt-5.5", name: "gpt-5.5", description: describeMapping("默认通用模型", this.codexDefaultModel) },
-        { id: "gpt-mini", name: "gpt-mini", description: describeMapping("轻量快速模型", this.codexFastModel || this.codexDefaultModel) },
-        { id: "gpt-codex", name: "gpt-codex", description: describeMapping("编程模型", this.codexCodeModel || this.codexDefaultModel) },
+        { id: "gpt-5.5", name: this.codexDefaultModel || "gpt-5.5", description: "默认通用模型" },
+        { id: "gpt-mini", name: this.codexFastModel || this.codexDefaultModel || "gpt-mini", description: "轻量快速模型" },
+        { id: "gpt-codex", name: this.codexCodeModel || this.codexDefaultModel || "gpt-codex", description: "编程模型" },
       ];
     }
 

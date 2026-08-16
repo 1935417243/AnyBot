@@ -95,10 +95,6 @@ export function createAnyBotApp(dom, deps) {
         settingsThemeTrigger,
         settingsThemeCurrent,
         settingsThemeGroup,
-        settingsSandboxCombobox,
-        settingsSandboxTrigger,
-        settingsSandboxCurrent,
-        settingsSandboxGroup,
         settingsProviderModelCombobox,
         settingsProviderModelTrigger,
         settingsProviderModelCurrent,
@@ -249,9 +245,6 @@ export function createAnyBotApp(dom, deps) {
         badge: permissionBadge,
         nameEl: permissionName,
         dropdown: permissionDropdown,
-        onChanged: function () {
-            if (settingsController) return settingsController.fetchSandboxConfig();
-        },
         onError: showError,
     });
 
@@ -303,9 +296,6 @@ export function createAnyBotApp(dom, deps) {
         modelBadge: modelBadge,
         modelDropdown: modelDropdown,
         modelSwitcher: modelSwitcher,
-        onSandboxChanged: function (sandbox) {
-            if (permissionModeController) permissionModeController.setMode(sandbox);
-        },
         settingsAboutVersion: settingsAboutVersion,
         settingsCancelBtn: settingsCancelBtn,
         settingsClearHistoryBtn: settingsClearHistoryBtn,
@@ -341,10 +331,6 @@ export function createAnyBotApp(dom, deps) {
         settingsMcpAddBtn: settingsMcpAddBtn,
         settingsMcpAddMenu: settingsMcpAddMenu,
         settingsMcpServerList: settingsMcpServerList,
-        settingsSandboxCombobox: settingsSandboxCombobox,
-        settingsSandboxCurrent: settingsSandboxCurrent,
-        settingsSandboxGroup: settingsSandboxGroup,
-        settingsSandboxTrigger: settingsSandboxTrigger,
         settingsSaveBtn: settingsSaveBtn,
         settingsSaveStatus: settingsSaveStatus,
         settingsTabPanels: settingsTabPanels,
@@ -1014,7 +1000,6 @@ export function createAnyBotApp(dom, deps) {
             sidebar.fetchSessions(),
             settings.fetchModelConfig(),
             settings.fetchProviders(),
-            settings.fetchSandboxConfig(),
             settings.fetchAppSettings(),
             settings.fetchProxyConfig(),
             permissionModeController ? permissionModeController.refresh() : Promise.resolve(),

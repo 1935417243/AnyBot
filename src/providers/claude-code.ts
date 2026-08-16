@@ -350,24 +350,23 @@ export class ClaudeCodeProvider implements IProvider {
     }
 
     listModels(): ProviderModel[] {
-        const describeMapping = (fallback: string, mapped?: string) =>
-            mapped ? `映射到 ${mapped}` : fallback;
+        const autoMapped = this.anthropicAutoModel || this.defaultModel;
 
         return [
             {
                 id: "auto",
-                name: "Auto",
-                description: describeMapping("使用 Claude Code 默认模型", this.anthropicAutoModel || this.defaultModel)
+                name: autoMapped || "Auto",
+                description: "使用 Claude Code 默认模型"
             },
             {
                 id: "claude-sonnet-4-6",
-                name: "Claude Sonnet 4.6",
-                description: describeMapping("默认推荐，均衡能力与速度", this.anthropicSonnetModel)
+                name: this.anthropicSonnetModel || "Claude Sonnet 4.6",
+                description: "默认推荐，均衡能力与速度"
             },
             {
                 id: "claude-opus-4-7",
-                name: "Claude Opus 4.7",
-                description: describeMapping("最强复杂任务模型", this.anthropicOpusModel)
+                name: this.anthropicOpusModel || "Claude Opus 4.7",
+                description: "最强复杂任务模型"
             },
         ];
     }

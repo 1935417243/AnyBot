@@ -55,10 +55,6 @@ export function createSettingsController(options) {
     const settingsMcpAddBtn = options.settingsMcpAddBtn;
     const settingsMcpAddMenu = options.settingsMcpAddMenu;
     const settingsMcpServerList = options.settingsMcpServerList;
-    const settingsSandboxCombobox = options.settingsSandboxCombobox;
-    const settingsSandboxCurrent = options.settingsSandboxCurrent;
-    const settingsSandboxGroup = options.settingsSandboxGroup;
-    const settingsSandboxTrigger = options.settingsSandboxTrigger;
     const settingsSaveBtn = options.settingsSaveBtn;
     const settingsSaveStatus = options.settingsSaveStatus;
     const settingsTabPanels = options.settingsTabPanels || [];
@@ -84,10 +80,8 @@ export function createSettingsController(options) {
     const systemThemeQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
 
     let modelConfig = null;
-    let sandboxConfig = null;
     let appSettingsPayload = null;
     let appSettings = null;
-    let selectedSandbox = null;
     let activeSettingsTab = 'general';
     let desktopUpdateStatus = null;
     let desktopUpdatePollTimer = null;
@@ -228,7 +222,6 @@ export function createSettingsController(options) {
     function setSettingsThemeMenuOpen(isOpen) {
         if (!settingsThemeCombobox || !settingsThemeTrigger) return;
         if (isOpen) {
-            setSettingsSandboxMenuOpen(false);
             if (settingsProviderController) settingsProviderController.closeProviderControls();
         }
         settingsThemeCombobox.classList.toggle('open', isOpen);
@@ -320,7 +313,11 @@ export function createSettingsController(options) {
 
     function updateModelBadgeLabel() {
         if (!modelConfig) return;
-        currentModelNameEl.textContent = modelConfig.currentModel;
+        var current = null;
+        (modelConfig.models || []).forEach(function (m) {
+            if (m.id === modelConfig.currentModel) current = m;
+        });
+        currentModelNameEl.textContent = current && current.name ? current.name : modelConfig.currentModel;
         modelBadge.title = currentModelNameEl.textContent;
     }
 
@@ -354,7 +351,7 @@ export function createSettingsController(options) {
                 (m.id === modelConfig.currentModel
                     ? '<svg class="model-option-check" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
                     : '<span style="width:14px;display:inline-block"></span>') +
-                escapeHtml(m.id) +
+                escapeHtml(m.name || m.id) +
                 '</div>' +
                 '<div class="model-option-desc">' + escapeHtml(m.description) + '</div>';
             opt.addEventListener('click', function (e) {
@@ -486,7 +483,6 @@ export function createSettingsController(options) {
     }
 
     settingsProviderController = createSettingsProviderController({
-        closeSandboxMenu: setSettingsSandboxMenuOpen,
         closeSettingsPanel: closeSettingsPanel,
         closeThemeMenu: setSettingsThemeMenuOpen,
         ensureAppSettings: ensureAppSettings,
@@ -828,35 +824,6 @@ export function createSettingsController(options) {
         });
     });
 
-    if (settingsSandboxTrigger) {
-        settingsSandboxTrigger.addEventListener('click', function (e) {
-            e.stopPropagation();
-            setSettingsSandboxMenuOpen(!settingsSandboxCombobox.classList.contains('open'));
-        });
-        settingsSandboxTrigger.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                setSettingsSandboxMenuOpen(true);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setSettingsSandboxMenuOpen(true);
-                requestAnimationFrame(function () {
-                    var options = getSettingsSandboxOptions();
-                    var last = options[options.length - 1];
-                    if (last) last.focus();
-                });
-            } else if (e.key === 'Escape') {
-                setSettingsSandboxMenuOpen(false);
-            }
-        });
-    }
-
-    if (settingsSandboxGroup) {
-        settingsSandboxGroup.addEventListener('click', function (e) {
-            e.stopPropagation();
-        });
-    }
-
     async function fetchProviders() {
         return settingsProviderController
             ? settingsProviderController.fetchProviders()
@@ -867,178 +834,11 @@ export function createSettingsController(options) {
         return settingsProviderController ? settingsProviderController.getProviderData() : null;
     }
 
-    async function fetchSandboxConfig() {
-        try {
-            var res = await fetch('/api/sandbox-config');
-            sandboxConfig = await res.json();
-            selectedSandbox = sandboxConfig.defaultSandbox;
-            renderSandboxOptions();
-        } catch (e) {
-            console.error('Failed to fetch sandbox config:', e);
-        }
-    }
-
-    function renderSandboxOptions() {
-        if (!settingsSandboxGroup || !sandboxConfig) return;
-        settingsSandboxGroup.innerHTML = '';
-        sandboxConfig.modes.forEach(function (mode) {
-            var option = document.createElement('button');
-            var isActive = mode.id === selectedSandbox;
-            option.className = 'settings-combobox-option sandbox-option' + (isActive ? ' active' : '');
-            option.type = 'button';
-            option.setAttribute('role', 'option');
-            option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-            option.dataset.sandboxValue = mode.id;
-            option.dataset.sandboxName = mode.name;
-            option.dataset.sandboxDescription = mode.description;
-            option.innerHTML =
-                (isActive
-                    ? '<svg class="settings-combobox-check" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-                    : '<span class="settings-combobox-check-placeholder"></span>') +
-                '<span class="sandbox-option-copy">' +
-                '<span class="sandbox-option-name">' + escapeHtml(mode.name) + '</span>' +
-                '<span class="sandbox-option-desc">' + escapeHtml(mode.description) + '</span>' +
-                '</span>';
-            option.addEventListener('click', async function (e) {
-                e.stopPropagation();
-                if (setSettingsSandboxValue(mode.id)) {
-                    setSettingsSandboxMenuOpen(false);
-                    if (settingsSandboxTrigger) settingsSandboxTrigger.focus();
-                    await persistSandboxConfig();
-                    showSettingsStatus('已保存');
-                }
-            });
-            option.addEventListener('keydown', handleSettingsSandboxOptionKeydown);
-            settingsSandboxGroup.appendChild(option);
-        });
-        updateSandboxDisplay();
-    }
-
-    function setSettingsSandboxValue(sandbox) {
-        if (!sandboxConfig || !settingsSandboxGroup) return false;
-        var valid = sandboxConfig.modes.some(function (mode) {
-            return mode.id === sandbox;
-        });
-        if (!valid) {
-            showError('该权限模式不可用');
-            return false;
-        }
-        selectedSandbox = sandbox;
-        updateSandboxDisplay();
-        return true;
-    }
-
-    function updateSandboxDisplay() {
-        if (!settingsSandboxGroup || !sandboxConfig) return;
-        var selectedMode = sandboxConfig.modes.find(function (mode) {
-            return mode.id === selectedSandbox;
-        });
-        if (settingsSandboxCurrent) {
-            settingsSandboxCurrent.textContent = selectedMode ? selectedMode.name : '请选择权限';
-        }
-        Array.prototype.forEach.call(settingsSandboxGroup.querySelectorAll('.sandbox-option'), function (option) {
-            var isActive = option.dataset.sandboxValue === selectedSandbox;
-            option.classList.toggle('active', isActive);
-            option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-            option.innerHTML =
-                (isActive
-                    ? '<svg class="settings-combobox-check" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-                    : '<span class="settings-combobox-check-placeholder"></span>') +
-                '<span class="sandbox-option-copy">' +
-                '<span class="sandbox-option-name">' + escapeHtml(option.dataset.sandboxName || '') + '</span>' +
-                '<span class="sandbox-option-desc">' + escapeHtml(option.dataset.sandboxDescription || '') + '</span>' +
-                '</span>';
-        });
-    }
-
-    function getSettingsSandboxOptions() {
-        if (!settingsSandboxGroup) return [];
-        return Array.prototype.slice.call(settingsSandboxGroup.querySelectorAll('.sandbox-option'));
-    }
-
-    function setSettingsSandboxMenuOpen(isOpen) {
-        if (!settingsSandboxCombobox || !settingsSandboxTrigger) return;
-        if (isOpen) {
-            setSettingsThemeMenuOpen(false);
-            if (settingsProviderController) settingsProviderController.closeProviderControls();
-        }
-        settingsSandboxCombobox.classList.toggle('open', isOpen);
-        settingsSandboxTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        if (isOpen) {
-            var active = settingsSandboxGroup && settingsSandboxGroup.querySelector('.sandbox-option.active');
-            requestAnimationFrame(function () {
-                (active || getSettingsSandboxOptions()[0] || settingsSandboxTrigger).focus();
-            });
-        }
-    }
-
-    function moveSettingsSandboxFocus(delta) {
-        var options = getSettingsSandboxOptions();
-        if (!options.length) return;
-        var currentIndex = options.indexOf(document.activeElement);
-        var nextIndex = currentIndex < 0 ? 0 : (currentIndex + delta + options.length) % options.length;
-        options[nextIndex].focus();
-    }
-
-    function handleSettingsSandboxOptionKeydown(e) {
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            moveSettingsSandboxFocus(1);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            moveSettingsSandboxFocus(-1);
-        } else if (e.key === 'Home') {
-            e.preventDefault();
-            var first = getSettingsSandboxOptions()[0];
-            if (first) first.focus();
-        } else if (e.key === 'End') {
-            e.preventDefault();
-            var options = getSettingsSandboxOptions();
-            var last = options[options.length - 1];
-            if (last) last.focus();
-        } else if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            e.currentTarget.click();
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            setSettingsSandboxMenuOpen(false);
-            if (settingsSandboxTrigger) settingsSandboxTrigger.focus();
-        }
-    }
-
-    async function persistSandboxConfig() {
-        if (!sandboxConfig || !selectedSandbox || selectedSandbox === sandboxConfig.defaultSandbox) return true;
-        try {
-            var res = await fetch('/api/sandbox-config', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({defaultSandbox: selectedSandbox}),
-            });
-            if (!res.ok) {
-                var err = await res.json().catch(function () { return {}; });
-                showError(err.error || '保存权限配置失败');
-                return false;
-            }
-            sandboxConfig = await res.json();
-            selectedSandbox = sandboxConfig.defaultSandbox;
-            renderSandboxOptions();
-            if (options.onSandboxChanged) options.onSandboxChanged(selectedSandbox);
-            return true;
-        } catch (e) {
-            showError('保存权限配置失败');
-            return false;
-        }
-    }
-
     function openSettingsPanel(tab) {
         showSettingsView();
         setSettingsTab(tab || activeSettingsTab || 'general');
         if (appSettings) renderAppSettings();
         if (getProviderData() && settingsProviderController) settingsProviderController.renderProviderSelect();
-        if (sandboxConfig) {
-            selectedSandbox = sandboxConfig.defaultSandbox;
-            renderSandboxOptions();
-        }
         settingsView.style.display = 'flex';
         modelSwitcher.classList.remove('open');
         modelBadge.setAttribute('aria-expanded', 'false');
@@ -1050,7 +850,6 @@ export function createSettingsController(options) {
 
     function closeSettingsPanel() {
         setSettingsThemeMenuOpen(false);
-        setSettingsSandboxMenuOpen(false);
         if (settingsProviderController) settingsProviderController.closeProviderControls();
         if (settingsMcpController) settingsMcpController.closeMenus();
         showChatView();
@@ -1201,7 +1000,7 @@ export function createSettingsController(options) {
                 showError(err.error || '导入失败');
                 return;
             }
-            await Promise.all([fetchAppSettings(), fetchProviders(), fetchSandboxConfig(), fetchModelConfig()]);
+            await Promise.all([fetchAppSettings(), fetchProviders(), fetchModelConfig()]);
             showSettingsStatus('导入完成');
         } catch (e) {
             showError('导入失败，请确认文件格式');
@@ -1354,9 +1153,6 @@ export function createSettingsController(options) {
         if (settingsThemeCombobox && !settingsThemeCombobox.contains(e.target)) {
             setSettingsThemeMenuOpen(false);
         }
-        if (settingsSandboxCombobox && !settingsSandboxCombobox.contains(e.target)) {
-            setSettingsSandboxMenuOpen(false);
-        }
     }
 
     function handleDocumentEscape() {
@@ -1365,11 +1161,6 @@ export function createSettingsController(options) {
         if (settingsThemeCombobox && settingsThemeCombobox.classList.contains('open')) {
             setSettingsThemeMenuOpen(false);
             if (settingsThemeTrigger) settingsThemeTrigger.focus();
-            return true;
-        }
-        if (settingsSandboxCombobox && settingsSandboxCombobox.classList.contains('open')) {
-            setSettingsSandboxMenuOpen(false);
-            if (settingsSandboxTrigger) settingsSandboxTrigger.focus();
             return true;
         }
         if (settingsProviderController && settingsProviderController.handleProviderMenuEscape()) return true;
@@ -1390,7 +1181,6 @@ export function createSettingsController(options) {
         fetchModelConfig: fetchModelConfig,
         fetchProviders: fetchProviders,
         fetchProxyConfig: fetchProxyConfig,
-        fetchSandboxConfig: fetchSandboxConfig,
         fetchDesktopUpdateStatus: fetchDesktopUpdateStatus,
         getModelConfig: function () {
             return modelConfig;
