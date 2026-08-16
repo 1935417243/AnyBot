@@ -1,0 +1,16 @@
+README.md
+  h_7a561dec792e5b 43-45
+README_EN.md
+  h_7a561dec792e5b 43-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "10f7e661104f36f5229cdbe288ce5ef713e601b8",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
