@@ -1,0 +1,18 @@
+package-lock.json
+  h_7a561dec792e5b 3,9
+package.json
+  h_7a561dec792e5b 3
+release-notes.md
+  h_7a561dec792e5b 8-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "7ab371718358b0d5e52f1e2bdbe56c233881cbf0",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
