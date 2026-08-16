@@ -71,16 +71,6 @@
             margin: 16px 32px;
         }
 
-        .plugins-footer {
-            display: flex;
-            padding: 12px 32px;
-            border-top: 1px solid var(--border);
-            align-items: center;
-            justify-content: space-between;
-            flex-shrink: 0;
-            background: var(--bg);
-        }
-
         .mcp-settings-card {
             min-height: 0;
             height: 100%;

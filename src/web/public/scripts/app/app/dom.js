@@ -109,7 +109,6 @@ export function getAppDom(documentRef) {
         pluginsTabs: all(documentRef, '[data-plugins-tab]'),
         pluginsTabPanels: all(documentRef, '[data-plugins-panel]'),
         pluginsSkillsPanel: byId(documentRef, 'plugins-skills-panel'),
-        pluginsCloseBtn: byId(documentRef, 'plugins-close-btn'),
         pluginsMcpRefreshBtn: byId(documentRef, 'plugins-mcp-refresh-btn'),
         pluginsMcpAddControl: byId(documentRef, 'plugins-mcp-add-control'),
         pluginsMcpAddBtn: byId(documentRef, 'plugins-mcp-add-btn'),

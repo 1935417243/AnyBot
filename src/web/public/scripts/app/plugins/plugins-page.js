@@ -25,10 +25,6 @@ export function createPluginsPageController(options) {
         showStatus: showSkillsSaveStatus,
     });
 
-    function showChatView() {
-        if (options.showChatView) options.showChatView();
-    }
-
     function setTab(tab) {
         if (tab !== 'mcp') tab = 'skills';
         activeTab = tab;
@@ -52,12 +48,6 @@ export function createPluginsPageController(options) {
             setTab(item.dataset.pluginsTab || 'skills');
         });
     });
-
-    if (options.pluginsCloseBtn) {
-        options.pluginsCloseBtn.addEventListener('click', function () {
-            showChatView();
-        });
-    }
 
     function fetchData() {
         return skillsController.fetchSkills();

@@ -286,21 +286,6 @@
             border-radius: 99px;
         }
 
-        .skills-save-status {
-            font-size: 12px;
-            color: #4ade80;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: opacity 0.2s ease;
-        }
-
-        .skills-footer-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
         .skills-footer-btn {
             padding: 8px 20px;
             border-radius: 9px;

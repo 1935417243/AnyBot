@@ -145,7 +145,6 @@ export function createAnyBotApp(dom, deps) {
         pluginsTabs,
         pluginsTabPanels,
         pluginsSkillsPanel,
-        pluginsCloseBtn,
         pluginsMcpRefreshBtn,
         pluginsMcpAddControl,
         pluginsMcpAddBtn,
@@ -776,12 +775,10 @@ export function createAnyBotApp(dom, deps) {
         invalidateSlashItemsData: function (providerType) {
             if (slashItemsStore) slashItemsStore.invalidate(providerType);
         },
-        showChatView: showChatView,
         showError: showError,
         pluginsTabs: pluginsTabs,
         pluginsTabPanels: pluginsTabPanels,
         pluginsSkillsPanel: pluginsSkillsPanel,
-        pluginsCloseBtn: pluginsCloseBtn,
         pluginsMcpRefreshBtn: pluginsMcpRefreshBtn,
         pluginsMcpAddControl: pluginsMcpAddControl,
         pluginsMcpAddBtn: pluginsMcpAddBtn,
