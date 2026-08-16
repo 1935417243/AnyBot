@@ -3,6 +3,7 @@ import { applyProxy } from "./proxy.js";
 import { ensureExecutablePathEnv } from "./utils/process.js";
 import { getConfiguredWebPort } from "./app-settings.js";
 import { createApp } from "./web/server.js";
+import { writeApiTokenFile } from "./web/auth.js";
 
 import {
   initProvider,
@@ -303,6 +304,7 @@ async function main(): Promise<void> {
   webServer = webApp.listen(WEB_PORT, WEB_HOST, () => {
     logger.info("web.started", { host: WEB_HOST, port: WEB_PORT });
     console.log(`AnyBot Web UI: http://${WEB_HOST}:${WEB_PORT}`);
+    writeApiTokenFile();
     startDesktopUpdateAutoCheck();
     verifyMcpServersOnStartup();
   });

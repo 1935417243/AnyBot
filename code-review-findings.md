@@ -57,6 +57,7 @@
 - **叠加问题 1**:`src/logger.ts:193-201` 的 `appendFileSync` 无 try/catch,磁盘满/LOG_DIR 不可写时 logger 自身每次调用都抛错——logger 大量出现在各模块 catch 分支里,等于把已捕获异常变成新的未捕获异常。
 - **叠加问题 2**:`electron/main.cjs:749-754` 后端进程退出后**不重启、不弹窗、不通知渲染进程**,桌面端变成窗口还在、API 全挂的僵尸(`backendExitMessage` 只在启动窗口内被消费)。
 - **修复建议**:`src/index.ts` 顶部加进程级兜底;修掉上述三处具体来源(floating promise 加 `.catch`,WS handler 加 try/catch 并校验 payload 结构);`writeLogFile` 整体包 try/catch;Electron 运行期 exit 时带次数上限和退避自动重启,或至少弹错误框提示。
+- **状态**:✅ 已修复(2026-08-16)。`src/index.ts` 注册 `uncaughtException`/`unhandledRejection` 兜底(记日志不退出);`qqbot.ts` WS 消息回调整体包 try/catch、`op=10` 校验 `heartbeat_interval`、`handleMessage` 加 `.catch`;`feishu.ts` dispatcher 回调加 `.catch`;`logger.ts` `writeLogFile` 包 try/catch 且失败告警按 60s 节流;`electron/main.cjs` 运行期后端退出后按 1s 起步指数退避(上限 30s、最多 5 次)自动重启并刷新窗口,放弃时弹错误框,主动停止(`stopBackend`)不触发重启。
 
 ### 5. 自动化调度器 delay-0 忙等自旋(CPU + 日志写盘风暴)
 

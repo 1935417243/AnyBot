@@ -102,7 +102,7 @@ export function configureMarkdown() {
         var alt = (typeof obj === 'string') ? '' : (obj.text || '');
 
         if (href.startsWith('/') && !href.startsWith('/api')) {
-            href = '/api/local-file?path=' + encodeURIComponent(href);
+            href = window.withApiToken('/api/local-file?path=' + encodeURIComponent(href));
         }
         if (!isSafeImageHref(href)) return escapeHtml(alt || title || '');
         return '<img src="' + escapeAttr(href) + '" alt="' + escapeAttr(alt) + '"'

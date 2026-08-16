@@ -947,7 +947,7 @@ export function createSettingsController(options) {
         await createNewChat(null, { force: true });
     });
     if (settingsExportDataBtn) settingsExportDataBtn.addEventListener('click', function () {
-        window.location.href = '/api/data/export';
+        window.location.href = window.withApiToken('/api/data/export');
     });
     if (settingsImportDataBtn && settingsImportFile) {
         settingsImportDataBtn.addEventListener('click', function () { settingsImportFile.click(); });

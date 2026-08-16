@@ -345,7 +345,7 @@ export function createMessageRenderer(config) {
         var isImg = config.imageExts.some(function (ext) { return name.toLowerCase().endsWith(ext); });
 
         if (isImg && attPath) {
-            var imgSrc = '/api/local-file?path=' + encodeURIComponent(attPath);
+            var imgSrc = window.withApiToken('/api/local-file?path=' + encodeURIComponent(attPath));
             var img = document.createElement('img');
             img.className = 'chat-image user-attachment-image';
             img.src = imgSrc;

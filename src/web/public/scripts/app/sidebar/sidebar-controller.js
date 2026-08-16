@@ -1483,7 +1483,7 @@ export function createSidebarController(options) {
         }
         if (realtimeEvents) return;
 
-        var source = new EventSource("/api/events");
+        var source = new EventSource(window.withApiToken("/api/events"));
         realtimeEvents = source;
 
         source.addEventListener("ready", function () {
