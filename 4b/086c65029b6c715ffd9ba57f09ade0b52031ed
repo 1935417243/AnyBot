@@ -1,0 +1,28 @@
+src/web/public/index.html
+  h_7a561dec792e5b 32,418
+src/web/public/scripts/app/app/create-app.js
+  h_7a561dec792e5b 117,357
+src/web/public/scripts/app/app/dom.js
+  h_7a561dec792e5b 78
+src/web/public/scripts/app/settings/settings-controller.js
+  h_7a561dec792e5b 4,81,903-923
+src/web/public/scripts/app/ui/confirm-dialog.js
+  h_7a561dec792e5b 1-92
+src/web/public/styles/confirm-dialog.css
+  h_7a561dec792e5b 1-105
+src/web/routes/settings.ts
+  h_7a561dec792e5b 9,95-105
+src/web/services/projects.ts
+  h_7a561dec792e5b 87-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "4b086c65029b6c715ffd9ba57f09ade0b52031ed",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
