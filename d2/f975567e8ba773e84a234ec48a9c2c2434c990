@@ -1,0 +1,44 @@
+code-review-findings.md
+  h_7a561dec792e5b 125
+src/app-settings.ts
+  h_7a561dec792e5b 73,131,201-209,365
+src/providers/claude-code.ts
+  h_7a561dec792e5b 25,433-443,447-452,517,530,541,552,563,599-603,605,607-610,612-613,615-616,619-639,642-644,646-656,791
+src/providers/codex.ts
+  h_7a561dec792e5b 53-55,787-791,801,818,825,836-840,844-848,883,903-909,911-926,928-937,939-942,1049
+src/web/public/index.html
+  h_7a561dec792e5b 16-19,321-334
+src/web/public/scripts/app/app/create-app.js
+  h_7a561dec792e5b 98-101,305-308,343-346
+src/web/public/scripts/app/app/dom.js
+  h_7a561dec792e5b 59-62
+src/web/public/scripts/app/settings/settings-controller.js
+  h_7a561dec792e5b 14-18,63-66,95,229,275-393,396-397,428-456,557,685,996,1319-1321,1331-1335
+src/web/public/styles/automations.css
+  h_7a561dec792e5b 402-403
+src/web/public/styles/change-review.css
+  h_7a561dec792e5b 41,447,458
+src/web/public/styles/chat.css
+  h_7a561dec792e5b 176,187,265,525-526,1219-1220,1365,1444
+src/web/public/styles/main.css
+  h_7a561dec792e5b 2,91
+src/web/public/styles/plugins.css
+  h_7a561dec792e5b 433
+src/web/public/styles/settings.css
+  h_7a561dec792e5b 20,133,317,501,503
+src/web/public/styles/sidebar.css
+  h_7a561dec792e5b 8,687
+src/web/public/styles/skills.css
+  h_7a561dec792e5b 339,409
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d2f975567e8ba773e84a234ec48a9c2c2434c990",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
