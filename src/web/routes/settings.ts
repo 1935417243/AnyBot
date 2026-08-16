@@ -5,6 +5,7 @@ import { logger, getLogDir } from "../../logger.js";
 import { getWorkdir } from "../../shared.js";
 import { openDirectory } from "../../utils/open-directory.js";
 import { getUploadDir } from "../services/files.js";
+import { maskAppSettingsSecrets, restoreAppSettingsSecrets, revealProviderSecret } from "../services/secrets.js";
 import {
   clearWorkspaceFiles,
   migrateWorkspaceMemoryFiles,
@@ -18,7 +19,7 @@ export function createSettingsRouter(): Router {
   router.get("/app-settings", (_req: Request, res: Response) => {
     try {
       res.json({
-        settings: readAppSettings(),
+        settings: maskAppSettingsSecrets(readAppSettings()),
         effective: {
           dataDir: getDataDir(),
           logDir: getLogDir(),
@@ -34,6 +35,7 @@ export function createSettingsRouter(): Router {
   router.put("/app-settings", (req: Request, res: Response) => {
     try {
       const settings = req.body as Partial<AppSettings>;
+      restoreAppSettingsSecrets(settings, readAppSettings());
       const previousWorkdir = getWorkdir();
       let requestedWorkdir: string | undefined;
       if (settings.workspace?.defaultWorkdir) {
@@ -52,7 +54,7 @@ export function createSettingsRouter(): Router {
       }
       logger.info("app_settings.updated");
       res.json({
-        settings: next,
+        settings: maskAppSettingsSecrets(next),
         effective: {
           dataDir: getDataDir(),
           logDir: getLogDir(),
@@ -63,6 +65,22 @@ export function createSettingsRouter(): Router {
       });
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : "保存设置失败" });
+    }
+  });
+
+  router.post("/app-settings/reveal-secret", (req: Request, res: Response) => {
+    const body = req.body as { provider?: unknown; field?: unknown; presetKey?: unknown } | undefined;
+    const provider = typeof body?.provider === "string" ? body.provider : "";
+    const field = typeof body?.field === "string" ? body.field : "";
+    const presetKey = typeof body?.presetKey === "string" && body.presetKey ? body.presetKey : undefined;
+    if (!provider || !field) {
+      res.status(400).json({ error: "缺少 provider 或 field" });
+      return;
+    }
+    try {
+      res.json({ value: revealProviderSecret(provider, field, presetKey) });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "读取密钥失败" });
     }
   });
 

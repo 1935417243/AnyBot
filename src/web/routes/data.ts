@@ -15,6 +15,12 @@ import { emitHistoryCleared } from "../events.js";
 import { readModelConfig, writeModelConfig } from "../model-config.js";
 import { readProxyConfig, writeProxyConfig, type ProxyConfig } from "../proxy-config.js";
 import { getUploadDir } from "../services/files.js";
+import {
+  maskAppSettingsSecrets,
+  maskChannelsConfig,
+  restoreAppSettingsSecrets,
+  restoreChannelsConfigSecrets,
+} from "../services/secrets.js";
 
 export function createDataRouter(): Router {
   const router = Router();
@@ -72,16 +78,20 @@ export function createDataRouter(): Router {
     }
   });
 
-  router.get("/data/export", (_req: Request, res: Response) => {
+  router.get("/data/export", (req: Request, res: Response) => {
     try {
+      // 默认脱敏导出;显式 ?includeSecrets=1 才包含明文密钥。
+      const includeSecrets = req.query.includeSecrets === "1" || req.query.includeSecrets === "true";
+      const appSettings = readAppSettings();
+      const channelsConfig = readChannelsConfig();
       const payload = {
         version: 1,
         exportedAt: new Date().toISOString(),
-        appSettings: readAppSettings(),
+        appSettings: includeSecrets ? appSettings : maskAppSettingsSecrets(appSettings),
         modelConfig: readModelConfig(),
         sandboxConfig: readSandboxConfig(),
         proxyConfig: readProxyConfig(),
-        channelsConfig: readChannelsConfig(),
+        channelsConfig: includeSecrets ? channelsConfig : maskChannelsConfig(channelsConfig),
       };
       res.setHeader("Content-Type", "application/json; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="anybot-config-${Date.now()}.json"`);
@@ -100,7 +110,10 @@ export function createDataRouter(): Router {
         proxyConfig?: ProxyConfig;
         channelsConfig?: ReturnType<typeof readChannelsConfig>;
       };
-      if (payload.appSettings) writeAppSettings(payload.appSettings);
+      if (payload.appSettings) {
+        // 掩码密钥表示"保持已存值",避免导入脱敏导出件时清空真实密钥。
+        writeAppSettings(restoreAppSettingsSecrets(payload.appSettings, readAppSettings()));
+      }
       if (payload.modelConfig) writeModelConfig(payload.modelConfig);
       if (payload.sandboxConfig?.defaultSandbox) setDefaultSandbox(payload.sandboxConfig.defaultSandbox);
       if (payload.proxyConfig) {
@@ -111,7 +124,9 @@ export function createDataRouter(): Router {
           applyProxy();
         }
       }
-      if (payload.channelsConfig) writeChannelsConfig(payload.channelsConfig);
+      if (payload.channelsConfig) {
+        writeChannelsConfig(restoreChannelsConfigSecrets(payload.channelsConfig, readChannelsConfig()));
+      }
       logger.info("data.imported");
       res.json({ ok: true });
     } catch (error) {

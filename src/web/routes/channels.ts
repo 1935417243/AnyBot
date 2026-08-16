@@ -3,11 +3,13 @@ import type { Request, Response } from "express";
 import {
   channelManager,
   getRegisteredChannelTypes,
+  readChannelConfig,
   readChannelsConfig,
   updateChannelConfig,
 } from "../../channels/index.js";
 import { getWeixinLoginStatus } from "../../channels/weixin.js";
 import { logger } from "../../logger.js";
+import { maskChannelsConfig, restoreChannelSecrets } from "../services/secrets.js";
 
 export function createChannelsRouter(): Router {
   const router = Router();
@@ -16,7 +18,7 @@ export function createChannelsRouter(): Router {
     try {
       const config = readChannelsConfig();
       const registered = getRegisteredChannelTypes();
-      res.json({ registered, config });
+      res.json({ registered, config: maskChannelsConfig(config) });
     } catch (error) {
       res.status(500).json({ error: "读取频道配置失败" });
     }
@@ -30,9 +32,12 @@ export function createChannelsRouter(): Router {
       return;
     }
     try {
-      const config = updateChannelConfig(channelType, req.body);
+      const partial = req.body as Record<string, unknown>;
+      const current = readChannelConfig(channelType) as Record<string, unknown> | null;
+      restoreChannelSecrets(channelType, partial, current);
+      const config = updateChannelConfig(channelType, partial);
       logger.info("channel.config.updated", { channelType });
-      res.json(config);
+      res.json(maskChannelsConfig(config));
 
       channelManager.restartChannel(channelType).catch((error) => {
         logger.error("channel.restart_after_save_failed", { channelType, error });

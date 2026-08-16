@@ -31,6 +31,8 @@ export function createSettingsProviderController(options) {
     const KIMI_CODING_MODELS = ['kimi-for-coding', 'k3', 'k3-256k', 'kimi-for-coding-highspeed'];
     const OLLAMA_BASE_URL = 'http://localhost:11434';
     const OLLAMA_PLACEHOLDER_API_KEY = 'ollama';
+    // 与后端 src/web/services/secrets.ts 的 SECRET_MASK 保持一致。
+    const SECRET_MASK = '__anybot_secret_unchanged__';
     const PROVIDER_BASE_URL_SUGGESTIONS = [
         {
             id: 'aliyun-token-plan',
@@ -372,12 +374,40 @@ export function createSettingsProviderController(options) {
             '</div>';
     }
 
+    async function revealProviderSecretInput(input) {
+        var provider = getSelectedSettingsProvider();
+        if (!provider) return;
+        var field = provider.type === 'codex' ? 'codexApiKey' : 'apiKey';
+        var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
+        var presetKey = getProviderBaseUrlPresetKey(baseUrlInput ? baseUrlInput.value.trim() : '');
+        try {
+            var res = await fetch('/api/app-settings/reveal-secret', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    provider: provider.type,
+                    field: field,
+                    presetKey: presetKey || undefined,
+                }),
+            });
+            var data = await res.json().catch(function () { return {}; });
+            if (res.ok && typeof data.value === 'string' && data.value) {
+                input.value = data.value;
+            }
+        } catch (e) {
+            // 取回失败时保留掩码,仅切换显示状态。
+        }
+    }
+
     function bindProviderSecretToggles() {
         Array.prototype.forEach.call(document.querySelectorAll('[data-provider-secret-toggle]'), function (button) {
-            button.addEventListener('click', function () {
+            button.addEventListener('click', async function () {
                 var input = document.getElementById(button.dataset.providerSecretToggle || '');
                 if (!input) return;
                 var shouldShow = input.type === 'password';
+                if (shouldShow && input.value === SECRET_MASK) {
+                    await revealProviderSecretInput(input);
+                }
                 input.type = shouldShow ? 'text' : 'password';
                 button.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
                 button.setAttribute('aria-label', shouldShow ? '隐藏密钥' : '显示密钥');

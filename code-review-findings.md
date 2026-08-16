@@ -38,6 +38,7 @@
 - **问题**:响应直接包含 `providers.*.apiKey`、频道 `appSecret`/`token` 明文。
 - **影响**:任何 XSS 或浏览器扩展即可窃取;与 #1 叠加是致命的。
 - **修复建议**:响应中密钥字段脱敏(只返回 `hasKey: true` 或掩码),写操作才接受完整值;导出功能加密或二次确认。
+- **状态**:✅ 已修复(2026-08-16)。新增 `src/web/services/secrets.ts`:`SECRET_MASK` 掩码常量 + `maskAppSettingsSecrets`/`maskChannelsConfig`(覆盖 `providers.*.apiKey`、`codexApiKey`、anthropic/codex preset 密钥、频道 `appSecret`/`token`)+ 对应的 restore 函数(写回体中值等于掩码时还原为已存值,无已存值则删除该字段)。`GET/PUT /api/app-settings`、`GET/PUT /api/channels*` 响应统一脱敏、写入前还原;`/api/data/export` 默认脱敏,显式 `?includeSecrets=1` 才含明文,`/api/data/import` 对掩码字段还原已存值(导入脱敏导出件不会清空密钥);`fetchProviderModels`(`services/provider-models.ts`)收到掩码时按 Base URL 经 `findStoredApiKeyForBaseUrl` 换回已存密钥,前端模型列表拉取不受影响。前端密码框中掩码显示为圆点,清空字段仍可删除密钥;设置页"显示密钥"按钮(`provider-secret-toggle`)点击时经 `POST /api/app-settings/reveal-secret`(按 provider/field/presetKey 单字段、显式触发)取回明文展示,其余场景明文不出后端。
 
 ### 3. 仓库根目录存有 OpenSSH 私钥,仅靠本地 exclude 防提交
 
@@ -124,6 +125,7 @@
 - **位置**:`src/index.ts`(无 SIGTERM/SIGINT handler)、`electron/main.cjs:939-947`(直接 `kill("SIGTERM")`)
 - **问题**:进程退出时 `automationScheduler.stop()` 从不被调用;`weixin.notifyStop()` 不发出,服务端认为 bot 仍在线;正在执行的 codex/claude 子进程可能成孤儿继续烧 API 额度。
 - **修复建议**:注册 SIGTERM/SIGINT → abort 活跃 run → stop channels → 退出。
+- **状态**:✅ 已修复(2026-08-16)。`src/index.ts` 注册 SIGTERM/SIGINT handler 走统一 `shutdown()`:先 `abortAllActiveRuns()`(`src/web/active-runs.ts`,abort 信号沿 `RunOptions.signal` 传入 codex/claude provider 触发子进程中止)→ `automationScheduler.stop()` → `stopAllChannels()`(`src/channels/index.ts` 新增 `ChannelManager.stopAll()`,逐个 `channel.stop()`,微信会发出 `notifyStop()`)→ `closeAllConnections()` 后关闭 Web server;5 秒强制退出兜底,重复信号幂等;桌面父进程消失路径(`desktop.parent_gone`)也改走同一优雅退出。
 
 #### 15. 登录态/凭据失效后无限重试无恢复路径
 

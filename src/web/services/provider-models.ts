@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { fetch as undiciFetch } from "undici";
 import { logger } from "../../logger.js";
 import { getObjectArrayValue, getObjectStringValue } from "./object-utils.js";
+import { findStoredApiKeyForBaseUrl, SECRET_MASK } from "./secrets.js";
 
 const PROVIDER_MODEL_FETCH_TIMEOUT_MS = 10000;
 const PROVIDER_MODEL_CACHE_TTL_MS = 30 * 60 * 1000;
@@ -79,6 +80,10 @@ function filterProviderModelIds(provider: string, models: string[]): string[] {
 export async function fetchProviderModels(baseUrl: string, apiKey: string): Promise<ProviderModelsResult> {
   if (!baseUrl) {
     throw new ProviderModelFetchError("缺少 Base URL", 400);
+  }
+  // 前端拿到的密钥是掩码,按 Base URL 换回已保存的真实密钥。
+  if (apiKey === SECRET_MASK) {
+    apiKey = findStoredApiKeyForBaseUrl(baseUrl);
   }
   if (!apiKey && !isOllamaBaseUrl(baseUrl)) {
     throw new ProviderModelFetchError("缺少 API Key", 400);
