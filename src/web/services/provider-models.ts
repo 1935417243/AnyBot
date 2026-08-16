@@ -25,6 +25,10 @@ export type ProviderModelsResult = {
   expiresAt: string;
 };
 
+function isOllamaBaseUrl(baseUrl: string): boolean {
+  return /^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]):11434(\/|$)/i.test(baseUrl.trim());
+}
+
 function buildProviderModelsRequest(baseUrl: string): { modelsUrl: string; provider: string } {
   const parsed = new URL(baseUrl);
   const lower = baseUrl.toLowerCase();
@@ -40,7 +44,10 @@ function buildProviderModelsRequest(baseUrl: string): { modelsUrl: string; provi
   if (lower.includes("api.minimaxi.com")) {
     return { modelsUrl: new URL("/anthropic/v1/models", parsed.origin).toString(), provider: "MiniMax" };
   }
-  throw new Error("仅支持 阿里Token Plan、VibeAPI、DeepSeek 或 MiniMax Base URL 自动获取模型");
+  if (isOllamaBaseUrl(baseUrl)) {
+    return { modelsUrl: new URL("/v1/models", parsed.origin).toString(), provider: "Ollama" };
+  }
+  throw new Error("仅支持 阿里Token Plan、VibeAPI、DeepSeek、MiniMax 或 Ollama Base URL 自动获取模型");
 }
 
 function getProviderModelCacheKey(modelsUrl: string, apiKey: string): string {
@@ -70,8 +77,11 @@ function filterProviderModelIds(provider: string, models: string[]): string[] {
 }
 
 export async function fetchProviderModels(baseUrl: string, apiKey: string): Promise<ProviderModelsResult> {
-  if (!baseUrl || !apiKey) {
-    throw new ProviderModelFetchError("缺少 Base URL 或 API Key", 400);
+  if (!baseUrl) {
+    throw new ProviderModelFetchError("缺少 Base URL", 400);
+  }
+  if (!apiKey && !isOllamaBaseUrl(baseUrl)) {
+    throw new ProviderModelFetchError("缺少 API Key", 400);
   }
 
   let modelsUrl: string;
@@ -85,6 +95,7 @@ export async function fetchProviderModels(baseUrl: string, apiKey: string): Prom
       error.message.includes("VibeAPI") ||
       error.message.includes("DeepSeek") ||
       error.message.includes("MiniMax") ||
+      error.message.includes("Ollama") ||
       error.message.includes("阿里Token Plan")
     )
       ? error.message
@@ -109,9 +120,7 @@ export async function fetchProviderModels(baseUrl: string, apiKey: string): Prom
   const timeout = setTimeout(() => controller.abort(), PROVIDER_MODEL_FETCH_TIMEOUT_MS);
   try {
     const response = await undiciFetch(modelsUrl, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
       signal: controller.signal,
     });
     const text = await response.text();

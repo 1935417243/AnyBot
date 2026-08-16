@@ -29,6 +29,8 @@ export function createSettingsProviderController(options) {
     const ALIYUN_TOKEN_PLAN_BASE_URL = 'https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic';
     const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
     const KIMI_CODING_MODEL = 'kimi-for-coding';
+    const OLLAMA_BASE_URL = 'http://localhost:11434';
+    const OLLAMA_PLACEHOLDER_API_KEY = 'ollama';
     const PROVIDER_BASE_URL_SUGGESTIONS = [
         {
             id: 'aliyun-token-plan',
@@ -49,6 +51,11 @@ export function createSettingsProviderController(options) {
             id: 'minimax',
             label: 'MiniMax',
             value: 'https://api.minimaxi.com/anthropic',
+        },
+        {
+            id: 'ollama',
+            label: 'Ollama（本地）',
+            value: OLLAMA_BASE_URL,
         },
         {
             id: 'vibeapi',
@@ -199,12 +206,18 @@ export function createSettingsProviderController(options) {
         return PROVIDER_SETTINGS_DEFINITIONS[providerType] || null;
     }
 
+    function isOllamaBaseUrl(baseUrl) {
+        var normalized = normalizeProviderBaseUrl(baseUrl);
+        return /^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]):11434(\/|$)/.test(normalized);
+    }
+
     function getRemoteProviderModelSource(baseUrl) {
         var lower = String(baseUrl || '').toLowerCase();
         if (lower.indexOf('token-plan.cn-beijing.maas.aliyuncs.com') !== -1) return '阿里Token Plan';
         if (lower.indexOf('vibeapi') !== -1) return 'VibeAPI';
         if (lower.indexOf('api.deepseek.com') !== -1) return 'DeepSeek';
         if (lower.indexOf('api.minimaxi.com') !== -1) return 'MiniMax';
+        if (isOllamaBaseUrl(baseUrl)) return 'Ollama';
         return '';
     }
 
@@ -411,7 +424,7 @@ export function createSettingsProviderController(options) {
         var baseUrl = getProviderModelSuggestionBaseUrl();
         var apiKey = getProviderModelSuggestionApiKey();
         var source = getRemoteProviderModelSource(baseUrl);
-        if (!source || !apiKey) {
+        if (!source || (!apiKey && !isOllamaBaseUrl(baseUrl))) {
             clearRemoteProviderModelSuggestions();
             return;
         }
@@ -578,6 +591,7 @@ export function createSettingsProviderController(options) {
         var modelInputs = Array.prototype.slice.call(document.querySelectorAll('[data-provider-model-suggestion-input="true"]'));
         if (baseUrlInput) {
             baseUrlInput.addEventListener('input', function () {
+                updateProviderApiKeyVisibility();
                 applyFixedProviderModel(baseUrlInput.value);
                 if (!getRemoteProviderModelSource(baseUrlInput.value)) {
                     clearRemoteProviderModelSuggestions();
@@ -589,6 +603,7 @@ export function createSettingsProviderController(options) {
                 if (openInput) showProviderModelSuggestionMenu(openInput);
             });
             baseUrlInput.addEventListener('change', function () {
+                updateProviderApiKeyVisibility();
                 var selectedSuggestion = baseUrlInput.dataset.providerBaseUrlSelectedSuggestion || '';
                 var appliedPreset = applySavedProviderBaseUrlSettings(baseUrlInput.value);
                 if (selectedSuggestion && appliedPreset) {
@@ -666,6 +681,7 @@ export function createSettingsProviderController(options) {
             if (showProviderFields) {
                 bindProviderModelSuggestionInputs();
                 bindProviderSecretToggles();
+                updateProviderApiKeyVisibility();
             }
         }
         if (showModelSelect) fetchSettingsModelConfig(provider.type);
@@ -754,11 +770,23 @@ export function createSettingsProviderController(options) {
         renderProviderDetails();
     }
 
+    function buildProviderApiKeyRow(value, hint) {
+        return '<div class="settings-row provider-api-key-row"><span><strong>API Key</strong><small>' + escapeHtml(hint || '访问兼容服务所需的密钥') + '</small></span>' +
+            buildProviderSecretInput('settings-provider-api-key', value || '', 'API Key') + '</div>';
+    }
+
+    function updateProviderApiKeyVisibility() {
+        var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
+        var hide = isOllamaBaseUrl(baseUrlInput ? baseUrlInput.value : '');
+        Array.prototype.forEach.call(document.querySelectorAll('.provider-api-key-row'), function (row) {
+            row.style.display = hide ? 'none' : '';
+        });
+    }
+
     function buildCodexCompatFields(cfg) {
         return '<div class="settings-row"><span><strong>Anthropic Base URL</strong><small>兼容 Anthropic API 的服务地址</small></span>' +
             buildProviderBaseUrlInput(cfg.codexAnthropicBaseUrl || '', 'Anthropic Base URL') + '</div>' +
-            '<div class="settings-row"><span><strong>API Key</strong><small>访问兼容服务所需的密钥</small></span>' +
-            buildProviderSecretInput('settings-provider-api-key', cfg.codexApiKey || '', 'API Key') + '</div>' +
+            buildProviderApiKeyRow(cfg.codexApiKey || '') +
             '<div class="settings-row"><span><strong>gpt-5.5</strong><small>映射到默认通用模型</small></span>' +
             buildProviderModelInput('settings-provider-codex-default-model', cfg.codexDefaultModel || '', 'gpt-5.5') + '</div>' +
             '<div class="settings-row"><span><strong>gpt-mini</strong><small>映射到轻量快速模型</small></span>' +
@@ -799,8 +827,7 @@ export function createSettingsProviderController(options) {
     function buildClaudeCodeCompatFields(cfg) {
         return '<div class="settings-row"><span><strong>Anthropic Base URL</strong><small>兼容 Anthropic API 的服务地址</small></span>' +
             buildProviderBaseUrlInput(cfg.anthropicBaseUrl || '', 'Anthropic Base URL') + '</div>' +
-            '<div class="settings-row"><span><strong>API Key</strong><small>访问兼容服务所需的密钥</small></span>' +
-            buildProviderSecretInput('settings-provider-api-key', cfg.apiKey || '', 'API Key') + '</div>' +
+            buildProviderApiKeyRow(cfg.apiKey || '') +
             '<div class="settings-row"><span><strong>Auto 模型</strong><small>用于 Auto 模型</small></span>' +
             buildProviderModelInput('settings-provider-anthropic-auto-model', cfg.anthropicAutoModel || cfg.defaultModel || '', 'Auto 模型') + '</div>' +
             '<div class="settings-row"><span><strong>Opus 模型</strong><small>用于 Opus 模型</small></span>' +
@@ -843,7 +870,12 @@ export function createSettingsProviderController(options) {
             next.pathToClaudeCodeExecutable = binInput.value.trim();
             delete next.bin;
         }
-        if (apiKeyInput) next.apiKey = apiKeyInput.value;
+        if (apiKeyInput) {
+            next.apiKey = apiKeyInput.value;
+            if (!next.apiKey.trim() && isOllamaBaseUrl(anthropicBaseUrl)) {
+                next.apiKey = OLLAMA_PLACEHOLDER_API_KEY;
+            }
+        }
         if (anthropicBaseUrlInput) next.anthropicBaseUrl = anthropicBaseUrl;
         if (anthropicAutoModelInput) {
             next.anthropicAutoModel = fixedModel || anthropicAutoModelInput.value.trim();
@@ -882,7 +914,12 @@ export function createSettingsProviderController(options) {
         var baseUrl = baseUrlInput ? baseUrlInput.value.trim() : '';
         var fixedModel = getFixedProviderModel(baseUrl);
         var presetKey = getProviderBaseUrlPresetKey(baseUrl);
-        if (apiKeyInput) next.codexApiKey = apiKeyInput.value;
+        if (apiKeyInput) {
+            next.codexApiKey = apiKeyInput.value;
+            if (!next.codexApiKey.trim() && isOllamaBaseUrl(baseUrl)) {
+                next.codexApiKey = OLLAMA_PLACEHOLDER_API_KEY;
+            }
+        }
         if (baseUrlInput) next.codexAnthropicBaseUrl = baseUrl;
         if (defaultModelInput) next.codexDefaultModel = fixedModel || defaultModelInput.value.trim();
         if (fastModelInput) next.codexFastModel = fixedModel || fastModelInput.value.trim();
@@ -904,8 +941,10 @@ export function createSettingsProviderController(options) {
     }
 
     function validateClaudeCodeSettings() {
+        var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
+        var ollamaLocal = isOllamaBaseUrl(baseUrlInput ? baseUrlInput.value : '');
         var fields = [
-            ['Anthropic Base URL', document.getElementById('settings-provider-anthropic-base-url')],
+            ['Anthropic Base URL', baseUrlInput],
             ['API Key', document.getElementById('settings-provider-api-key')],
             ['Auto 模型', document.getElementById('settings-provider-anthropic-auto-model')],
             ['Opus 模型', document.getElementById('settings-provider-anthropic-opus-model')],
@@ -916,6 +955,7 @@ export function createSettingsProviderController(options) {
         var missing = fields.filter(function (entry) {
             var input = entry[1];
             if (!input) return false;
+            if (ollamaLocal && input.id === 'settings-provider-api-key') return false;
             var value = input.value.trim();
             return !value;
         }).map(function (entry) {
@@ -929,8 +969,10 @@ export function createSettingsProviderController(options) {
     }
 
     function validateCodexSettings() {
+        var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
+        var ollamaLocal = isOllamaBaseUrl(baseUrlInput ? baseUrlInput.value : '');
         var fields = [
-            ['Anthropic Base URL', document.getElementById('settings-provider-anthropic-base-url')],
+            ['Anthropic Base URL', baseUrlInput],
             ['API Key', document.getElementById('settings-provider-api-key')],
             ['gpt-5.5', document.getElementById('settings-provider-codex-default-model')],
             ['gpt-mini', document.getElementById('settings-provider-codex-fast-model')],
@@ -939,6 +981,7 @@ export function createSettingsProviderController(options) {
         var missing = fields.filter(function (entry) {
             var input = entry[1];
             if (!input) return false;
+            if (ollamaLocal && input.id === 'settings-provider-api-key') return false;
             return !input.value.trim();
         }).map(function (entry) {
             return entry[0];
