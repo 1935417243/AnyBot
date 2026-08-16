@@ -114,6 +114,9 @@ export function createTaskDock(options) {
 
     function updateTask(event) {
         var id = resolveTaskId(event.taskId);
+        if (!tasks.get(id)) {
+            ensureTask({ id: id, description: event.description || '', status: event.status || 'running' });
+        }
         var task = tasks.get(id);
         if (!task) return;
         if (event.description) task.description = event.description;
@@ -124,6 +127,9 @@ export function createTaskDock(options) {
 
     function finishTask(event) {
         var id = resolveTaskId(event.taskId);
+        if (!tasks.get(id)) {
+            ensureTask({ id: id, description: event.summary || '', status: 'running' });
+        }
         var task = tasks.get(id);
         if (!task) return;
         task.status = event.status || 'completed';

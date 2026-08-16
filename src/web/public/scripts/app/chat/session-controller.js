@@ -337,6 +337,7 @@ export function createSessionController(config) {
 
         try {
             stopActiveStreamSubscription();
+            var isSameSession = id === currentSessionId;
             var res = await fetch('/api/sessions/' + id + '?limit=' + config.sessionMessagePageSize);
             if (!res.ok) {
                 if (!options.silent) config.showError('加载会话失败');
@@ -357,7 +358,8 @@ export function createSessionController(config) {
 
             if (!wasChatView) config.showChatView();
 
-            if (window.TaskDock) window.TaskDock.reset();
+            // 同会话静默重载保留 dock 实时状态（比落库回放更全）；切会话才清空重建
+            if (window.TaskDock && !isSameSession) window.TaskDock.reset();
             currentNewestMessageId = config.renderSessionMessages(data.messages || [], !!data.hasMoreMessages);
             await config.fetchModelConfig(currentSessionProvider);
             if (data.activeRun && data.activeRun.kind === 'compact') {

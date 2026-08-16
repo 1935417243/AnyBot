@@ -1,7 +1,10 @@
 (function () {
-    var LARGE_MESSAGE_PREVIEW_CHARS = 20000;
-    var STREAMING_ANSWER_PREVIEW_CHARS = 12000;
+    var LARGE_MESSAGE_PREVIEW_CHARS = 40000;
+    var STREAMING_ANSWER_PREVIEW_CHARS = 40000;
     var STREAMING_RENDER_INTERVAL_MS = 90;
+    var STREAMING_RENDER_SLOW_INTERVAL_MS = 400;
+    var ADAPTIVE_RENDER_CHARS = 4000;
+    var NEAR_BOTTOM_PX = 120;
     var LONG_SHELL_COMMAND_CHARS = 300;
     var SHELL_COMMAND_SUMMARY_CHARS = 220;
 
@@ -107,7 +110,14 @@
 
     function createMessage(opts) {
         var messagesEl = opts.messagesEl;
-        var scrollBottom = opts.scrollBottom || function () {};
+        var rawScrollBottom = opts.scrollBottom || function () {};
+        var scrollBottom = function (force) {
+            if (!force && !isPersisted && messagesEl) {
+                var distance = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+                if (distance > NEAR_BOTTOM_PX) return;
+            }
+            rawScrollBottom();
+        };
         var startedAt = opts.startedAt || Date.now();
         var isPersisted = !!opts.persisted;
 
@@ -199,7 +209,7 @@
         row.appendChild(bubble);
         messagesEl.appendChild(row);
         if (isPersisted) attachCompletionMeta();
-        scrollBottom();
+        scrollBottom(true);
 
         var ticker = isPersisted ? null : setInterval(function () {
             if (state.status !== 'running') {
@@ -409,9 +419,6 @@
             finalEl.classList.add('streaming');
             finalEl.innerHTML = renderMarkdown(visibleText);
             enhanceLocalFileLinks(finalEl);
-            finalEl.querySelectorAll('pre code').forEach(function (block) {
-                if (typeof hljs !== 'undefined') hljs.highlightElement(block);
-            });
             scrollBottom();
         }
 
@@ -419,6 +426,12 @@
             if (!scheduledAnswerRender) return;
             clearTimeout(scheduledAnswerRender);
             scheduledAnswerRender = null;
+        }
+
+        function streamRenderInterval(text) {
+            return String(text || '').length > ADAPTIVE_RENDER_CHARS
+                ? STREAMING_RENDER_SLOW_INTERVAL_MS
+                : STREAMING_RENDER_INTERVAL_MS;
         }
 
         function scheduleStreamingAnswerRender() {
@@ -430,7 +443,7 @@
             scheduledAnswerRender = setTimeout(function () {
                 scheduledAnswerRender = null;
                 renderStreamingAnswer();
-            }, STREAMING_RENDER_INTERVAL_MS);
+            }, streamRenderInterval(state.answerText));
         }
 
         function scheduleSegmentRender(segment, renderFn) {
@@ -442,7 +455,7 @@
             segment.renderTimer = setTimeout(function () {
                 segment.renderTimer = null;
                 renderFn(segment);
-            }, STREAMING_RENDER_INTERVAL_MS);
+            }, streamRenderInterval(segment.text));
         }
 
         function appendAnswerText(text) {
@@ -462,15 +475,27 @@
             if (reviewCard) content.appendChild(reviewCard);
         }
 
+        function isStreamingRender() {
+            return !isPersisted && state.status === 'running';
+        }
+
         function renderProcessTextSegment(segment) {
             if (!segment.text) {
                 segment.el.remove();
                 return;
             }
-            segment.el.innerHTML = renderMarkdown(segment.text);
-            segment.el.querySelectorAll('pre code').forEach(function (block) {
-                if (typeof hljs !== 'undefined') hljs.highlightElement(block);
-            });
+            if (isStreamingRender()) {
+                segment.plain = true;
+                segment.el.classList.add('plain-text');
+                segment.el.textContent = segment.text;
+            } else {
+                segment.plain = false;
+                segment.el.classList.remove('plain-text');
+                segment.el.innerHTML = renderMarkdown(segment.text);
+                segment.el.querySelectorAll('pre code').forEach(function (block) {
+                    if (typeof hljs !== 'undefined') hljs.highlightElement(block);
+                });
+            }
             scrollBottom();
         }
 
@@ -496,11 +521,14 @@
                 segment.el.remove();
                 return;
             }
-            segment.body.innerHTML = renderMarkdown(segment.text);
-            segment.body.querySelectorAll('pre code').forEach(function (block) {
-                if (typeof hljs !== 'undefined') hljs.highlightElement(block);
-            });
+            segment.body.textContent = segment.text;
             scrollBottom();
+        }
+
+        function finalizeSegmentRenders() {
+            state.processTextSegments.forEach(function (segment) {
+                if (segment.plain) renderProcessTextSegment(segment);
+            });
         }
 
         function appendThinkingText(text) {
@@ -1006,9 +1034,10 @@
             } else if (state.status === 'running') {
                 state.durationMs = Date.now() - startedAt;
             }
+            state.status = 'completed';
+            finalizeSegmentRenders();
             renderAnswer();
             attachCompletionMeta();
-            state.status = 'completed';
             updateProcessTitle();
             if (ticker) clearInterval(ticker);
             updateProcessAvailability();
@@ -1030,12 +1059,14 @@
                 if (event.status === 'completed') {
                     state.status = 'completed';
                     state.durationMs = event.durationMs || (Date.now() - startedAt);
+                    finalizeSegmentRenders();
                     updateProcessTitle();
                     if (ticker) clearInterval(ticker);
                     if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
                 } else if (event.status === 'failed') {
                     state.status = 'completed';
                     state.durationMs = event.durationMs || (Date.now() - startedAt);
+                    finalizeSegmentRenders();
                     updateProcessTitle();
                     if (ticker) clearInterval(ticker);
                     if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
@@ -1090,9 +1121,10 @@
 
             if (event.type === 'error') {
                 state.answerText = state.answerText || ('处理失败：' + (event.error || '未知错误'));
+                state.status = 'completed';
+                finalizeSegmentRenders();
                 renderAnswer();
                 attachCompletionMeta();
-                state.status = 'completed';
                 updateProcessTitle();
                 if (ticker) clearInterval(ticker);
                 updateProcessAvailability();
@@ -1102,9 +1134,10 @@
 
             if (event.type === 'cancelled') {
                 state.answerText = event.message || '已中断';
+                state.status = 'completed';
+                finalizeSegmentRenders();
                 renderAnswer();
                 attachCompletionMeta();
-                state.status = 'completed';
                 updateProcessTitle();
                 if (ticker) clearInterval(ticker);
                 updateProcessAvailability();
