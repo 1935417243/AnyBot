@@ -62,6 +62,7 @@ export function createSessionController(config) {
         currentSessionId = null;
         currentSessionProjectId = targetProjectId;
         currentSessionProvider = currentProviderType || null;
+        if (window.TaskDock) window.TaskDock.reset();
         config.updateConversationHeaderTitle('新对话');
         currentSessionUpdatedAt = 0;
         currentNewestMessageId = 0;
@@ -356,9 +357,9 @@ export function createSessionController(config) {
 
             if (!wasChatView) config.showChatView();
 
+            if (window.TaskDock) window.TaskDock.reset();
             currentNewestMessageId = config.renderSessionMessages(data.messages || [], !!data.hasMoreMessages);
             await config.fetchModelConfig(currentSessionProvider);
-
             if (data.activeRun && data.activeRun.kind === 'compact') {
                 resumeActiveCompact(id, data.activeRun);
             } else if (data.activeStream) {
@@ -388,6 +389,7 @@ export function createSessionController(config) {
                 currentSessionProvider = null;
                 currentSessionUpdatedAt = 0;
                 currentNewestMessageId = 0;
+                if (window.TaskDock) window.TaskDock.reset();
                 config.updateConversationHeaderTitle('新对话');
                 config.resetInputHistoryFromMessages([], false);
                 config.clearPromptSkills();

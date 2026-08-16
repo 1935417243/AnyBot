@@ -12,6 +12,8 @@ const MAX_CLIENT_EVENT_TEXT = 4000;
 const MAX_CLIENT_DIFF_TEXT = 4000;
 const MAX_CLIENT_TASK_TEXT = 1200;
 const MAX_CLIENT_DELTA_TEXT = 8000;
+const MAX_TODO_ITEMS = 50;
+const MAX_TODO_CONTENT_TEXT = 200;
 
 export type AgentStreamEvent =
   | ClaudeAgentStreamEvent
@@ -170,6 +172,19 @@ function compactToolStartEvent(event: Extract<ClaudeAgentStreamEvent, { type: "t
   };
 }
 
+function compactTodoUpdateEvent(
+  event: Extract<ClaudeAgentStreamEvent, { type: "todo_update" }>,
+): ClaudeAgentStreamEvent {
+  return {
+    ...event,
+    todos: event.todos.slice(0, MAX_TODO_ITEMS).map((todo) => ({
+      ...todo,
+      content: truncateForHistory(todo.content, MAX_TODO_CONTENT_TEXT) || "",
+      activeForm: truncateForHistory(todo.activeForm, MAX_TODO_CONTENT_TEXT),
+    })),
+  };
+}
+
 function compactAgentEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEvent | null {
   if (event.type === "answer_delta" || event.type === "process_delta" || event.type === "tool_progress") return null;
   if (event.type === "thinking_delta") return null;
@@ -221,6 +236,9 @@ function compactAgentEvent(event: ClaudeAgentStreamEvent): ClaudeAgentStreamEven
   if (event.type === "file_change") {
     return { ...event, diff: undefined };
   }
+  if (event.type === "todo_update") {
+    return compactTodoUpdateEvent(event);
+  }
   return event;
 }
 
@@ -261,6 +279,9 @@ function compactAgentEventForClient(active: ActiveAgentStream, event: AgentStrea
   }
   if (event.type === "file_change") {
     return { ...event, diff: undefined };
+  }
+  if (event.type === "todo_update") {
+    return compactTodoUpdateEvent(event);
   }
   return event;
 }

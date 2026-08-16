@@ -116,6 +116,14 @@ export type ClaudeAgentStreamEvent =
       event: "change" | "add" | "unlink";
       diff?: string;
     }
+  | {
+      type: "todo_update";
+      todos: Array<{
+        content: string;
+        status: "pending" | "in_progress" | "completed";
+        activeForm?: string;
+      }>;
+    }
   | { type: "context_usage"; usage: ProviderContextUsage };
 
 const SECRET_PATTERNS: RegExp[] = [
@@ -185,6 +193,39 @@ export function createToolStartEvent(
       status: "running",
     },
   };
+}
+
+export function createTodoUpdateEvent(
+  input: HookInput,
+): ClaudeAgentStreamEvent | null {
+  if (input.hook_event_name !== "PreToolUse") return null;
+  if (input.tool_name !== "TodoWrite") return null;
+  const toolInput = input.tool_input;
+  const todos = isRecord(toolInput) && Array.isArray(toolInput.todos) ? toolInput.todos : null;
+  if (!todos) return null;
+  const items = todos.flatMap((todo) => {
+    if (!isRecord(todo)) return [];
+    const content = sanitizeAgentText(
+      getString(todo, "content") || getString(todo, "title") || "",
+    );
+    if (!content) return [];
+    const rawStatus = (getString(todo, "status") || "").toLowerCase();
+    const status =
+      rawStatus === "in_progress"
+        ? "in_progress"
+        : rawStatus === "completed" || rawStatus === "done"
+          ? "completed"
+          : "pending";
+    const activeForm = getString(todo, "activeForm");
+    return [
+      {
+        content,
+        status: status as "pending" | "in_progress" | "completed",
+        activeForm: activeForm ? sanitizeAgentText(activeForm) : undefined,
+      },
+    ];
+  });
+  return { type: "todo_update", todos: items };
 }
 
 export async function createToolEndEvent(

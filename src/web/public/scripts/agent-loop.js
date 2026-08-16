@@ -611,6 +611,9 @@
             if (name === 'Agent' || name === 'Task') {
                 return '启动子任务 ' + (summary || '');
             }
+            if (name === 'TodoWrite') {
+                return '更新待办列表';
+            }
             return name + (summary ? ' ' + summary : '');
         }
 
@@ -1014,6 +1017,7 @@
 
         function handleEvent(event) {
             if (!event || !event.type) return;
+            if (window.TaskDock) window.TaskDock.handleEvent(event);
             if (event.type === 'agent_status') {
                 if (event.durationMs || event.durationMs === 0) {
                     state.durationMs = event.durationMs;

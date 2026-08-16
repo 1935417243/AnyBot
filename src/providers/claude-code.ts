@@ -30,6 +30,7 @@ import {
     createToolEndEvent,
     createToolProgressEvent,
     createToolStartEvent,
+    createTodoUpdateEvent,
     extractAssistantTextDelta,
     extractAssistantThinkingDelta,
 } from "./claude-code-agent-events.js";
@@ -528,6 +529,8 @@ export class ClaudeCodeProvider implements IProvider {
                                 async (input) => {
                                     const event = createToolStartEvent(input, workdir);
                                     if (event) await emitEvent?.(event);
+                                    const todoEvent = createTodoUpdateEvent(input);
+                                    if (todoEvent) await emitEvent?.(todoEvent);
                                     return {};
                                 },
                             ],
