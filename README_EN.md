@@ -11,7 +11,7 @@ AnyBot is a local AI Coding Agent console and remote entry point that lets you c
 
 AnyBot uses the platform native binaries provided by `@openai/codex-sdk` and `@anthropic-ai/claude-agent-sdk` by default, so users do not need to install `codex` or Claude Code globally. If needed, you can still configure an external CLI from settings. Provider settings, model mappings, environment variables, and MCP configuration are stored inside AnyBot.
 
-If you do not want to use the machine's global model configuration, you can configure separate compatibility endpoints and model mappings inside AnyBot for Codex / Claude Code, connecting DeepSeek, Kimi, MiniMax, VibeAPI, or other Anthropic API-compatible services. AnyBot's settings only take effect inside AnyBot and do not affect the machine's global configuration.
+If you do not want to use the machine's global model configuration, you can configure separate compatibility endpoints and model mappings inside AnyBot for Codex / Claude Code, connecting Aliyun Token Plan, DeepSeek, Kimi, MiniMax, Ollama (local), VibeAPI, or other Anthropic API-compatible services. AnyBot's settings only take effect inside AnyBot and do not affect the machine's global configuration.
 
 The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
 
@@ -21,10 +21,10 @@ The desktop app supports **macOS** and **Windows**; running from source supports
 
 - **Multiple Providers**: switch between Codex SDK/CLI and Claude Code from the Web UI or channel commands.
 - **Compatible model access**: configure the Codex Responses compatibility layer and Claude Code Anthropic-compatible interface inside AnyBot, including Base URL, API Key, and model mappings.
-- **MCP servers**: manually add, enable, disable, check, and inspect MCP Server logs from settings. Enabled servers are passed to Codex / Claude Code.
+- **MCP servers**: add, enable, disable, check, and inspect MCP Server logs from the Plugins page; verified servers are passed to both Codex and Claude Code.
 - **Agent Web UI**: local chat UI with Markdown, code highlighting, streamed Agent events, cancellation, context compaction, and persistent history.
-- **Project workspaces**: manage projects in the sidebar; project sessions use the project path as the Provider working directory.
-- **Skills and slash menu**: browse, enable, disable, and delete skills; the `/` picker shows Provider-specific skills and commands.
+- **Project workspaces**: manage projects in the sidebar, including cloning from Git repositories, viewing and switching branches, and clearing the workspace; project sessions use the project path as the Provider working directory.
+- **Skills and Plugins page**: the sidebar Plugins page manages skills and MCP servers together; skills are isolated per Provider and can be browsed, enabled, disabled, and deleted, and the `/` picker shows Provider-specific skills and commands.
 - **Attachments**: upload by button, pasted images, or drag and drop. The upload limit is 50MB per file. Image support depends on the current Provider.
 - **Change review**: after Agent edits, inspect diffs and approve or revert changes from the Web UI.
 - **Channel integrations**: Feishu long connection, DingTalk Stream, QQ Bot WebSocket, Telegram long polling, and personal Weixin.
@@ -36,17 +36,13 @@ The desktop app supports **macOS** and **Windows**; running from source supports
 
 ## Screenshots
 
-| New Chat | Automations |
-|:---:|:---:|
-| ![New Chat](assets/主页.png) | ![Automations](assets/自动化.png) |
+![New Chat](assets/主页.png)
 
-| Channels |
-|:---:|
-| ![Channels](assets/频道页.png) |
+![Automations](assets/自动化.png)
 
-| Settings |
-|:---:|
-| ![Settings](assets/设置页.png) |
+![Channels](assets/频道页.png)
+
+![Settings](assets/设置页.png)
 
 ---
 
@@ -139,7 +135,7 @@ Provider and model choices are saved from the Web UI. Each Provider remembers it
 
 ## Compatible Model Support
 
-AnyBot can configure Anthropic API-compatible services separately for Codex and Claude Code from settings. Built-in Base URL suggestions currently include DeepSeek, Kimi, MiniMax, and VibeAPI; you can also manually enter another compatible service URL.
+AnyBot can configure Anthropic API-compatible services separately for Codex and Claude Code from settings. Built-in Base URL suggestions currently include Aliyun Token Plan, DeepSeek, Kimi, MiniMax, Ollama (local), and VibeAPI; you can also manually enter another compatible service URL.
 
 Codex connects to compatible services through the **Responses compatibility layer**. When enabled, the Codex Provider uses AnyBot's local compatibility service configuration and model mapping with an isolated `CODEX_HOME`, so it does not affect the user's global `~/.codex` configuration.
 
@@ -161,14 +157,14 @@ After enabling **Responses compatibility layer** under **Settings -> Providers -
 The Web UI is the recommended entry point:
 
 - Persistent multi-session history backed by SQLite.
-- Project management, project sessions, directory tree browsing, and default working directory settings.
+- Project management, project sessions, directory tree browsing, Git repository cloning and branch switching, and default working directory settings.
 - Markdown rendering, code copy, long-message folding, and context usage display.
 - Streamed Agent activity, response cancellation, and `/compact` context compaction.
 - File uploads, image preview, and local image access.
 - Slash picker for Provider-specific skills, projects, and native Provider commands.
 - Change review with diff inspection, approve, and revert.
-- Provider, model, MCP, sandbox/permission, appearance, logs, data import/export, and channel settings.
-- Provider-isolated skill management.
+- Provider, model, sandbox/permission, appearance, logs, data import/export, and channel settings.
+- Plugins page: unified management of skills (Provider-isolated skill directory scanning with enable, disable, delete, and open-in-folder) and MCP servers.
 - Automation task management: configure schedule, Provider, model, project, skills, and delivery method; the local scheduler creates a new session for each run.
 
 ---
@@ -226,11 +222,13 @@ Channel config is stored in `.data/channels.json` and is best managed from the W
     "token": "",
     "baseUrl": "https://ilinkai.weixin.qq.com",
     "botType": "3",
-    "botAgent": "AnyBot/0.1.0",
+    "botAgent": "",
     "ownerChatId": ""
   }
 }
 ```
+
+When `weixin.botAgent` is left empty, it defaults to the current app version (for example, `AnyBot/1.0.0`).
 
 ### Feishu
 
@@ -269,9 +267,9 @@ The Web UI `/` picker shows skills, projects, and commands for the current Provi
 
 ## MCP Servers
 
-MCP Servers are managed under **Settings -> Providers -> MCP**, and their configuration is stored in `.data/app-settings.json`. AnyBot currently supports pasting an `mcpServers` JSON object or a single Server config containing `command` / `url`; supported types are `stdio`, `http`, and `sse`.
+MCP Servers are managed in the **Plugins** page's "MCP Servers" tab, and their configuration is stored in `.data/app-settings.json`. AnyBot currently supports pasting an `mcpServers` JSON object or a single Server config containing `command` / `url`; supported types are `stdio`, `http`, and `sse`.
 
-Enabled MCP Servers are checked on app startup. You can also refresh, recheck, view logs, disable, or delete them from settings. After verification, the same MCP configuration is passed to Codex and Claude Code: Codex receives Codex CLI `mcp_servers` config, while Claude Code receives Claude Agent SDK `mcpServers` config.
+Enabled MCP Servers are checked on app startup. You can also refresh, recheck, view logs, disable, or delete them from the Plugins page. After verification, the same MCP configuration is passed to Codex and Claude Code: Codex receives Codex CLI `mcp_servers` config, while Claude Code receives Claude Agent SDK `mcpServers` config.
 
 ---
 
@@ -279,8 +277,12 @@ Enabled MCP Servers are checked on app startup. You can also refresh, recheck, v
 
 AnyBot keeps a lightweight local API so scripts can push notifications to configured channel owners. Common uses include deployment results, scheduled task output, or local automation alerts.
 
+`/api` requires authentication: a random token is generated at startup and written to `.data/api-token` (override with `ANYBOT_API_TOKEN`). Local scripts can read it and pass it via the `Authorization: Bearer` header or the `?token=` query parameter.
+
 ```bash
+TOKEN=$(cat .data/api-token)
 curl -X POST http://localhost:19981/api/send \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"channel": "telegram", "message": "Deploy finished"}'
 ```
@@ -308,6 +310,8 @@ Common files:
 - `.data/model-config.json`: Provider and model selection.
 - `.data/runtime-config.json`: sandbox defaults.
 - `.data/channels.json`: channel config.
+- `.data/api-token`: local API auth token (mode 0600), used by local scripts calling `/api`.
+- `.data/proxy.json`: proxy configuration.
 - `.data/disabled-skills.json`: skill enabled state.
 - `.data/change-reviews/`: change review snapshots.
 - `.data/codex/`: isolated `CODEX_HOME` used by the Codex Responses compatibility layer, including Codex sessions and skills.
@@ -339,6 +343,7 @@ AnyBot/
 │   ├── automation-scheduler.ts     # Local automation scheduling, run history, delivery
 │   ├── app-settings.ts             # App settings
 │   ├── sandbox-config.ts           # Provider sandbox / permission settings
+│   ├── mcp-config.ts               # MCP config transformation (injected into Codex / Claude Code)
 │   ├── prompt.ts                   # Shared system prompt builder
 │   ├── shared.ts                   # Runtime config and path helpers
 │   ├── logger.ts                   # Structured logging

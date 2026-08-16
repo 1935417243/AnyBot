@@ -11,7 +11,7 @@ AnyBot 是一个本机 AI Coding Agent 控制台与远程入口，可以让你�
 
 AnyBot 默认使用随 `@openai/codex-sdk` 和 `@anthropic-ai/claude-agent-sdk` 提供的平台 native binary，不要求用户额外全局安装 `codex` 或 Claude Code；如果需要，也可以在设置中指定外部 CLI。Provider、模型映射、环境变量和 MCP 配置都保存在 AnyBot 内部。
 
-如果不想使用本机全局模型配置，可以在 AnyBot 内为 Codex / Claude Code 单独配置兼容接口和模型映射，接入 DeepSeek、Kimi、MiniMax、VibeAPI 或其它 Anthropic API 兼容服务。AnyBot 内配置只在 AnyBot 内生效，不会影响本机全局配置。
+如果不想使用本机全局模型配置，可以在 AnyBot 内为 Codex / Claude Code 单独配置兼容接口和模型映射，接入阿里 Token Plan、DeepSeek、Kimi、MiniMax、Ollama（本地）、VibeAPI 或其它 Anthropic API 兼容服务。AnyBot 内配置只在 AnyBot 内生效，不会影响本机全局配置。
 
 桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
 
@@ -21,10 +21,10 @@ AnyBot 默认使用随 `@openai/codex-sdk` 和 `@anthropic-ai/claude-agent-sdk` 
 
 - **多 Provider**：支持 Codex SDK/CLI 和 Claude Code，可在 Web UI 或频道命令中切换 Provider 和模型。
 - **兼容模型接入**：支持 Codex Responses 适配层和 Claude Code Anthropic 兼容接口，可在 AnyBot 内配置 Base URL、API Key 和模型映射。
-- **MCP 服务器**：可在设置中手动添加、启用、禁用、检查和查看 MCP Server 日志。
+- **MCP 服务器**：在插件页手动添加、启用、禁用、检查和查看 MCP Server 日志，校验通过后同一份配置注入 Codex 和 Claude Code。
 - **Agent Web UI**：本地聊天界面，支持 Markdown、代码高亮、流式 Agent 事件、停止响应、上下文压缩和会话历史。
-- **项目工作区**：在侧边栏管理项目，项目会话会把项目目录作为 Provider 工作目录；也支持在单轮消息中额外选择项目。
-- **技能入口**：Web UI 可浏览、启用、禁用、删除技能，并在输入框 `/` 菜单中按当前 Provider 展示可用技能和命令。
+- **项目工作区**：在侧边栏管理项目，支持从 Git 仓库克隆项目、查看和切换分支、清空工作区；项目会话会把项目目录作为 Provider 工作目录，也支持在单轮消息中额外选择项目。
+- **技能与插件页**：侧边栏「插件」页集中管理技能和 MCP 服务器；技能按 Provider 隔离，可浏览、启用、禁用、删除，并在输入框 `/` 菜单中按当前 Provider 展示可用技能和命令。
 - **附件上传**：Web UI 支持按钮、粘贴图片和拖拽上传，单文件上限 50MB；图片能力取决于当前 Provider。
 - **变更审核**：Agent 修改文件后生成变更快照，可在 Web UI 中查看 diff、通过或撤销。
 - **多频道接入**：支持飞书长连接、钉钉 Stream、QQ Bot WebSocket、Telegram 长轮询和个人微信通道。
@@ -36,17 +36,13 @@ AnyBot 默认使用随 `@openai/codex-sdk` 和 `@anthropic-ai/claude-agent-sdk` 
 
 ## 截图预览
 
-| 新对话 | 自动化 |
-|:---:|:---:|
-| ![新对话](assets/主页.png) | ![自动化](assets/自动化.png) |
+![新对话](assets/主页.png)
 
-| 频道 |
-|:---:|
-| ![频道](assets/频道页.png) |
+![自动化](assets/自动化.png)
 
-| 设置 |
-|:---:|
-| ![设置](assets/设置页.png) |
+![频道](assets/频道页.png)
+
+![设置](assets/设置页.png)
 
 ---
 
@@ -139,7 +135,7 @@ Provider 和模型选择会在 Web UI 中保存；每个 Provider 会记住上�
 
 ## 兼容模型支持
 
-AnyBot 可以在设置页为 Codex 和 Claude Code 单独配置 Anthropic API 兼容服务。当前内置 Base URL 建议项包括 DeepSeek、Kimi、MiniMax 和 VibeAPI；也可以手动填写其它兼容服务地址。
+AnyBot 可以在设置页为 Codex 和 Claude Code 单独配置 Anthropic API 兼容服务。当前内置 Base URL 建议项包括阿里 Token Plan、DeepSeek、Kimi、MiniMax、Ollama（本地）和 VibeAPI；也可以手动填写其它兼容服务地址。
 
 Codex 通过 **Responses 适配层** 接入兼容服务。开启后，Codex Provider 会使用 AnyBot 内置的兼容服务配置和模型映射，并使用独立 `CODEX_HOME`，不影响用户全局 `~/.codex` 配置。
 
@@ -161,14 +157,14 @@ Claude Code 通过 **Anthropic 兼容接口** 接入兼容服务。开启后，C
 Web UI 是当前推荐入口，主要能力包括：
 
 - 多会话历史和 SQLite 持久化。
-- 项目管理、项目会话、目录树和默认工作目录设置。
+- 项目管理、项目会话、目录树、Git 仓库克隆与分支切换、默认工作目录设置。
 - Markdown 渲染、代码复制、长消息折叠、上下文用量展示。
 - Agent 流式过程展示、取消响应、`/compact` 上下文压缩。
 - 文件上传、图片预览、本地图片访问。
 - Slash picker：按当前 Provider 展示技能、项目和 Provider 原生命令。
 - 变更审核：展示 Agent 改动 diff，支持通过或撤销。
-- Provider、模型、MCP、Sandbox/权限、应用外观、日志、数据导入导出和频道配置。
-- 技能管理：按 Provider 隔离扫描技能目录，支持启用、禁用、删除和打开文件夹。
+- Provider、模型、Sandbox/权限、应用外观、日志、数据导入导出和频道配置。
+- 插件页：集中管理技能（按 Provider 隔离扫描技能目录，支持启用、禁用、删除和打开文件夹）和 MCP 服务器。
 - 自动化任务管理：配置触发时间、Provider、模型、项目、技能和交付方式；本地调度器会按配置新建会话并执行任务。
 
 ---
@@ -226,11 +222,13 @@ Web UI 是当前推荐入口，主要能力包括：
     "token": "",
     "baseUrl": "https://ilinkai.weixin.qq.com",
     "botType": "3",
-    "botAgent": "AnyBot/0.1.0",
+    "botAgent": "",
     "ownerChatId": ""
   }
 }
 ```
+
+`weixin.botAgent` 留空时默认按当前应用版本生成（例如 `AnyBot/1.0.0`）。
 
 ### 飞书
 
@@ -269,9 +267,9 @@ Web UI 的 `/` 入口会按当前 Provider 展示可用技能、项目和命令�
 
 ## MCP 服务器
 
-MCP Server 在 **设置 -> 提供商 -> MCP** 中管理，配置保存在 `.data/app-settings.json`。当前支持粘贴 `mcpServers` JSON，或包含 `command` / `url` 的单个 Server 配置；支持 `stdio`、`http` 和 `sse` 类型。
+MCP Server 在侧边栏 **插件** 页的「MCP 服务器」tab 中管理，配置保存在 `.data/app-settings.json`。当前支持粘贴 `mcpServers` JSON，或包含 `command` / `url` 的单个 Server 配置；支持 `stdio`、`http` 和 `sse` 类型。
 
-启用的 MCP Server 会在应用启动时校验，也可以在设置页手动刷新、重新检查、查看日志、禁用或删除。校验通过后，同一份 MCP 配置会传给 Codex 和 Claude Code；Codex 会转换为 Codex CLI 的 `mcp_servers` 配置，Claude Code 会转换为 Claude Agent SDK 的 `mcpServers` 配置。
+启用的 MCP Server 会在应用启动时校验，也可以在插件页手动刷新、重新检查、查看日志、禁用或删除。校验通过后，同一份 MCP 配置会传给 Codex 和 Claude Code；Codex 会转换为 Codex CLI 的 `mcp_servers` 配置，Claude Code 会转换为 Claude Agent SDK 的 `mcpServers` 配置。
 
 ---
 
@@ -279,8 +277,12 @@ MCP Server 在 **设置 -> 提供商 -> MCP** 中管理，配置保存在 `.data
 
 AnyBot 保留了轻量本地 API，方便脚本把通知推送到已配置 Owner 的频道。常见用法是发送部署结果、定时任务结果或本机自动化提醒。
 
+`/api` 需要鉴权：启动时生成随机 token 写入 `.data/api-token`（可用 `ANYBOT_API_TOKEN` 覆盖），本机脚本可读取后通过 `Authorization: Bearer` 头或 `?token=` 查询参数携带。
+
 ```bash
+TOKEN=$(cat .data/api-token)
 curl -X POST http://localhost:19981/api/send \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"channel": "telegram", "message": "部署完成"}'
 ```
@@ -308,6 +310,8 @@ curl -X POST http://localhost:19981/api/send \
 - `.data/model-config.json`：Provider 与模型选择。
 - `.data/runtime-config.json`：Sandbox/权限默认值。
 - `.data/channels.json`：频道配置。
+- `.data/api-token`：本机 API 鉴权 token（mode 0600），供本机脚本调用 `/api` 使用。
+- `.data/proxy.json`：代理配置。
 - `.data/disabled-skills.json`：技能启用状态。
 - `.data/change-reviews/`：变更审核快照。
 - `.data/codex/`：开启 Codex Responses 适配层后的隔离 `CODEX_HOME`，包含 Codex 会话和技能数据。
@@ -339,6 +343,7 @@ AnyBot/
 │   ├── automation-scheduler.ts     # 本地自动化调度、运行记录和结果交付
 │   ├── app-settings.ts             # 应用设置读写
 │   ├── sandbox-config.ts           # Provider sandbox / 权限模式配置
+│   ├── mcp-config.ts               # MCP 配置转换（注入 Codex / Claude Code）
 │   ├── prompt.ts                   # 共享系统提示词构建
 │   ├── shared.ts                   # 共享运行配置、ID 和路径辅助
 │   ├── logger.ts                   # 结构化日志
