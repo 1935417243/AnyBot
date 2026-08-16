@@ -42,7 +42,6 @@ export function createHomeHero(options) {
             return;
         }
         picker.hidden = false;
-        if (chip) chip.classList.toggle('home-project-chip--none', !project);
         if (chipNameEl) chipNameEl.textContent = project ? project.name : NO_PROJECT_LABEL;
         if (chip) chip.title = project ? (project.path || project.name) : NO_PROJECT_LABEL;
     }
