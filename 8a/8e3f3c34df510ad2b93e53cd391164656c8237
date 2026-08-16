@@ -1,0 +1,26 @@
+src/web/public/scripts/app/app/create-app.js
+  h_7a561dec792e5b 271-279,448-450,692-694
+src/web/public/scripts/app/chat/file-reference-picker.js
+  h_7a561dec792e5b 203-210,212
+src/web/public/scripts/app/chat/home-hero.js
+  h_7a561dec792e5b 5,39,45-65,73-78,80
+src/web/public/scripts/app/chat/send-message.js
+  h_7a561dec792e5b 3-8,112-119
+src/web/public/scripts/app/chat/session-controller.js
+  h_7a561dec792e5b 15-16,26-29,31-33,35-42,51-59,61-111,417
+src/web/public/styles/chat.css
+  h_7a561dec792e5b 585-595
+src/web/routes/files.ts
+  h_7a561dec792e5b 165-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "8a8e3f3c34df510ad2b93e53cd391164656c8237",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
