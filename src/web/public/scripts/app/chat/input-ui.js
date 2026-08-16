@@ -56,6 +56,11 @@ export function createChatInputUiController(options) {
     }
 
     function resizeChatInput() {
+        if (inputEl.value === '') {
+            inputEl.style.height = '';
+            inputEl.style.overflowY = 'hidden';
+            return;
+        }
         inputEl.style.height = 'auto';
         inputEl.style.overflowY = inputEl.scrollHeight > maxInputHeight ? 'auto' : 'hidden';
         inputEl.style.height = Math.min(inputEl.scrollHeight, maxInputHeight) + 'px';

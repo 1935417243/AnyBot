@@ -26,6 +26,17 @@ export function getAppDom(documentRef) {
         modelDropdown: byId(documentRef, 'model-dropdown'),
         currentModelNameEl: byId(documentRef, 'current-model-name'),
 
+        permissionSwitcher: byId(documentRef, 'permission-switcher'),
+        permissionBadge: byId(documentRef, 'permission-badge'),
+        permissionName: byId(documentRef, 'permission-name'),
+        permissionDropdown: byId(documentRef, 'permission-dropdown'),
+
+        homeHero: byId(documentRef, 'home-hero'),
+        homeProjectPicker: byId(documentRef, 'home-project-picker'),
+        homeProjectChip: byId(documentRef, 'home-project-chip'),
+        homeProjectChipName: byId(documentRef, 'home-project-chip-name'),
+        homeProjectDropdown: byId(documentRef, 'home-project-dropdown'),
+
         settingsBtn: byId(documentRef, 'settings-btn'),
         sidebarUpdateBtn: byId(documentRef, 'sidebar-update-btn'),
         settingsView: byId(documentRef, 'settings-view'),

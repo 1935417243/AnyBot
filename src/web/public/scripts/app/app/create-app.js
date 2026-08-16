@@ -7,6 +7,8 @@ import { createInputHistoryController } from '../chat/input-history.js';
 import { createChatInputUiController } from '../chat/input-ui.js';
 import { createMessageListController } from '../chat/message-list-controller.js';
 import { createMessageMetaController } from '../chat/message-meta.js';
+import { createPermissionMode } from '../chat/permission-mode.js';
+import { createHomeHero } from '../chat/home-hero.js';
 import { createSendMessageController } from '../chat/send-message.js';
 import { createSessionController } from '../chat/session-controller.js';
 import { createSlashItemsStore } from '../chat/slash-items-store.js';
@@ -65,6 +67,15 @@ export function createAnyBotApp(dom, deps) {
         modelBadge,
         modelDropdown,
         currentModelNameEl,
+        permissionSwitcher,
+        permissionBadge,
+        permissionName,
+        permissionDropdown,
+        homeHero,
+        homeProjectPicker,
+        homeProjectChip,
+        homeProjectChipName,
+        homeProjectDropdown,
         settingsBtn,
         sidebarUpdateBtn,
         settingsView,
@@ -160,6 +171,8 @@ export function createAnyBotApp(dom, deps) {
     let viewRouter = null;
     let attachmentController = null;
     let inputHistoryController = null;
+    let permissionModeController = null;
+    let homeHeroController = null;
     let appEventsBound = false;
     let pendingAttachments = [];
     const toastController = createToastController({ documentRef: documentRef });
@@ -231,6 +244,35 @@ export function createAnyBotApp(dom, deps) {
         },
     });
 
+    permissionModeController = createPermissionMode({
+        switcher: permissionSwitcher,
+        badge: permissionBadge,
+        nameEl: permissionName,
+        dropdown: permissionDropdown,
+        onChanged: function () {
+            if (settingsController) return settingsController.fetchSandboxConfig();
+        },
+        onError: showError,
+    });
+
+    homeHeroController = createHomeHero({
+        hero: homeHero,
+        picker: homeProjectPicker,
+        chip: homeProjectChip,
+        chipNameEl: homeProjectChipName,
+        dropdown: homeProjectDropdown,
+        getActiveProjectId: function () {
+            return sidebarController ? sidebarController.getActiveProjectId() : null;
+        },
+        getProjects: function () {
+            return sidebarController ? sidebarController.getProjects() : [];
+        },
+        selectProject: function (projectId) {
+            requireSidebarController().selectProject(projectId);
+            return requireSessionController().createNewChat(projectId);
+        },
+    });
+
     settingsController = createSettingsController({
         addProjectBtn: addProjectBtn,
         createNewChat: function (projectId, chatOptions) {
@@ -258,6 +300,9 @@ export function createAnyBotApp(dom, deps) {
         modelBadge: modelBadge,
         modelDropdown: modelDropdown,
         modelSwitcher: modelSwitcher,
+        onSandboxChanged: function (sandbox) {
+            if (permissionModeController) permissionModeController.setMode(sandbox);
+        },
         settingsAboutVersion: settingsAboutVersion,
         settingsCancelBtn: settingsCancelBtn,
         settingsClearHistoryBtn: settingsClearHistoryBtn,
@@ -517,13 +562,18 @@ export function createAnyBotApp(dom, deps) {
 
     messageListController = createMessageListController({
         attachMessageMeta: messageMetaController.attachMessageMeta,
+        chatViewEl: chatView,
         copyCode: copyCode,
         getCurrentSessionId: function () {
             return sessionController ? sessionController.getCurrentSessionId() : null;
         },
+        homeHeroEl: homeHero,
         imageExts: IMAGE_EXTS,
         largeMessagePreviewChars: LARGE_MESSAGE_PREVIEW_CHARS,
         messagesEl: messagesEl,
+        onShowHome: function () {
+            if (homeHeroController) homeHeroController.syncChip();
+        },
         openImageModal: openImageModal,
         prependInputHistoryMessages: function (messages, hasMoreMessages) {
             return requireInputHistoryController().prependMessages(messages, hasMoreMessages);
@@ -606,6 +656,7 @@ export function createAnyBotApp(dom, deps) {
         sessionMessagePageSize: SESSION_MESSAGE_PAGE_SIZE,
         setActiveProjectId: function (projectId) {
             requireSidebarController().setActiveProjectId(projectId);
+            if (homeHeroController) homeHeroController.syncChip();
         },
         setSendButtonDisabled: function (value) {
             sendBtn.disabled = value;
@@ -911,6 +962,8 @@ export function createAnyBotApp(dom, deps) {
             if (filePicker.isOpen() && filePickerEl && e.target !== inputEl && !filePickerEl.contains(e.target)) {
                 closeFilePicker();
             }
+            if (permissionModeController) permissionModeController.handleDocumentClick(e);
+            if (homeHeroController) homeHeroController.handleDocumentClick(e);
             requireSettingsController().handleDocumentClick(e);
         });
 
@@ -928,6 +981,8 @@ export function createAnyBotApp(dom, deps) {
                     if (documentRef.activeElement === inputEl) inputEl.focus();
                     return;
                 }
+                if (permissionModeController && permissionModeController.handleEscape()) return;
+                if (homeHeroController && homeHeroController.handleEscape()) return;
                 if (requireSettingsController().handleDocumentEscape(e)) return;
             }
         });
@@ -953,6 +1008,7 @@ export function createAnyBotApp(dom, deps) {
             settings.fetchSandboxConfig(),
             settings.fetchAppSettings(),
             settings.fetchProxyConfig(),
+            permissionModeController ? permissionModeController.refresh() : Promise.resolve(),
         ]);
         settings.startDesktopUpdateStatusRefresh();
         var initialSessions = sidebar.getSessions();

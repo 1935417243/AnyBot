@@ -16,8 +16,8 @@ export function createMessageRenderer(config) {
     var USER_MESSAGE_COLLAPSE_CHARS = 500;
 
     function clearEmpty() {
-        var empty = document.getElementById('empty-state');
-        if (empty) empty.remove();
+        if (config.chatViewEl) config.chatViewEl.classList.remove('chat-view--home');
+        if (config.homeHeroEl) config.homeHeroEl.hidden = true;
     }
 
     function renderAssistantText(content, text) {
@@ -31,12 +31,10 @@ export function createMessageRenderer(config) {
     }
 
     function showEmptyState() {
-        config.messagesEl.innerHTML =
-            '<div id="empty-state">' +
-            '<div class="empty-icon">Ab</div>' +
-            '<div class="empty-title">AnyBot 已就绪</div>' +
-            '<div class="empty-sub">输入你的需求，我来帮你处理</div>' +
-            '</div>';
+        config.messagesEl.innerHTML = '';
+        if (config.chatViewEl) config.chatViewEl.classList.add('chat-view--home');
+        if (config.homeHeroEl) config.homeHeroEl.hidden = false;
+        if (config.onShowHome) config.onShowHome();
     }
 
     function appendMessage(role, text, attachments, changeReview, opts) {

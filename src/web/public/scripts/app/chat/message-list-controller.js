@@ -12,6 +12,9 @@ export function createMessageListController(config) {
 
     var messageRenderer = createMessageRenderer({
         messagesEl: messagesEl,
+        chatViewEl: config.chatViewEl,
+        homeHeroEl: config.homeHeroEl,
+        onShowHome: config.onShowHome,
         largeMessagePreviewChars: config.largeMessagePreviewChars,
         imageExts: config.imageExts,
         renderMarkdown: config.renderMarkdown,

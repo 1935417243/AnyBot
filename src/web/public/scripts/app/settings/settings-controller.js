@@ -1022,6 +1022,7 @@ export function createSettingsController(options) {
             sandboxConfig = await res.json();
             selectedSandbox = sandboxConfig.defaultSandbox;
             renderSandboxOptions();
+            if (options.onSandboxChanged) options.onSandboxChanged(selectedSandbox);
             return true;
         } catch (e) {
             showError('保存权限配置失败');
