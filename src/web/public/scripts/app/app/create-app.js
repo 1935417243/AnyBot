@@ -1,4 +1,5 @@
 import { createAttachmentController } from '../chat/attachments.js';
+import { createBranchSwitcher } from '../chat/branch-switcher.js';
 import { createAutomationsPageController } from '../automations/automations-page.js';
 import { createContextUsageController, formatTokenCount } from '../chat/context-usage.js';
 import { createFileReferencePickerController } from '../chat/file-reference-picker.js';
@@ -71,6 +72,10 @@ export function createAnyBotApp(dom, deps) {
         permissionBadge,
         permissionName,
         permissionDropdown,
+        branchSwitcher,
+        branchBadge,
+        branchName,
+        branchDropdown,
         homeHero,
         homeProjectPicker,
         homeProjectChip,
@@ -174,6 +179,7 @@ export function createAnyBotApp(dom, deps) {
     let attachmentController = null;
     let inputHistoryController = null;
     let permissionModeController = null;
+    let branchSwitcherController = null;
     let homeHeroController = null;
     let appEventsBound = false;
     let pendingAttachments = [];
@@ -251,6 +257,20 @@ export function createAnyBotApp(dom, deps) {
         badge: permissionBadge,
         nameEl: permissionName,
         dropdown: permissionDropdown,
+        onError: showError,
+    });
+
+    branchSwitcherController = createBranchSwitcher({
+        switcher: branchSwitcher,
+        badge: branchBadge,
+        nameEl: branchName,
+        dropdown: branchDropdown,
+        getCurrentSessionId: function () {
+            return sessionController ? sessionController.getCurrentSessionId() : null;
+        },
+        getActiveProjectId: function () {
+            return sidebarController ? sidebarController.getActiveProjectId() : null;
+        },
         onError: showError,
     });
 
@@ -634,6 +654,9 @@ export function createAnyBotApp(dom, deps) {
         removeSessionSummary: function (id) {
             requireSidebarController().removeSessionSummary(id);
         },
+        refreshBranchSwitcher: function () {
+            if (branchSwitcherController) branchSwitcherController.refresh();
+        },
         renderSessionMessages: function (messages, hasMoreMessages) {
             return requireMessageListController().renderSessionMessages(messages, hasMoreMessages);
         },
@@ -975,6 +998,7 @@ export function createAnyBotApp(dom, deps) {
                 closeFilePicker();
             }
             if (permissionModeController) permissionModeController.handleDocumentClick(e);
+            if (branchSwitcherController) branchSwitcherController.handleDocumentClick(e);
             if (homeHeroController) homeHeroController.handleDocumentClick(e);
             if (pluginsPageController) pluginsPageController.handleDocumentClick(e);
             requireSettingsController().handleDocumentClick(e);
@@ -995,6 +1019,7 @@ export function createAnyBotApp(dom, deps) {
                     return;
                 }
                 if (permissionModeController && permissionModeController.handleEscape()) return;
+                if (branchSwitcherController && branchSwitcherController.handleEscape()) return;
                 if (homeHeroController && homeHeroController.handleEscape()) return;
                 if (requireSettingsController().handleDocumentEscape(e)) return;
             }

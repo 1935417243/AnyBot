@@ -63,6 +63,7 @@ export function createSessionController(config) {
         currentSessionProjectId = targetProjectId;
         currentSessionProvider = currentProviderType || null;
         if (window.TaskDock) window.TaskDock.reset();
+        if (config.refreshBranchSwitcher) config.refreshBranchSwitcher();
         config.updateConversationHeaderTitle('新对话');
         currentSessionUpdatedAt = 0;
         currentNewestMessageId = 0;
@@ -360,6 +361,7 @@ export function createSessionController(config) {
 
             // 同会话静默重载保留 dock 实时状态（比落库回放更全）；切会话才清空重建
             if (window.TaskDock && !isSameSession) window.TaskDock.reset();
+            if (config.refreshBranchSwitcher) config.refreshBranchSwitcher();
             currentNewestMessageId = config.renderSessionMessages(data.messages || [], !!data.hasMoreMessages);
             await config.fetchModelConfig(currentSessionProvider);
             if (data.activeRun && data.activeRun.kind === 'compact') {
@@ -392,6 +394,7 @@ export function createSessionController(config) {
                 currentSessionUpdatedAt = 0;
                 currentNewestMessageId = 0;
                 if (window.TaskDock) window.TaskDock.reset();
+                if (config.refreshBranchSwitcher) config.refreshBranchSwitcher();
                 config.updateConversationHeaderTitle('新对话');
                 config.resetInputHistoryFromMessages([], false);
                 config.clearPromptSkills();

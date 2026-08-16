@@ -1585,6 +1585,135 @@
             line-height: 1.5;
         }
 
+        .branch-switcher {
+            position: relative;
+            flex: 0 0 auto;
+        }
+
+        .branch-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            height: 32px;
+            padding: 0 7px;
+            background: transparent;
+            border: 0;
+            border-radius: 7px;
+            color: var(--text-muted);
+            cursor: pointer;
+            outline: none;
+            transition: background 0.18s ease, color 0.18s ease;
+            user-select: none;
+            font-family: 'Sora', sans-serif;
+        }
+
+        .branch-badge:hover {
+            background: var(--subtle-hover);
+            color: var(--text);
+        }
+
+        .branch-badge:focus-visible {
+            background: var(--subtle-hover);
+        }
+
+        .branch-switcher.open .branch-badge {
+            background: var(--subtle-hover);
+            color: var(--text);
+        }
+
+        .branch-badge-icon {
+            flex-shrink: 0;
+            opacity: 0.72;
+        }
+
+        .branch-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: currentColor;
+            white-space: nowrap;
+        }
+
+        .branch-badge-arrow {
+            width: 13px;
+            height: 13px;
+            color: currentColor;
+            opacity: 0.72;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .branch-switcher.open .branch-badge-arrow {
+            transform: rotate(180deg);
+        }
+
+        .branch-dropdown {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 0;
+            width: min(240px, calc(100vw * var(--app-viewport-scale) - 48px));
+            max-height: min(320px, 50vh);
+            overflow-y: auto;
+            background: var(--popover-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 6px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(4px);
+            transition: all 0.18s ease;
+            z-index: 50;
+            box-shadow: 0 -8px 32px var(--popover-shadow);
+        }
+
+        .branch-switcher.open .branch-dropdown {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .branch-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            padding: 8px 10px;
+            border: 0;
+            border-radius: 10px;
+            background: transparent;
+            font-family: 'Sora', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.12s ease;
+        }
+
+        .branch-option:hover {
+            background: var(--sidebar-hover);
+        }
+
+        .branch-option.active {
+            color: var(--accent);
+        }
+
+        .branch-option-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .branch-option-check {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        .branch-option-check-placeholder {
+            width: 14px;
+            flex-shrink: 0;
+        }
+
         .skill-picker {
             position: absolute;
             left: 24px;

@@ -31,6 +31,11 @@ export function getAppDom(documentRef) {
         permissionName: byId(documentRef, 'permission-name'),
         permissionDropdown: byId(documentRef, 'permission-dropdown'),
 
+        branchSwitcher: byId(documentRef, 'branch-switcher'),
+        branchBadge: byId(documentRef, 'branch-badge'),
+        branchName: byId(documentRef, 'branch-name'),
+        branchDropdown: byId(documentRef, 'branch-dropdown'),
+
         homeHero: byId(documentRef, 'home-hero'),
         homeProjectPicker: byId(documentRef, 'home-project-picker'),
         homeProjectChip: byId(documentRef, 'home-project-chip'),

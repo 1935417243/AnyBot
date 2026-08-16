@@ -7,6 +7,7 @@ import { createDataRouter } from "./routes/data.js";
 import { createDesktopUpdateRouter } from "./routes/desktop-update.js";
 import { createEventsRouter } from "./routes/events.js";
 import { createFilesRouter } from "./routes/files.js";
+import { createGitRouter } from "./routes/git.js";
 import { createMessagesRouter } from "./routes/messages.js";
 import { createMcpRouter } from "./routes/mcp.js";
 import { createProjectsRouter } from "./routes/projects.js";
@@ -36,6 +37,7 @@ export function createApiRouter(): Router {
   router.use(createChangeReviewsRouter());
   router.use(createSendRouter());
   router.use(createFilesRouter());
+  router.use(createGitRouter());
   router.use(createMessagesRouter());
 
   return router;
