@@ -40,9 +40,9 @@ The desktop app supports **macOS** and **Windows**; running from source supports
 |:---:|:---:|
 | ![New Chat](assets/主页.png) | ![Automations](assets/自动化.png) |
 
-| Skills | Channels |
-|:---:|:---:|
-| ![Skills](assets/技能页.png) | ![Channels](assets/频道页.png) |
+| Channels |
+|:---:|
+| ![Channels](assets/频道页.png) |
 
 | Settings |
 |:---:|

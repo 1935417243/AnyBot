@@ -40,9 +40,9 @@ AnyBot 默认使用随 `@openai/codex-sdk` 和 `@anthropic-ai/claude-agent-sdk` 
 |:---:|:---:|
 | ![新对话](assets/主页.png) | ![自动化](assets/自动化.png) |
 
-| 技能 | 频道 |
-|:---:|:---:|
-| ![技能](assets/技能页.png) | ![频道](assets/频道页.png) |
+| 频道 |
+|:---:|
+| ![频道](assets/频道页.png) |
 
 | 设置 |
 |:---:|
