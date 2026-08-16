@@ -1,0 +1,28 @@
+src/providers/claude-code-agent-events.ts
+  h_7a561dec792e5b 119-126,198-230
+src/providers/claude-code.ts
+  h_7a561dec792e5b 33,532-533
+src/web/agent-stream.ts
+  h_7a561dec792e5b 15-16,175-187,239-241,283-285
+src/web/public/scripts/agent-loop.js
+  h_7a561dec792e5b 614-616,1020
+src/web/public/scripts/app/chat/session-controller.js
+  h_7a561dec792e5b 65,360,392
+src/web/public/scripts/app/chat/task-dock.js
+  h_7a561dec792e5b 1-366
+src/web/public/scripts/app/main.js
+  h_7a561dec792e5b 4,10
+src/web/public/styles/chat.css
+  h_7a561dec792e5b 1296-1445
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d7c16a9f6c2ff73438dbadb98117de0e6d4bff66",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
