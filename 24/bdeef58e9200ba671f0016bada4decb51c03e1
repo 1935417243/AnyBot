@@ -1,0 +1,14 @@
+src/web/public/index.html
+  h_7a561dec792e5b 90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "24bdeef58e9200ba671f0016bada4decb51c03e1",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
