@@ -1,0 +1,18 @@
+.gitignore
+  h_7a561dec792e5b 14-15
+src/web/public/index.html
+  h_7a561dec792e5b 42
+src/web/public/styles/sidebar.css
+  h_7a561dec792e5b 39,48-49,79-80,85-86,88,95-96,98,101-106,113-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "3f63f3cf8861ef49c46913a7ab39cbb0a31cd388",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
