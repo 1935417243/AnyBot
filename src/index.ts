@@ -269,6 +269,15 @@ function shutdown(signal: string, exitCode = 0): void {
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
+// Last-resort safety net: a single bad message or failed write must not take
+// down the whole service (channels, web UI, scheduler).
+process.on("uncaughtException", (error) => {
+  logger.error("process.uncaught_exception", { error });
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error("process.unhandled_rejection", { error: reason });
+});
+
 async function main(): Promise<void> {
   exitWhenDesktopParentDies();
 

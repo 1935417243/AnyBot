@@ -84,7 +84,9 @@ export class FeishuChannel implements IChannel {
           content: string;
           mentions?: Array<{ id?: { open_id?: string } }>;
         };
-      }) => this.handleMessage(event),
+      }) => this.handleMessage(event).catch((error) => {
+        logger.error("feishu.handle_message_failed", { error });
+      }),
     });
 
     await wsClient.start({ eventDispatcher: dispatcher });

@@ -23,6 +23,13 @@ let updateDownloadedDialogOpen = false;
 let isQuitting = false;
 let backendReady = false;
 let pendingShowHomeWindow = false;
+let backendStopIntentional = false;
+let backendRestartAttempts = 0;
+
+const BACKEND_RESTART_MAX_ATTEMPTS = 5;
+const BACKEND_RESTART_BASE_DELAY_MS = 1000;
+const BACKEND_RESTART_MAX_DELAY_MS = 30000;
+const BACKEND_RESTART_RESET_MS = 5 * 60 * 1000;
 
 const DEFAULT_WEB_PORT = 19981;
 const DEFAULT_DESKTOP_SETTINGS = {
@@ -747,10 +754,14 @@ async function startBackend() {
   backendProcess.stdout.on("data", (data) => writeLog("backend", data.toString().trim()));
   backendProcess.stderr.on("data", (data) => writeLog("backend:error", data.toString().trim()));
   backendProcess.on("exit", (code, signal) => {
+    const wasReady = backendReady;
     backendExitMessage = `Backend exited before the web server started (code=${code}, signal=${signal}).`;
     writeLog("backend", `exited code=${code} signal=${signal}`);
     backendProcess = null;
     backendReady = false;
+    if (wasReady && !backendStopIntentional && !isQuitting) {
+      scheduleBackendRestart();
+    }
   });
 
   await waitForServer(resolveWebPort(), 15000, () => {
@@ -762,6 +773,54 @@ async function startBackend() {
       ? `${backendExitMessage}\n\nLog file: ${logFilePath}`
       : backendExitMessage;
   });
+}
+
+function scheduleBackendRestart() {
+  backendRestartAttempts += 1;
+  if (backendRestartAttempts > BACKEND_RESTART_MAX_ATTEMPTS) {
+    writeLog("backend", "restart attempts exhausted; giving up");
+    const detail = "AnyBot 后端服务多次重启失败，请重启应用。";
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: "error",
+        buttons: ["确定"],
+        message: "AnyBot 后端服务异常退出",
+        detail,
+      }).catch(() => {});
+    } else {
+      dialog.showErrorBox("AnyBot 后端服务异常退出", detail);
+    }
+    return;
+  }
+
+  const delayMs = Math.min(
+    BACKEND_RESTART_BASE_DELAY_MS * 2 ** (backendRestartAttempts - 1),
+    BACKEND_RESTART_MAX_DELAY_MS,
+  );
+  writeLog("backend", `restarting in ${delayMs}ms (attempt ${backendRestartAttempts}/${BACKEND_RESTART_MAX_ATTEMPTS})`);
+
+  setTimeout(() => {
+    if (isQuitting || backendProcess) {
+      return;
+    }
+    startBackend()
+      .then(() => {
+        backendReady = true;
+        writeLog("backend", "restarted successfully");
+        // Only count rapid crash loops; a backend that stays healthy for a
+        // while resets the attempt budget.
+        setTimeout(() => {
+          backendRestartAttempts = 0;
+        }, BACKEND_RESTART_RESET_MS).unref();
+        if (mainWindow) {
+          mainWindow.loadURL(getAppUrl());
+        }
+      })
+      .catch((error) => {
+        writeLog("backend:error", error.stack || String(error));
+        scheduleBackendRestart();
+      });
+  }, delayMs).unref();
 }
 
 function createMenu() {
@@ -941,6 +1000,7 @@ function stopBackend() {
     return;
   }
 
+  backendStopIntentional = true;
   backendProcess.kill("SIGTERM");
   backendProcess = null;
   backendReady = false;

@@ -190,14 +190,26 @@ function emit(level: LogLevel, message: string, context?: Record<string, unknown
   }
 }
 
+let lastWriteErrorWarnMs = 0;
+
 function writeLogFile(line: string): void {
-  mkdirSync(logDir, { recursive: true });
-  const now = new Date();
-  sweepExpiredLogs(now);
-  const currentLogDir = path.join(logDir, buildLogDayDirName(now));
-  mkdirSync(currentLogDir, { recursive: true });
-  const filePath = path.join(currentLogDir, buildLogFileName(now));
-  appendFileSync(filePath, `${line}\n`, "utf8");
+  try {
+    mkdirSync(logDir, { recursive: true });
+    const now = new Date();
+    sweepExpiredLogs(now);
+    const currentLogDir = path.join(logDir, buildLogDayDirName(now));
+    mkdirSync(currentLogDir, { recursive: true });
+    const filePath = path.join(currentLogDir, buildLogFileName(now));
+    appendFileSync(filePath, `${line}\n`, "utf8");
+  } catch (error) {
+    // The logger must never throw into callers (most catch blocks log);
+    // throttle the fallback warning to avoid a console storm on disk-full.
+    const nowMs = Date.now();
+    if (nowMs - lastWriteErrorWarnMs >= 60_000) {
+      lastWriteErrorWarnMs = nowMs;
+      console.error("logger.write_failed", error);
+    }
+  }
 }
 
 function sweepExpiredLogs(now: Date): void {

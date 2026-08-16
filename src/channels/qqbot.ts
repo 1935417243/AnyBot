@@ -152,48 +152,58 @@ export class QQBotChannel implements IChannel {
     });
 
     this.ws.on("message", (data: any) => {
-      const payloadString = data.toString();
-      let payload: any;
       try {
-          payload = JSON.parse(payloadString);
-      } catch (e) {
-          return;
-      }
-      
-      if (payload.s) {
-          this.lastSeq = payload.s;
-      }
+        const payloadString = data.toString();
+        let payload: any;
+        try {
+            payload = JSON.parse(payloadString);
+        } catch (e) {
+            return;
+        }
 
-      const op = payload.op;
-      const t = payload.t;
+        if (payload.s) {
+            this.lastSeq = payload.s;
+        }
 
-      if (op === 10) {
-        // Hello
-        const interval = payload.d.heartbeat_interval;
-        logger.info("qqbot.ws_hello", { heartbeatInterval: interval });
-        
-        // 发送 Identify, 请求公域与频道的普通消息以及私信
-        this.ws!.send(JSON.stringify({
-          op: 2,
-          d: {
-            token: `QQBot ${this.accessToken}`,
-            intents: (1 << 30) | (1 << 12) | (1 << 25), // PUBLIC_GUILD_MESSAGES, DIRECT_MESSAGE, GROUP_AND_C2C
-            shard: [0, 1]
+        const op = payload.op;
+        const t = payload.t;
+
+        if (op === 10) {
+          // Hello
+          const interval = payload.d?.heartbeat_interval;
+          if (typeof interval !== "number" || !Number.isFinite(interval) || interval <= 0) {
+            logger.warn("qqbot.ws_hello_invalid", { payload: payloadString.slice(0, 200) });
+            return;
           }
-        }));
+          logger.info("qqbot.ws_hello", { heartbeatInterval: interval });
 
-        this.heartbeatInterval = setInterval(() => {
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-              this.ws.send(JSON.stringify({ op: 1, d: this.lastSeq }));
-          }
-        }, interval);
-      } else if (op === 0 && t === "READY") {
-        logger.info("qqbot.started", { user: payload.d.user });
-      } else if (op === 0 && (t === "DIRECT_MESSAGE_CREATE" || t === "AT_MESSAGE_CREATE" || t === "GROUP_AT_MESSAGE_CREATE" || t === "C2C_MESSAGE_CREATE")) {
-        // 处理消息事件
-        this.handleMessage(payload.d, t);
-      } else if (op === 9) {
-        logger.error("qqbot.ws_invalid_session");
+          // 发送 Identify, 请求公域与频道的普通消息以及私信
+          this.ws!.send(JSON.stringify({
+            op: 2,
+            d: {
+              token: `QQBot ${this.accessToken}`,
+              intents: (1 << 30) | (1 << 12) | (1 << 25), // PUBLIC_GUILD_MESSAGES, DIRECT_MESSAGE, GROUP_AND_C2C
+              shard: [0, 1]
+            }
+          }));
+
+          this.heartbeatInterval = setInterval(() => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({ op: 1, d: this.lastSeq }));
+            }
+          }, interval);
+        } else if (op === 0 && t === "READY") {
+          logger.info("qqbot.started", { user: payload.d?.user });
+        } else if (op === 0 && (t === "DIRECT_MESSAGE_CREATE" || t === "AT_MESSAGE_CREATE" || t === "GROUP_AT_MESSAGE_CREATE" || t === "C2C_MESSAGE_CREATE")) {
+          // 处理消息事件
+          this.handleMessage(payload.d, t).catch((error) => {
+            logger.error("qqbot.handle_message_failed", { error, eventType: t });
+          });
+        } else if (op === 9) {
+          logger.error("qqbot.ws_invalid_session");
+        }
+      } catch (error) {
+        logger.error("qqbot.ws_message_error", { error });
       }
     });
 
