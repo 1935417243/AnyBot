@@ -1,0 +1,32 @@
+src/web/public/index.html
+  h_7a561dec792e5b 132-145,149-150,160-173,175-197
+src/web/public/scripts/app/app/create-app.js
+  h_7a561dec792e5b 10-11,70-78,174-175,247-275,303-305,565,570,574-576,659,965-966,984-985,1011
+src/web/public/scripts/app/app/dom.js
+  h_7a561dec792e5b 29-39
+src/web/public/scripts/app/chat/home-hero.js
+  h_7a561dec792e5b 1-106
+src/web/public/scripts/app/chat/input-ui.js
+  h_7a561dec792e5b 59-63
+src/web/public/scripts/app/chat/message-list-controller.js
+  h_7a561dec792e5b 15-17
+src/web/public/scripts/app/chat/message-renderer.js
+  h_7a561dec792e5b 19-20,34-37
+src/web/public/scripts/app/chat/permission-mode.js
+  h_7a561dec792e5b 1-133
+src/web/public/scripts/app/settings/settings-controller.js
+  h_7a561dec792e5b 1025
+src/web/public/styles/chat.css
+  h_7a561dec792e5b 413-432,436-438,442-443,446-453,457-490,494-552,554-593,1274,1276-1279,1281,1286-1429,1681-1682,1694,1699-1702,1714
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "25112bc3940dffa5809c6b0665252630cd23075e",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
