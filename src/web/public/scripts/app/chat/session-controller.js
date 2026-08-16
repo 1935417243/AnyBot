@@ -40,7 +40,7 @@ export function createSessionController(config) {
             } else {
                 config.updateConversationHeaderTitle('新对话');
             }
-            config.revealSessionContainer(targetProjectId);
+            config.revealSessionContainer(targetProjectId, { defer: options.deferSidebarReveal });
             config.renderHistory();
             config.renderProjects();
             config.updateSidebarSelection();
@@ -66,7 +66,7 @@ export function createSessionController(config) {
         currentSessionUpdatedAt = 0;
         currentNewestMessageId = 0;
         config.setActiveProjectId(currentSessionProjectId);
-        config.revealSessionContainer(currentSessionProjectId);
+        config.revealSessionContainer(currentSessionProjectId, { defer: options.deferSidebarReveal });
         config.showChatView();
         config.updateContextUsage(null);
         config.resetInputHistoryFromMessages([], false);

@@ -1244,7 +1244,9 @@ export function createSidebarController(options) {
         return true;
     }
 
-    function revealSessionContainer(projectId) {
+    function revealSessionContainer(projectId, options) {
+        // defer 时保持侧边栏现状（如首页 chip 切换项目），等发送消息创建会话后再展开
+        if (options && options.defer) return;
         if (projectId) {
             setProjectsCollapsed(false);
             expandProject(projectId);

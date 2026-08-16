@@ -269,14 +269,10 @@ export function createAnyBotApp(dom, deps) {
         },
         selectProject: function (projectId) {
             var sidebar = requireSidebarController();
-            if (projectId) {
-                sidebar.selectProject(projectId);
-            } else {
-                sidebar.setActiveProjectId(null);
-                sidebar.renderProjects();
-                sidebar.updateSelection();
-            }
-            return requireSessionController().createNewChat(projectId || null);
+            // 首页 chip 只切换选中项目，侧边栏项目在发送消息创建会话后才展开
+            sidebar.setActiveProjectId(projectId || null);
+            sidebar.updateSelection();
+            return requireSessionController().createNewChat(projectId || null, { deferSidebarReveal: true });
         },
     });
 
@@ -657,8 +653,8 @@ export function createAnyBotApp(dom, deps) {
         revealActiveSessionInSidebar: function () {
             requireSidebarController().revealActiveSession();
         },
-        revealSessionContainer: function (projectId) {
-            requireSidebarController().revealSessionContainer(projectId);
+        revealSessionContainer: function (projectId, opts) {
+            requireSidebarController().revealSessionContainer(projectId, opts);
         },
         scrollBottom: function (opts) {
             return requireMessageListController().scrollBottom(opts);
