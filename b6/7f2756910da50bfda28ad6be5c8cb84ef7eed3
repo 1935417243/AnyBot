@@ -1,0 +1,18 @@
+src/channels/index.ts
+  h_7a561dec792e5b 66-80,134-137
+src/index.ts
+  h_7a561dec792e5b 1,26,51,219,226-271,294
+src/web/active-runs.ts
+  h_7a561dec792e5b 43-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "b67f2756910da50bfda28ad6be5c8cb84ef7eed3",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
