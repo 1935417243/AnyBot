@@ -582,6 +582,17 @@
             text-overflow: ellipsis;
         }
 
+        .home-project-chip--none {
+            color: var(--text-muted);
+            border-style: dashed;
+        }
+
+        .home-project-divider {
+            height: 1px;
+            margin: 4px 6px;
+            background: var(--border);
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;

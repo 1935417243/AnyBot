@@ -268,8 +268,15 @@ export function createAnyBotApp(dom, deps) {
             return sidebarController ? sidebarController.getProjects() : [];
         },
         selectProject: function (projectId) {
-            requireSidebarController().selectProject(projectId);
-            return requireSessionController().createNewChat(projectId);
+            var sidebar = requireSidebarController();
+            if (projectId) {
+                sidebar.selectProject(projectId);
+            } else {
+                sidebar.setActiveProjectId(null);
+                sidebar.renderProjects();
+                sidebar.updateSelection();
+            }
+            return requireSessionController().createNewChat(projectId || null);
         },
     });
 
@@ -437,6 +444,9 @@ export function createAnyBotApp(dom, deps) {
         selectedFilesEl: selectedFilesEl,
         getCurrentSessionId: function () {
             return sessionController ? sessionController.getCurrentSessionId() : null;
+        },
+        getCurrentProjectId: function () {
+            return sessionController ? sessionController.getCurrentSessionProjectId() : null;
         },
         getCurrentView: function () {
             return getCurrentView();
@@ -679,6 +689,9 @@ export function createAnyBotApp(dom, deps) {
     sendMessageController = createSendMessageController({
         inputEl: inputEl,
         messagesEl: messagesEl,
+        ensureSession: function () {
+            return requireSessionController().ensureSession();
+        },
         getState: function () {
             var promptSelection = requireSlashPickerController().getSelection();
             var session = requireSessionController();

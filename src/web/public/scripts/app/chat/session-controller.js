@@ -12,6 +12,8 @@ export function createSessionController(config) {
     var currentSessionUpdatedAt = 0;
     var currentNewestMessageId = 0;
 
+    var ensureSessionPromise = null;
+
     async function createNewChat(projectId, options) {
         options = options || {};
         var targetProjectId = arguments.length > 0 ? projectId : config.getActiveProjectId();
@@ -21,59 +23,92 @@ export function createSessionController(config) {
         }
         var providerData = config.getProviderData();
         var currentProviderType = providerData && providerData.current;
-        var canReuseEmptySession =
+        var providerMatches = !currentProviderType || !currentSessionProvider || currentSessionProvider === currentProviderType;
+        var isViewingEmptySession = !!currentSessionId && !config.messagesEl.querySelector('.message-row');
+        var isSameDraft = !currentSessionId && currentSessionProjectId === targetProjectId;
+        var canReuseCurrentContext =
             !options.force &&
-            currentSessionId &&
-            currentSessionProjectId === targetProjectId &&
-            (!currentProviderType || currentSessionProvider === currentProviderType) &&
-            !config.messagesEl.querySelector('.message-row');
-        if (canReuseEmptySession) {
+            providerMatches &&
+            (isSameDraft || (isViewingEmptySession && currentSessionProjectId === targetProjectId));
+        if (canReuseCurrentContext) {
             config.setActiveProjectId(targetProjectId);
-            config.clearSessionModelSelection(currentSessionId);
-            var reusableSummary = config.findSessionSummary(currentSessionId);
-            config.updateConversationHeaderTitle(reusableSummary ? reusableSummary.title : '新对话');
+            if (currentSessionId) {
+                config.clearSessionModelSelection(currentSessionId);
+                var reusableSummary = config.findSessionSummary(currentSessionId);
+                config.updateConversationHeaderTitle(reusableSummary ? reusableSummary.title : '新对话');
+                config.revealActiveSessionInSidebar();
+            } else {
+                config.updateConversationHeaderTitle('新对话');
+            }
             config.revealSessionContainer(targetProjectId);
             config.renderHistory();
             config.renderProjects();
             config.updateSidebarSelection();
-            config.revealActiveSessionInSidebar();
             await config.fetchModelConfig(currentSessionProvider);
             config.inputEl.focus();
             return;
         }
-        try {
-            var res = await fetch('/api/sessions', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ projectId: targetProjectId }),
-            });
-            var data = await res.json();
-            if (!res.ok) throw new Error(data.error || '创建会话失败');
-            currentSessionId = data.id;
-            currentSessionProjectId = data.projectId || targetProjectId || null;
-            currentSessionProvider = data.provider || null;
-            config.updateConversationHeaderTitle(data.title);
-            currentSessionUpdatedAt = Number(data.updatedAt || Date.now());
-            currentNewestMessageId = 0;
-            config.setActiveProjectId(currentSessionProjectId);
-            config.revealSessionContainer(currentSessionProjectId);
-            config.showChatView();
-            config.updateContextUsage(null);
-            config.resetInputHistoryFromMessages([], false);
-            config.showEmptyState();
-            config.inputEl.value = '';
-            config.clearPromptSkills();
-            if (config.clearFileReferences) config.clearFileReferences();
-            config.resizeChatInput();
-            config.setSendButtonDisabled(true);
-            config.inputEl.focus();
-            await config.fetchModelConfig(currentSessionProvider);
-            await config.fetchSessions();
-            config.updateSidebarSelection();
-            config.revealActiveSessionInSidebar();
-        } catch (e) {
-            config.showError(e.message || '创建会话失败');
+        // 丢弃未发送的空会话，避免侧边栏残留「新对话」
+        var abandonedEmptySessionId = null;
+        if (isViewingEmptySession && currentSessionId) {
+            abandonedEmptySessionId = currentSessionId;
+            currentSessionId = null;
+            try {
+                await fetch('/api/sessions/' + abandonedEmptySessionId, { method: 'DELETE' });
+                if (config.removeSessionSummary) config.removeSessionSummary(abandonedEmptySessionId);
+            } catch (_) {}
         }
+        // 草稿模式：只设置前端状态，发送第一条消息时才真正创建会话
+        currentSessionId = null;
+        currentSessionProjectId = targetProjectId;
+        currentSessionProvider = currentProviderType || null;
+        config.updateConversationHeaderTitle('新对话');
+        currentSessionUpdatedAt = 0;
+        currentNewestMessageId = 0;
+        config.setActiveProjectId(currentSessionProjectId);
+        config.revealSessionContainer(currentSessionProjectId);
+        config.showChatView();
+        config.updateContextUsage(null);
+        config.resetInputHistoryFromMessages([], false);
+        config.showEmptyState();
+        config.inputEl.value = '';
+        config.clearPromptSkills();
+        if (config.clearFileReferences) config.clearFileReferences();
+        config.resizeChatInput();
+        config.setSendButtonDisabled(true);
+        config.inputEl.focus();
+        await config.fetchModelConfig(currentSessionProvider);
+        await config.fetchSessions();
+        config.updateSidebarSelection();
+        config.revealActiveSessionInSidebar();
+    }
+
+    function ensureSession() {
+        if (currentSessionId) return Promise.resolve(currentSessionId);
+        if (ensureSessionPromise) return ensureSessionPromise;
+        ensureSessionPromise = (async function () {
+            try {
+                var res = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ projectId: currentSessionProjectId }),
+                });
+                var data = await res.json();
+                if (!res.ok) throw new Error(data.error || '创建会话失败');
+                currentSessionId = data.id;
+                currentSessionProjectId = data.projectId || null;
+                currentSessionProvider = data.provider || null;
+                currentSessionUpdatedAt = Number(data.updatedAt || Date.now());
+                currentNewestMessageId = 0;
+                config.revealSessionContainer(currentSessionProjectId);
+                config.updateSidebarSelection();
+                await config.fetchSessions();
+                return currentSessionId;
+            } finally {
+                ensureSessionPromise = null;
+            }
+        })();
+        return ensureSessionPromise;
     }
 
     function stopActiveStreamSubscription() {
@@ -379,6 +414,7 @@ export function createSessionController(config) {
         clearActiveStreamForSession: clearActiveStreamForSession,
         createNewChat: createNewChat,
         deleteSession: deleteSession,
+        ensureSession: ensureSession,
         failActiveCompact: failActiveCompact,
         finishActiveCompact: finishActiveCompact,
         getActiveStreamSessionId: function () {

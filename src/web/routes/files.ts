@@ -162,6 +162,27 @@ export function createFilesRouter(): Router {
     }
   });
 
+  router.get("/files/mentions", async (req: Request, res: Response) => {
+    const raw = req.query.projectId;
+    const projectId = typeof raw === "string" && raw ? raw : null;
+    if (projectId && !db.getProject(projectId)) {
+      res.json({ files: [] });
+      return;
+    }
+
+    try {
+      const workdir = getSessionWorkdir({ projectId });
+      const files = await listMentionableFiles(workdir, {
+        allowWorkspaceScan: !projectId,
+        excludeDefaultWorkspaceDirs: !projectId,
+      });
+      res.json({ files });
+    } catch (error) {
+      logger.warn("web.files.mention_list_failed", { projectId, error });
+      res.json({ files: [] });
+    }
+  });
+
   router.get("/sessions/:id/files/mentions", async (req: Request, res: Response) => {
     const session = db.getSessionMetadata(req.params.id as string);
     if (!session) {

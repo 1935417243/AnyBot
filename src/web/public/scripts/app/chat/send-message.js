@@ -1,5 +1,11 @@
 export function createSendMessageController(config) {
     async function sendMessage() {
+        try {
+            await config.ensureSession();
+        } catch (e) {
+            config.showError(e.message || '创建会话失败');
+            return;
+        }
         var outgoing = collectOutgoingMessage();
         if (!outgoing) return;
 
@@ -103,6 +109,14 @@ export function createSendMessageController(config) {
     function sendProviderCommand(commandText) {
         var normalizedCommand = normalizeProviderCommandText(commandText);
         if (!normalizedCommand) return false;
+        if (!config.getState().currentSessionId) {
+            // 草稿态：先落库再执行命令，保持同步布尔返回契约
+            Promise.resolve()
+                .then(function () { return config.ensureSession(); })
+                .then(function () { sendProviderCommand(normalizedCommand); })
+                .catch(function (e) { config.showError(e.message || '创建会话失败'); });
+            return true;
+        }
         if (isCompactCommand(normalizedCommand)) {
             var compactOutgoing = collectOutgoingMessage({ text: '/compact' });
             if (!compactOutgoing) return true;

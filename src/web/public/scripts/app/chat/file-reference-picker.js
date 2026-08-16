@@ -200,9 +200,16 @@ export function createFileReferencePickerController(config) {
 
     async function fetchFiles() {
         var sessionId = config.getCurrentSessionId();
-        if (!sessionId) return [];
+        var url;
+        if (sessionId) {
+            url = '/api/sessions/' + encodeURIComponent(sessionId) + '/files/mentions';
+        } else {
+            // 草稿态：会话尚未创建，按当前项目取文件列表
+            var projectId = config.getCurrentProjectId ? config.getCurrentProjectId() : null;
+            url = '/api/files/mentions' + (projectId ? '?projectId=' + encodeURIComponent(projectId) : '');
+        }
         try {
-            var res = await fetch('/api/sessions/' + encodeURIComponent(sessionId) + '/files/mentions');
+            var res = await fetch(url);
             if (!res.ok) throw new Error('HTTP ' + res.status);
             var data = await res.json();
             return normalizeFiles(data && data.files);
