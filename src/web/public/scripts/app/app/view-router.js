@@ -21,10 +21,6 @@ export function createViewRouter(options) {
         options.skillsView.style.display = 'none';
         options.automationView.style.display = 'none';
         options.settingsView.style.display = 'none';
-        options.newChatBtn.classList.remove('active');
-        options.channelsBtn.classList.remove('active');
-        options.skillsBtn.classList.remove('active');
-        options.automationsBtn.classList.remove('active');
         options.settingsBtn.classList.remove('active');
     }
 
@@ -32,7 +28,6 @@ export function createViewRouter(options) {
         hideAllViews();
         currentView = 'chat';
         options.chatView.style.display = 'flex';
-        options.newChatBtn.classList.add('active');
         renderHistory();
         renderProjects();
     }
@@ -41,7 +36,6 @@ export function createViewRouter(options) {
         hideAllViews();
         currentView = 'channels';
         options.channelView.style.display = 'flex';
-        options.channelsBtn.classList.add('active');
         renderHistory();
         if (options.renderChannelsPage) options.renderChannelsPage();
     }
@@ -50,7 +44,6 @@ export function createViewRouter(options) {
         hideAllViews();
         currentView = 'skills';
         options.skillsView.style.display = 'flex';
-        options.skillsBtn.classList.add('active');
         renderHistory();
         if (options.renderSkillsPage) options.renderSkillsPage();
     }
@@ -59,7 +52,6 @@ export function createViewRouter(options) {
         hideAllViews();
         currentView = 'automations';
         options.automationView.style.display = 'flex';
-        options.automationsBtn.classList.add('active');
         renderHistory();
         if (options.renderAutomationsPage) options.renderAutomationsPage();
     }

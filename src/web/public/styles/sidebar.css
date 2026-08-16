@@ -36,7 +36,7 @@
         }
 
         .sidebar-top {
-            padding: 20px 16px 12px;
+            padding: 20px 8px 12px;
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
         }
@@ -45,7 +45,8 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 16px;
+            padding: 0 8px;
+            margin-bottom: 12px;
         }
 
         .logo-icon {
@@ -75,114 +76,44 @@
             color: var(--accent);
         }
 
-        #new-chat-btn {
-            width: 100%;
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text-muted);
-            padding: 9px 14px;
-            cursor: pointer;
-            font-family: 'Sora', sans-serif;
-            font-size: 13px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.18s ease;
-            letter-spacing: 0.01em;
-        }
-
-        #new-chat-btn:hover {
-            background: var(--sidebar-hover);
-            color: var(--text);
-            border-color: rgba(124, 111, 247, 0.25);
-        }
-
-        #new-chat-btn.active {
-            background: var(--accent-dim);
-            border-color: rgba(124, 111, 247, 0.35);
-            color: var(--text);
-            box-shadow: 0 0 16px var(--accent-glow);
-        }
-
-        #new-chat-btn svg {
-            flex-shrink: 0;
-        }
-
+        #new-chat-btn,
+        #skills-btn,
         #channels-btn,
         #automations-btn {
             width: 100%;
             background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 10px;
+            border: 0;
+            border-radius: 8px;
             color: var(--text-muted);
-            padding: 9px 14px;
+            padding: 8px 10px;
             cursor: pointer;
             font-family: 'Sora', sans-serif;
             font-size: 13px;
             font-weight: 500;
             display: flex;
             align-items: center;
-            gap: 8px;
-            transition: all 0.18s ease;
+            gap: 10px;
+            transition: background 0.15s ease, color 0.15s ease;
             letter-spacing: 0.01em;
-            margin-top: 6px;
+            margin-top: 2px;
         }
 
+        #new-chat-btn {
+            margin-top: 0;
+        }
+
+        #new-chat-btn:hover,
+        #skills-btn:hover,
         #channels-btn:hover,
         #automations-btn:hover {
             background: var(--sidebar-hover);
             color: var(--text);
-            border-color: rgba(124, 111, 247, 0.25);
         }
 
-        #channels-btn.active,
-        #automations-btn.active {
-            background: var(--accent-dim);
-            border-color: rgba(124, 111, 247, 0.35);
-            color: var(--text);
-            box-shadow: 0 0 16px var(--accent-glow);
-        }
-
+        #new-chat-btn svg,
+        #skills-btn svg,
         #channels-btn svg,
         #automations-btn svg {
-            flex-shrink: 0;
-        }
-
-        #skills-btn {
-            width: 100%;
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text-muted);
-            padding: 9px 14px;
-            cursor: pointer;
-            font-family: 'Sora', sans-serif;
-            font-size: 13px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.18s ease;
-            letter-spacing: 0.01em;
-            margin-top: 6px;
-        }
-
-        #skills-btn:hover {
-            background: var(--sidebar-hover);
-            color: var(--text);
-            border-color: rgba(124, 111, 247, 0.25);
-        }
-
-        #skills-btn.active {
-            background: var(--accent-dim);
-            border-color: rgba(124, 111, 247, 0.35);
-            color: var(--text);
-            box-shadow: 0 0 16px var(--accent-glow);
-        }
-
-        #skills-btn svg {
             flex-shrink: 0;
         }
 

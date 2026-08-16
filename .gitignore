@@ -12,3 +12,4 @@ build/icons/*.tiff
 .skills/
 .data/
 .playwright-mcp/
+.playwright-cli/
