@@ -1,0 +1,20 @@
+src/providers/claude-code.ts
+  h_7a561dec792e5b 353,358-359,363-364,368-369
+src/providers/codex.ts
+  h_7a561dec792e5b 725-727
+src/web/public/scripts/app/settings/settings-controller.js
+  h_7a561dec792e5b 316-320,354,1003
+src/web/public/styles/settings.css
+  h_7a561dec792e5b 400
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "bfdf65da367ca7574ee7e13b51a579c7eb0d5bfa",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
