@@ -1,0 +1,20 @@
+src/web/public/scripts/app/settings/settings-provider-controller.js
+  s_cf141a347092f5::t_5ce7f3627fa212 31
+  s_cf141a347092f5::t_906ff9e41852f3 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "3e4b061af3618ee22d9ecd5ebe49291b677923e7",
+  "prompts": {},
+  "sessions": {
+    "s_cf141a347092f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1c92f2a-b094-4b6a-a27f-44ef9b6fd54d",
+        "model": "k3"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}

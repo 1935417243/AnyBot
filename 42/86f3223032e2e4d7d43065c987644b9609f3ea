@@ -1,0 +1,22 @@
+code-review-findings.md
+  s_84c5ebc2871215::t_6e2f8c287a5da4 66
+  s_84c5ebc2871215::t_ed15755c2f267e 63-65
+  s_84c5ebc2871215::t_d0dbd1a857660d 67-69
+  s_84c5ebc2871215::t_ee2c90dd923c43 1-62,70-277
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "4286f3223032e2e4d7d43065c987644b9609f3ea",
+  "prompts": {},
+  "sessions": {
+    "s_84c5ebc2871215": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0380c693-3f27-4841-9489-2ef4efdc8caa",
+        "model": "k3"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
