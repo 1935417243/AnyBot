@@ -50,6 +50,9 @@ export class ProviderTimeoutError extends Error {
   }
 }
 
+/** abort 后等待 SDK 事件流收尾的宽限时间；超过则强制判定超时，避免 for-await 永久挂起。 */
+export const PROVIDER_HARD_ABORT_GRACE_MS = 15_000;
+
 export class ProviderProcessError extends Error {
   constructor(exitCode: number | null, output: string) {
     const code = exitCode ?? "unknown";
@@ -781,6 +784,11 @@ export class CodexProvider implements IProvider {
       ? ensureCodexSkillsAvailableInHome(this.codexHome)
       : null;
     const mcpServers = getCodexMcpServersConfig();
+    let hardExpired = false;
+    // 硬超时兜底触发后丢弃后台残留事件，避免 turn 已失败返回后仍向会话推流
+    const emitEvent: typeof onEvent = onEvent
+      ? (event) => (hardExpired ? undefined : onEvent(event))
+      : undefined;
     const adapterRunId = onEvent && this.codexCompatEnabled && this.codexAdapterBaseUrl
       ? randomUUID()
       : undefined;
@@ -790,7 +798,7 @@ export class CodexProvider implements IProvider {
           if (event.type === "answer_delta" && event.text) {
             adapterAnswerStreamed = true;
           }
-          return onEvent(event);
+          return emitEvent?.(event);
         })
       : undefined;
 
@@ -807,14 +815,14 @@ export class CodexProvider implements IProvider {
       extractContextUsage(usage, tokenCountInfo, contextModel);
 
     const emitCodexAnswerDone = async (): Promise<ProviderContextUsage | undefined> => {
-      if (!onEvent || answerDoneEmitted) return undefined;
+      if (!emitEvent || answerDoneEmitted) return undefined;
 
       const content = responseText.trim();
       if (!content) return undefined;
 
       const contextUsage = buildCurrentContextUsage();
       answerDoneEmitted = true;
-      await onEvent({
+      await emitEvent({
         type: "codex_answer_done",
         content,
         sessionId: providerSessionId,
@@ -825,9 +833,19 @@ export class CodexProvider implements IProvider {
       return contextUsage;
     };
 
+    let hardTimer: NodeJS.Timeout | null = null;
+    let rejectHardDeadline: (error: Error) => void = () => {};
+    const hardDeadline = new Promise<never>((_resolve, reject) => {
+      rejectHardDeadline = reject;
+    });
     const timer = setTimeout(() => {
       timedOut = true;
       abortController.abort();
+      // abort 只是请求 SDK 停止；若事件流迟迟不结束，硬 deadline 强制让本次 turn 失败返回
+      hardTimer = setTimeout(() => {
+        hardExpired = true;
+        rejectHardDeadline(new ProviderTimeoutError(timeoutMs));
+      }, PROVIDER_HARD_ABORT_GRACE_MS);
     }, timeoutMs);
     const abortFromSignal = () => abortController.abort(signal?.reason);
     if (signal?.aborted) {
@@ -862,7 +880,7 @@ export class CodexProvider implements IProvider {
         throw new ProviderExecutableNotFoundError("Codex CLI", this.bin);
       }
 
-      await onEvent?.({
+      await emitEvent?.({
         type: "agent_status",
         status: "started",
         message: "Codex Agent 已启动",
@@ -882,41 +900,46 @@ export class CodexProvider implements IProvider {
         signal: abortController.signal,
       });
 
-      for await (const event of events) {
-        // Codex CLI can emit token_count records that are not part of the SDK's typed event union.
-        const rawEvent: unknown = event;
-        if (isCodexTokenCountEvent(rawEvent)) {
-          tokenCountInfo = rawEvent.payload?.info || null;
-        }
+      const consuming = (async () => {
+        for await (const event of events) {
+          // Codex CLI can emit token_count records that are not part of the SDK's typed event union.
+          const rawEvent: unknown = event;
+          if (isCodexTokenCountEvent(rawEvent)) {
+            tokenCountInfo = rawEvent.payload?.info || null;
+          }
 
-        if (event.type === "thread.started") {
-          providerSessionId = event.thread_id;
-        } else if (event.type === "turn.started") {
-          await onEvent?.({
-            type: "agent_status",
-            status: "running",
-            message: "Codex Agent 正在处理",
-          });
-        } else if (event.type === "turn.completed") {
-          usage = event.usage;
-          earlyContextUsage = (await emitCodexAnswerDone()) || earlyContextUsage;
-        } else if (event.type === "turn.failed") {
-          throw new ProviderProcessError(1, event.error.message);
-        } else if (event.type === "error") {
-          throw new ProviderProcessError(1, event.message);
-        }
+          if (event.type === "thread.started") {
+            providerSessionId = event.thread_id;
+          } else if (event.type === "turn.started") {
+            await emitEvent?.({
+              type: "agent_status",
+              status: "running",
+              message: "Codex Agent 正在处理",
+            });
+          } else if (event.type === "turn.completed") {
+            usage = event.usage;
+            earlyContextUsage = (await emitCodexAnswerDone()) || earlyContextUsage;
+          } else if (event.type === "turn.failed") {
+            throw new ProviderProcessError(1, event.error.message);
+          } else if (event.type === "error") {
+            throw new ProviderProcessError(1, event.message);
+          }
 
-        if ("item" in event) {
-          const text = await this.handleItemEvent(
-            event,
-            toolStateById,
-            textByAgentMessageId,
-            onEvent,
-            adapterAnswerStreamed,
-          );
-          if (text !== null) responseText = text;
+          if ("item" in event) {
+            const text = await this.handleItemEvent(
+              event,
+              toolStateById,
+              textByAgentMessageId,
+              emitEvent,
+              adapterAnswerStreamed,
+            );
+            if (text !== null) responseText = text;
+          }
         }
-      }
+      })();
+      // SDK 忽略 abort 时 for-await 可能永不结束；硬 deadline 强制 reject，由后台残留的 consuming 自行收尾
+      consuming.catch(() => {});
+      await Promise.race([consuming, hardDeadline]);
 
       clearTimeout(timer);
 
@@ -1023,6 +1046,7 @@ export class CodexProvider implements IProvider {
       throw error;
     } finally {
       clearTimeout(timer);
+      if (hardTimer) clearTimeout(hardTimer);
       signal?.removeEventListener("abort", abortFromSignal);
       unregisterAdapterStream?.();
     }

@@ -336,7 +336,7 @@
 
         .skills-download-modal {
             width: min(680px, 100%);
-            max-height: min(720px, calc(100vh - 48px));
+            max-height: min(720px, calc(100vh * var(--app-viewport-scale) - 48px));
             border: 1px solid var(--border);
             border-radius: 12px;
             background: var(--sidebar);
@@ -406,7 +406,7 @@
 
         .skills-official-list {
             min-height: 120px;
-            max-height: min(420px, calc(100vh - 300px));
+            max-height: min(420px, calc(100vh * var(--app-viewport-scale) - 300px));
             overflow-y: auto;
             display: flex;
             flex-direction: column;

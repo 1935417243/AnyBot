@@ -5,7 +5,7 @@
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: calc(100vh * var(--app-viewport-scale));
             overflow-x: hidden;
             overflow-y: hidden;
             transition: width 0.25s ease;
@@ -684,7 +684,7 @@
 
         .project-clone-dialog {
             width: min(460px, 100%);
-            max-height: calc(100vh - 40px);
+            max-height: calc(100vh * var(--app-viewport-scale) - 40px);
             border: 1px solid var(--border);
             border-radius: 8px;
             background: var(--sidebar);

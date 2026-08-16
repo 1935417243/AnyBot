@@ -122,6 +122,7 @@
 - **位置**:`src/providers/codex.ts:831-834, 888`、`src/providers/claude-code.ts:434-437, 583`
 - **问题**:超时只是 `abortController.abort()`,然后继续 `for await (const event of events)`。SDK 忽略 abort 时 for-await 永不结束 → turn 永久挂起,activeRun 永不释放,该会话此后所有消息 423。
 - **修复建议**:`Promise.race` 加硬 deadline,强制 reject 并显式 kill 子进程。
+- **状态**:✅ 已修复(2026-08-16)。两个 provider 的 abort 后都武装 15s 硬兜底(`PROVIDER_HARD_ABORT_GRACE_MS`,定义在 `providers/codex.ts` 并 export):超时 timer 先 `abort()`(codex 经 spawn signal SIGTERM 子进程),若事件流在宽限期内仍不结束,硬 deadline 强制 `Promise.race` reject `ProviderTimeoutError`,turn 失败返回、activeRun 正常释放,会话不再卡 423;claude-code 同时调用 SDK `Query.close()` 杀掉子进程。事件消费循环包进 `consuming` IIFE 并预挂 `.catch`,后台残留循环的事件经 `emitEvent` 包装在 `hardExpired` 后丢弃,不会向已结束的会话推流;catch 块的状态事件仍走原始 `onEvent`,超时报错可正常上屏。
 
 #### 14. 无优雅退出路径
 

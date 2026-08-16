@@ -11,6 +11,11 @@ const THEME_OPTIONS = [
     {id: 'dark', name: '深色'},
     {id: 'system', name: '自动'},
 ];
+const FONT_SIZE_STORAGE_KEY = 'webuiFontSize';
+const DEFAULT_FONT_SIZE = 14;
+const MIN_FONT_SIZE = 12;
+const MAX_FONT_SIZE = 20;
+const FONT_SIZE_OPTIONS = [12, 13, 14, 15, 16, 18];
 const HIGHLIGHT_DARK_CSS = 'vendor/highlight/github-dark-dimmed.min.css';
 const HIGHLIGHT_LIGHT_CSS = 'vendor/highlight/github.min.css';
 
@@ -55,6 +60,10 @@ export function createSettingsController(options) {
     const settingsThemeCurrent = options.settingsThemeCurrent;
     const settingsThemeGroup = options.settingsThemeGroup;
     const settingsThemeTrigger = options.settingsThemeTrigger;
+    const settingsFontSizeCombobox = options.settingsFontSizeCombobox;
+    const settingsFontSizeCurrent = options.settingsFontSizeCurrent;
+    const settingsFontSizeGroup = options.settingsFontSizeGroup;
+    const settingsFontSizeTrigger = options.settingsFontSizeTrigger;
     const settingsTitle = options.settingsTitle;
     const settingsSubtitle = options.settingsSubtitle;
     const settingsUpdateCheckBtn = options.settingsUpdateCheckBtn;
@@ -83,6 +92,7 @@ export function createSettingsController(options) {
     let sessionModelSelections = {};
     let settingsProviderController = null;
     let currentThemeSetting = readStoredTheme();
+    let currentFontSize = readStoredFontSize();
 
     function createNewChat(projectId, chatOptions) {
         if (!options.createNewChat) return Promise.resolve();
@@ -216,6 +226,7 @@ export function createSettingsController(options) {
         if (!settingsThemeCombobox || !settingsThemeTrigger) return;
         if (isOpen) {
             if (settingsProviderController) settingsProviderController.closeProviderControls();
+            setSettingsFontSizeMenuOpen(false);
         }
         settingsThemeCombobox.classList.toggle('open', isOpen);
         settingsThemeTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
@@ -261,8 +272,129 @@ export function createSettingsController(options) {
         }
     }
 
+    function readStoredFontSize() {
+        var value = parseInt(localStorage.getItem(FONT_SIZE_STORAGE_KEY) || '', 10);
+        return normalizeFontSize(value);
+    }
+
+    function normalizeFontSize(value) {
+        var parsed = Number(value);
+        if (!Number.isFinite(parsed)) return DEFAULT_FONT_SIZE;
+        return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.floor(parsed)));
+    }
+
+    function applyFontSize(value) {
+        currentFontSize = normalizeFontSize(value);
+        document.documentElement.style.zoom = String(currentFontSize / DEFAULT_FONT_SIZE);
+        // 视口单位不随 zoom 反向缩放,需要用倒数变量补偿 100vh/100vw 等规则
+        document.documentElement.style.setProperty('--app-viewport-scale', String(DEFAULT_FONT_SIZE / currentFontSize));
+        updateFontSizeDisplay();
+        if (options.onFontSizeChanged) options.onFontSizeChanged();
+    }
+
+    function setFontSize(value) {
+        var size = normalizeFontSize(value);
+        localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(size));
+        applyFontSize(size);
+    }
+
+    function getFontSizeLabel(size) {
+        return normalizeFontSize(size) + ' px';
+    }
+
+    function renderFontSizeOptions() {
+        if (!settingsFontSizeGroup) return;
+        settingsFontSizeGroup.innerHTML = '';
+        FONT_SIZE_OPTIONS.forEach(function (size) {
+            var item = document.createElement('button');
+            item.className = 'settings-combobox-option font-size-option';
+            item.type = 'button';
+            item.setAttribute('role', 'option');
+            item.dataset.fontSizeValue = String(size);
+            item.innerHTML = buildSettingsComboboxOptionHtml(size === currentFontSize, getFontSizeLabel(size));
+            item.addEventListener('click', async function (e) {
+                e.stopPropagation();
+                setFontSize(size);
+                setSettingsFontSizeMenuOpen(false);
+                if (settingsFontSizeTrigger) settingsFontSizeTrigger.focus();
+                await persistAppSettingsPatch({general: {fontSize: size}}, '已保存');
+            });
+            item.addEventListener('keydown', handleSettingsFontSizeOptionKeydown);
+            settingsFontSizeGroup.appendChild(item);
+        });
+        updateFontSizeDisplay();
+    }
+
+    function updateFontSizeDisplay() {
+        if (settingsFontSizeCurrent) settingsFontSizeCurrent.textContent = getFontSizeLabel(currentFontSize);
+        if (!settingsFontSizeGroup) return;
+        Array.prototype.forEach.call(settingsFontSizeGroup.querySelectorAll('.font-size-option'), function (item) {
+            var isActive = Number(item.dataset.fontSizeValue) === currentFontSize;
+            item.classList.toggle('active', isActive);
+            item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            item.innerHTML = buildSettingsComboboxOptionHtml(isActive, getFontSizeLabel(Number(item.dataset.fontSizeValue)));
+        });
+    }
+
+    function getSettingsFontSizeOptions() {
+        if (!settingsFontSizeGroup) return [];
+        return Array.prototype.slice.call(settingsFontSizeGroup.querySelectorAll('.font-size-option'));
+    }
+
+    function setSettingsFontSizeMenuOpen(isOpen) {
+        if (!settingsFontSizeCombobox || !settingsFontSizeTrigger) return;
+        if (isOpen) {
+            if (settingsProviderController) settingsProviderController.closeProviderControls();
+            setSettingsThemeMenuOpen(false);
+        }
+        settingsFontSizeCombobox.classList.toggle('open', isOpen);
+        settingsFontSizeTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (isOpen) {
+            var active = settingsFontSizeGroup && settingsFontSizeGroup.querySelector('.font-size-option.active');
+            requestAnimationFrame(function () {
+                (active || getSettingsFontSizeOptions()[0] || settingsFontSizeTrigger).focus();
+            });
+        }
+    }
+
+    function moveSettingsFontSizeFocus(delta) {
+        var options = getSettingsFontSizeOptions();
+        if (!options.length) return;
+        var currentIndex = options.indexOf(document.activeElement);
+        var nextIndex = currentIndex < 0 ? 0 : (currentIndex + delta + options.length) % options.length;
+        options[nextIndex].focus();
+    }
+
+    function handleSettingsFontSizeOptionKeydown(e) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            moveSettingsFontSizeFocus(1);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            moveSettingsFontSizeFocus(-1);
+        } else if (e.key === 'Home') {
+            e.preventDefault();
+            var first = getSettingsFontSizeOptions()[0];
+            if (first) first.focus();
+        } else if (e.key === 'End') {
+            e.preventDefault();
+            var options = getSettingsFontSizeOptions();
+            var last = options[options.length - 1];
+            if (last) last.focus();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.currentTarget.click();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setSettingsFontSizeMenuOpen(false);
+            if (settingsFontSizeTrigger) settingsFontSizeTrigger.focus();
+        }
+    }
+
     renderThemeOptions();
     applyTheme(currentThemeSetting);
+    renderFontSizeOptions();
+    applyFontSize(currentFontSize);
 
     if (settingsThemeTrigger) {
         settingsThemeTrigger.addEventListener('click', function (e) {
@@ -289,6 +421,35 @@ export function createSettingsController(options) {
 
     if (settingsThemeGroup) {
         settingsThemeGroup.addEventListener('click', function (e) {
+            e.stopPropagation();
+        });
+    }
+
+    if (settingsFontSizeTrigger) {
+        settingsFontSizeTrigger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            setSettingsFontSizeMenuOpen(!settingsFontSizeCombobox.classList.contains('open'));
+        });
+        settingsFontSizeTrigger.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setSettingsFontSizeMenuOpen(true);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSettingsFontSizeMenuOpen(true);
+                requestAnimationFrame(function () {
+                    var options = getSettingsFontSizeOptions();
+                    var last = options[options.length - 1];
+                    if (last) last.focus();
+                });
+            } else if (e.key === 'Escape') {
+                setSettingsFontSizeMenuOpen(false);
+            }
+        });
+    }
+
+    if (settingsFontSizeGroup) {
+        settingsFontSizeGroup.addEventListener('click', function (e) {
             e.stopPropagation();
         });
     }
@@ -393,6 +554,7 @@ export function createSettingsController(options) {
             general: {
                 theme: 'system',
                 language: 'auto',
+                fontSize: DEFAULT_FONT_SIZE,
                 openAtLogin: false,
                 openWindowOnStart: true,
                 webPort: 19981,
@@ -520,6 +682,7 @@ export function createSettingsController(options) {
     function renderAppSettings() {
         if (!appSettings) return;
         setTheme(appSettings.general.theme || currentThemeSetting || 'system');
+        setFontSize(appSettings.general.fontSize || currentFontSize || DEFAULT_FONT_SIZE);
         if (settingsDefaultWorkdir) {
             settingsDefaultWorkdir.value =
                 appSettings.workspace.defaultWorkdir ||
@@ -830,6 +993,7 @@ export function createSettingsController(options) {
 
     function closeSettingsPanel() {
         setSettingsThemeMenuOpen(false);
+        setSettingsFontSizeMenuOpen(false);
         if (settingsProviderController) settingsProviderController.closeProviderControls();
         showChatView();
     }
@@ -1152,6 +1316,9 @@ export function createSettingsController(options) {
         if (settingsThemeCombobox && !settingsThemeCombobox.contains(e.target)) {
             setSettingsThemeMenuOpen(false);
         }
+        if (settingsFontSizeCombobox && !settingsFontSizeCombobox.contains(e.target)) {
+            setSettingsFontSizeMenuOpen(false);
+        }
     }
 
     function handleDocumentEscape() {
@@ -1159,6 +1326,11 @@ export function createSettingsController(options) {
         if (settingsThemeCombobox && settingsThemeCombobox.classList.contains('open')) {
             setSettingsThemeMenuOpen(false);
             if (settingsThemeTrigger) settingsThemeTrigger.focus();
+            return true;
+        }
+        if (settingsFontSizeCombobox && settingsFontSizeCombobox.classList.contains('open')) {
+            setSettingsFontSizeMenuOpen(false);
+            if (settingsFontSizeTrigger) settingsFontSizeTrigger.focus();
             return true;
         }
         if (settingsProviderController && settingsProviderController.handleProviderMenuEscape()) return true;

@@ -13,6 +13,10 @@
                 document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
                 document.documentElement.dataset.themeSetting = setting;
                 document.documentElement.style.colorScheme = theme === 'light' ? 'light' : 'dark';
+                var fontSize = parseInt(localStorage.getItem('webuiFontSize') || '14', 10);
+                if (!isFinite(fontSize) || fontSize < 12 || fontSize > 20) fontSize = 14;
+                document.documentElement.style.zoom = String(fontSize / 14);
+                document.documentElement.style.setProperty('--app-viewport-scale', String(14 / fontSize));
             } catch (_) {}
         })();
     </script>
@@ -312,6 +316,20 @@
                                             </svg>
                                         </button>
                                         <div class="settings-combobox-menu" id="settings-theme-group" role="listbox" aria-labelledby="settings-theme-label"></div>
+                                    </div>
+                                </div>
+                                <div class="settings-field">
+                                    <span class="settings-field-label" id="settings-font-size-label">字体大小</span>
+                                    <div class="settings-combobox" id="settings-font-size-combobox">
+                                        <button class="settings-combobox-trigger" id="settings-font-size-trigger" type="button"
+                                                aria-haspopup="listbox" aria-expanded="false"
+                                                aria-labelledby="settings-font-size-label settings-font-size-current">
+                                            <span class="settings-combobox-value" id="settings-font-size-current">14 px</span>
+                                            <svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                        <div class="settings-combobox-menu" id="settings-font-size-group" role="listbox" aria-labelledby="settings-font-size-label"></div>
                                     </div>
                                 </div>
                             </div>

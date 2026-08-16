@@ -399,8 +399,8 @@
         }
 
         .automation-drawer.automation-runs-drawer {
-            width: min(640px, calc(100vw - 24px));
-            max-width: calc(100vw - 24px);
+            width: min(640px, calc(100vw * var(--app-viewport-scale) - 24px));
+            max-width: calc(100vw * var(--app-viewport-scale) - 24px);
         }
 
         .automation-run-history {

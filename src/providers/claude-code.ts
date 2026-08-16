@@ -22,7 +22,7 @@ import type {
     RunResult,
 } from "./types.js";
 import {ProviderCancelledError} from "./types.js";
-import {ProviderEmptyOutputError, ProviderProcessError, ProviderTimeoutError,} from "./codex.js";
+import {ProviderEmptyOutputError, ProviderProcessError, ProviderTimeoutError, PROVIDER_HARD_ABORT_GRACE_MS,} from "./codex.js";
 import {
     type ClaudeAgentStreamEvent,
     createFileChangeEvent,
@@ -430,9 +430,26 @@ export class ClaudeCodeProvider implements IProvider {
         const mcpServers = getClaudeMcpServersConfig() as Options["mcpServers"] | undefined;
 
         let timedOut = false;
+        let hardExpired = false;
+        let closeStream: (() => void) | null = null;
+        let hardTimer: NodeJS.Timeout | null = null;
+        let rejectHardDeadline: (error: Error) => void = () => {};
+        const hardDeadline = new Promise<never>((_resolve, reject) => {
+            rejectHardDeadline = reject;
+        });
+        // 硬超时兜底触发后丢弃后台残留事件，避免 turn 已失败返回后仍向会话推流
+        const emitEvent: typeof onEvent = onEvent
+            ? (event) => (hardExpired ? undefined : onEvent(event))
+            : undefined;
         const timer = setTimeout(() => {
             timedOut = true;
             abortController.abort();
+            // abort 只是请求 SDK 停止；若事件流迟迟不结束，关闭 stream 并强制让本次 turn 失败返回
+            hardTimer = setTimeout(() => {
+                hardExpired = true;
+                closeStream?.();
+                rejectHardDeadline(new ProviderTimeoutError(timeoutMs));
+            }, PROVIDER_HARD_ABORT_GRACE_MS);
         }, timeoutMs);
         const abortFromSignal = () => abortController.abort(signal?.reason);
         if (signal?.aborted) {
@@ -497,7 +514,7 @@ export class ClaudeCodeProvider implements IProvider {
                 ? {apiKeyHelper: this.apiKeyHelper}
                 : undefined;
 
-            await onEvent?.({
+            await emitEvent?.({
                 type: "agent_status",
                 status: "started",
                 message: "Claude Code Agent 已启动",
@@ -510,7 +527,7 @@ export class ClaudeCodeProvider implements IProvider {
                             hooks: [
                                 async (input) => {
                                     const event = createToolStartEvent(input, workdir);
-                                    if (event) await onEvent(event);
+                                    if (event) await emitEvent?.(event);
                                     return {};
                                 },
                             ],
@@ -521,7 +538,7 @@ export class ClaudeCodeProvider implements IProvider {
                             hooks: [
                                 async (input) => {
                                     const event = await createToolEndEvent(input, workdir);
-                                    if (event) await onEvent(event);
+                                    if (event) await emitEvent?.(event);
                                     return {};
                                 },
                             ],
@@ -532,7 +549,7 @@ export class ClaudeCodeProvider implements IProvider {
                             hooks: [
                                 async (input) => {
                                     const event = await createToolEndEvent(input, workdir);
-                                    if (event) await onEvent(event);
+                                    if (event) await emitEvent?.(event);
                                     return {};
                                 },
                             ],
@@ -543,7 +560,7 @@ export class ClaudeCodeProvider implements IProvider {
                             hooks: [
                                 async (input) => {
                                     const event = await createFileChangeEvent(input, workdir);
-                                    if (event) await onEvent(event);
+                                    if (event) await emitEvent?.(event);
                                     return {};
                                 },
                             ],
@@ -579,44 +596,64 @@ export class ClaudeCodeProvider implements IProvider {
                 },
             });
 
-            for await (const message of stream) {
-                if (isSdkAssistantMessage(message)) {
-                    lastAssistantMessage = message;
+            closeStream = () => {
+                try {
+                    stream.close();
+                } catch {
+                    // 忽略关闭失败，硬 deadline 仍会强制结束本次 turn
                 }
-                if (isSdkCompactBoundaryMessage(message)) {
-                    compactBoundaryMessage = message;
-                }
-                if (isSdkStatusMessage(message) && message.compact_result === "failed") {
-                    compactError = message.compact_error || "Claude Code 上下文压缩失败";
-                }
+            };
 
-                if (onEvent) {
-                    const delta = extractAssistantTextDelta(message);
-                    if (delta) {
-                        streamedResponseText += delta;
-                        await onEvent({type: "answer_delta", text: delta});
+            const consuming = (async () => {
+                for await (const message of stream) {
+                    if (isSdkAssistantMessage(message)) {
+                        lastAssistantMessage = message;
+                    }
+                    if (isSdkCompactBoundaryMessage(message)) {
+                        compactBoundaryMessage = message;
+                    }
+                    if (isSdkStatusMessage(message) && message.compact_result === "failed") {
+                        compactError = message.compact_error || "Claude Code 上下文压缩失败";
                     }
 
-                    const thinking = extractAssistantThinkingDelta(message);
-                    if (thinking) {
-                        await onEvent({type: "thinking_delta", text: thinking});
+                    if (emitEvent) {
+                        const delta = extractAssistantTextDelta(message);
+                        if (delta) {
+                            streamedResponseText += delta;
+                            await emitEvent({type: "answer_delta", text: delta});
+                        }
+
+                        const thinking = extractAssistantThinkingDelta(message);
+                        if (thinking) {
+                            await emitEvent({type: "thinking_delta", text: thinking});
+                        }
+
+                        const progress = createToolProgressEvent(message);
+                        if (progress) {
+                            await emitEvent(progress);
+                        }
+
+                        const task = createTaskEvent(message);
+                        if (task) {
+                            await emitEvent(task);
+                        }
                     }
 
-                    const progress = createToolProgressEvent(message);
-                    if (progress) {
-                        await onEvent(progress);
-                    }
-
-                    const task = createTaskEvent(message);
-                    if (task) {
-                        await onEvent(task);
+                    if (isSdkResultMessage(message)) {
+                        resultMessage = message;
                     }
                 }
-
-                if (isSdkResultMessage(message)) {
-                    resultMessage = message;
-                }
-            }
+                // 返回值用于把闭包内的赋值带回主流程，保持后续控制流收窄有效
+                return {resultMessage, lastAssistantMessage, compactBoundaryMessage, compactError, streamedResponseText};
+            })();
+            // SDK 忽略 abort 时 for-await 可能永不结束；硬 deadline 强制 reject，由后台残留的 consuming 自行收尾
+            consuming.catch(() => {});
+            const consumed = await Promise.race([consuming, hardDeadline]);
+            resultMessage = consumed.resultMessage;
+            lastAssistantMessage = consumed.lastAssistantMessage;
+            compactBoundaryMessage = consumed.compactBoundaryMessage;
+            compactError = consumed.compactError;
+            streamedResponseText = consumed.streamedResponseText;
 
             clearTimeout(timer);
 
@@ -751,6 +788,7 @@ export class ClaudeCodeProvider implements IProvider {
             throw err;
         } finally {
             clearTimeout(timer);
+            if (hardTimer) clearTimeout(hardTimer);
             signal?.removeEventListener("abort", abortFromSignal);
         }
     }

@@ -70,6 +70,7 @@ export interface AppSettings {
   general: {
     theme: AppTheme;
     language: AppLanguage;
+    fontSize: number;
     openAtLogin: boolean;
     openWindowOnStart: boolean;
     webPort: number;
@@ -127,6 +128,7 @@ function createDefaultSettings(): AppSettings {
     general: {
       theme: "system",
       language: "auto",
+      fontSize: 14,
       openAtLogin: false,
       openWindowOnStart: true,
       webPort: 19981,
@@ -194,6 +196,15 @@ function isLogLevel(value: unknown): value is AppLogLevel {
 
 function isTheme(value: unknown): value is AppTheme {
   return value === "light" || value === "dark" || value === "system";
+}
+
+const MIN_FONT_SIZE = 12;
+const MAX_FONT_SIZE = 20;
+
+function normalizeFontSize(value: unknown): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  if (!Number.isFinite(parsed)) return DEFAULT_SETTINGS.general.fontSize;
+  return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.floor(parsed)));
 }
 
 function normalizeLogRetentionDays(value: unknown): number {
@@ -351,6 +362,7 @@ function mergeSettings(value: unknown): AppSettings {
     general: {
       theme: isTheme(general.theme) ? general.theme : DEFAULT_SETTINGS.general.theme,
       language: isLanguage(general.language) ? general.language : DEFAULT_SETTINGS.general.language,
+      fontSize: normalizeFontSize(general.fontSize),
       openAtLogin: typeof general.openAtLogin === "boolean" ? general.openAtLogin : DEFAULT_SETTINGS.general.openAtLogin,
       openWindowOnStart:
         typeof general.openWindowOnStart === "boolean"

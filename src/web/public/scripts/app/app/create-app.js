@@ -95,6 +95,10 @@ export function createAnyBotApp(dom, deps) {
         settingsThemeTrigger,
         settingsThemeCurrent,
         settingsThemeGroup,
+        settingsFontSizeCombobox,
+        settingsFontSizeTrigger,
+        settingsFontSizeCurrent,
+        settingsFontSizeGroup,
         settingsProviderModelCombobox,
         settingsProviderModelTrigger,
         settingsProviderModelCurrent,
@@ -298,6 +302,10 @@ export function createAnyBotApp(dom, deps) {
         modelBadge: modelBadge,
         modelDropdown: modelDropdown,
         modelSwitcher: modelSwitcher,
+        onFontSizeChanged: function () {
+            // zoom 变化后输入框的内联像素高度已过期,需要按新字号重新自适应
+            resizeChatInput();
+        },
         settingsAboutVersion: settingsAboutVersion,
         settingsCancelBtn: settingsCancelBtn,
         settingsClearHistoryBtn: settingsClearHistoryBtn,
@@ -332,6 +340,10 @@ export function createAnyBotApp(dom, deps) {
         settingsThemeCombobox: settingsThemeCombobox,
         settingsThemeCurrent: settingsThemeCurrent,
         settingsThemeGroup: settingsThemeGroup,
+        settingsFontSizeCombobox: settingsFontSizeCombobox,
+        settingsFontSizeTrigger: settingsFontSizeTrigger,
+        settingsFontSizeCurrent: settingsFontSizeCurrent,
+        settingsFontSizeGroup: settingsFontSizeGroup,
         settingsThemeTrigger: settingsThemeTrigger,
         settingsTitle: settingsTitle,
         settingsSubtitle: settingsSubtitle,

@@ -17,7 +17,7 @@
 
         .settings-panel {
             width: 380px;
-            max-width: 92vw;
+            max-width: calc(92vw * var(--app-viewport-scale));
             height: 100%;
             background: var(--sidebar);
             border: 1px solid var(--border);
@@ -130,7 +130,7 @@
             bottom: calc(100% + 8px);
             z-index: 80;
             width: 248px;
-            max-width: min(72vw, 280px);
+            max-width: min(calc(72vw * var(--app-viewport-scale)), 280px);
             padding: 8px 10px;
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -314,7 +314,7 @@
             left: 0;
             right: 0;
             z-index: 30;
-            max-height: min(280px, 52vh);
+            max-height: min(280px, calc(52vh * var(--app-viewport-scale)));
             overflow-y: auto;
             padding: 4px;
             background: var(--popover-bg);
@@ -498,9 +498,9 @@
         }
 
         .settings-panel {
-            width: min(1180px, calc(100vw - 64px));
+            width: min(1180px, calc(100vw * var(--app-viewport-scale) - 64px));
             max-width: none;
-            height: min(820px, calc(100vh - 64px));
+            height: min(820px, calc(100vh * var(--app-viewport-scale) - 64px));
             border: 1px solid var(--border);
             border-radius: 18px;
             background: var(--bg);

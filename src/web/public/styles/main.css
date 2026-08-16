@@ -1,4 +1,5 @@
         :root {
+            --app-viewport-scale: 1;
             --bg: #0d0d0f;
             --sidebar: #111114;
             --sidebar-hover: #1a1a1f;
@@ -87,7 +88,7 @@
             background: var(--bg);
             color: var(--text);
             display: flex;
-            height: 100vh;
+            height: calc(100vh * var(--app-viewport-scale));
             overflow: hidden;
             font-size: 14px;
         }

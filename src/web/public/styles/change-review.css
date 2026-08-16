@@ -38,7 +38,7 @@
     --change-review-secondary-bg: transparent;
     --change-review-scrollbar-track: rgba(255, 255, 255, 0.035);
     --change-review-scrollbar-thumb: rgba(255, 255, 255, 0.18);
-    width: min(920px, calc(100vw - 360px));
+    width: min(920px, calc(100vw * var(--app-viewport-scale) - 360px));
     min-width: min(620px, 100%);
     max-width: 100%;
     margin-top: 18px;
@@ -444,7 +444,7 @@
     }
 
     .change-review-card {
-        width: min(760px, calc(100vw - 112px));
+        width: min(760px, calc(100vw * var(--app-viewport-scale) - 112px));
         min-width: 0;
     }
 }
@@ -455,7 +455,7 @@
     }
 
     .change-review-card {
-        width: calc(100vw - 72px);
+        width: calc(100vw * var(--app-viewport-scale) - 72px);
         border-radius: 9px;
     }
 

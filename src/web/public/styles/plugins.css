@@ -430,7 +430,7 @@
 
         .mcp-dialog {
             width: min(680px, 100%);
-            max-height: min(760px, calc(100vh - 56px));
+            max-height: min(760px, calc(100vh * var(--app-viewport-scale) - 56px));
             border: 1px solid var(--border);
             border-radius: 12px;
             background: var(--sidebar);
