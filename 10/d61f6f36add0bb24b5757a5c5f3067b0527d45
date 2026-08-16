@@ -1,0 +1,22 @@
+code-review-findings.md
+  h_7a561dec792e5b 34,106
+src/web/public/scripts/app/chat/session-controller.js
+  h_7a561dec792e5b 378-383,400
+src/web/public/scripts/app/sidebar/sidebar-controller.js
+  h_7a561dec792e5b 1068-1072,1091
+src/web/routes/projects.ts
+  h_7a561dec792e5b 4-5,147-158
+src/web/routes/sessions.ts
+  h_7a561dec792e5b 5-6,179-186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "10d61f6f36add0bb24b5757a5c5f3067b0527d45",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
