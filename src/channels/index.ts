@@ -63,6 +63,21 @@ class ChannelManager {
     return Array.from(this.runningChannels.keys());
   }
 
+  async stopAll(): Promise<void> {
+    const entries = Array.from(this.runningChannels.entries());
+    this.runningChannels.clear();
+    await Promise.all(
+      entries.map(async ([type, channel]) => {
+        try {
+          await channel.stop();
+          logger.info("channel.stopped", { type });
+        } catch (error) {
+          logger.error("channel.stop_failed", { type, error });
+        }
+      }),
+    );
+  }
+
   async restartChannel(type: string): Promise<void> {
     if (!this.callbacks) {
       logger.warn("channel.restart_skipped", { type, reason: "no callbacks registered" });
@@ -114,6 +129,10 @@ export async function startAllChannels(
   callbacks: ChannelCallbacks,
 ): Promise<IChannel[]> {
   return channelManager.startAll(callbacks);
+}
+
+export async function stopAllChannels(): Promise<void> {
+  return channelManager.stopAll();
 }
 
 export { readChannelsConfig, readChannelConfig, writeChannelsConfig, updateChannelConfig } from "./config.js";

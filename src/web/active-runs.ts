@@ -40,3 +40,12 @@ export function getActiveRunInfo(sessionId: string): ActiveRunInfo | null {
 export function hasActiveRun(sessionId: string): boolean {
   return activeRuns.has(sessionId);
 }
+
+export function abortAllActiveRuns(reason?: unknown): number {
+  const runs = Array.from(activeRuns.values());
+  activeRuns.clear();
+  for (const run of runs) {
+    run.controller.abort(reason);
+  }
+  return runs.length;
+}

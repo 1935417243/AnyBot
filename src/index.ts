@@ -1,3 +1,4 @@
+import type { Server } from "node:http";
 import { applyProxy } from "./proxy.js";
 import { ensureExecutablePathEnv } from "./utils/process.js";
 import { getConfiguredWebPort } from "./app-settings.js";
@@ -22,7 +23,7 @@ import {
   setCurrentModel,
   getProviderTypes,
 } from "./web/model-config.js";
-import { startAllChannels } from "./channels/index.js";
+import { startAllChannels, stopAllChannels } from "./channels/index.js";
 import { automationScheduler } from "./automation-scheduler.js";
 import type { ChannelCallbacks } from "./channels/index.js";
 import {
@@ -47,6 +48,7 @@ import {
   resetChannelSession,
   runPreparedChatTurn,
 } from "./chat-runner.js";
+import { abortAllActiveRuns } from "./web/active-runs.js";
 import * as db from "./web/db.js";
 
 ensureExecutablePathEnv();
@@ -214,12 +216,58 @@ function exitWhenDesktopParentDies(): void {
       process.kill(parentPid, 0);
     } catch {
       logger.warn("desktop.parent_gone");
-      process.exit(0);
+      shutdown("desktop_parent_gone");
     }
   }, 5000);
 
   timer.unref();
 }
+
+// --- Graceful shutdown ---
+
+const SHUTDOWN_TIMEOUT_MS = 5_000;
+
+let webServer: Server | null = null;
+let shuttingDown = false;
+
+function shutdown(signal: string, exitCode = 0): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info("service.stopping", { signal });
+
+  const forceExit = setTimeout(() => {
+    logger.warn("service.stop_timeout", { signal });
+    process.exit(exitCode);
+  }, SHUTDOWN_TIMEOUT_MS);
+  forceExit.unref();
+
+  void (async () => {
+    try {
+      const aborted = abortAllActiveRuns();
+      if (aborted > 0) {
+        logger.info("service.stop_aborted_runs", { count: aborted });
+      }
+      automationScheduler.stop();
+      await stopAllChannels();
+      if (webServer) {
+        // SSE/agent streams keep connections open forever; drop them so
+        // close() can settle instead of waiting for the force-exit timer.
+        webServer.closeAllConnections();
+        await new Promise<void>((resolve) => {
+          webServer!.close(() => resolve());
+        });
+      }
+    } catch (error) {
+      logger.warn("service.stop_failed", { error });
+    } finally {
+      clearTimeout(forceExit);
+      process.exit(exitCode);
+    }
+  })();
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 async function main(): Promise<void> {
   exitWhenDesktopParentDies();
@@ -243,7 +291,7 @@ async function main(): Promise<void> {
   });
 
   const webApp = createApp();
-  webApp.listen(WEB_PORT, WEB_HOST, () => {
+  webServer = webApp.listen(WEB_PORT, WEB_HOST, () => {
     logger.info("web.started", { host: WEB_HOST, port: WEB_PORT });
     console.log(`AnyBot Web UI: http://${WEB_HOST}:${WEB_PORT}`);
     startDesktopUpdateAutoCheck();
