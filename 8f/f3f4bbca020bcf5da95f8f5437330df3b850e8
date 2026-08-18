@@ -1,0 +1,23 @@
+release-notes.md
+  s_79ceb66208196e::t_9559856d92c3d6 8-13
+package.json
+  s_79ceb66208196e::t_6e25f7ca9445e6 3
+package-lock.json
+  s_79ceb66208196e::t_dd8334e3ffe73c 3,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "8ff3f4bbca020bcf5da95f8f5437330df3b850e8",
+  "prompts": {},
+  "sessions": {
+    "s_79ceb66208196e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64702687-b4e3-4c0c-a00c-055b65901272",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
