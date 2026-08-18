@@ -1,0 +1,20 @@
+src/index.ts
+  s_34b7b4a3921f91::t_8ef48521eb8c16 52
+  s_34b7b4a3921f91::t_fec4f8564eca56 94,104,111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "c294f52df46dfd5a23e851a6f9ecac6b701aeda0",
+  "prompts": {},
+  "sessions": {
+    "s_34b7b4a3921f91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0118743b-31f5-4212-8ac1-b7fe0c8e96d1",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
