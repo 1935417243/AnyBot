@@ -63,11 +63,12 @@ export function createSessionController(config) {
         currentSessionProjectId = targetProjectId;
         currentSessionProvider = currentProviderType || null;
         if (window.TaskDock) window.TaskDock.reset();
-        if (config.refreshBranchSwitcher) config.refreshBranchSwitcher();
         config.updateConversationHeaderTitle('新对话');
         currentSessionUpdatedAt = 0;
         currentNewestMessageId = 0;
         config.setActiveProjectId(currentSessionProjectId);
+        // 必须在 setActiveProjectId 之后刷新，否则会读到旧项目的分支
+        if (config.refreshBranchSwitcher) config.refreshBranchSwitcher();
         config.revealSessionContainer(currentSessionProjectId, { defer: options.deferSidebarReveal });
         config.showChatView();
         config.updateContextUsage(null);

@@ -1,4 +1,5 @@
 var BRANCH_NAME_MAX_CHARS = 10;
+var SEARCH_MIN_BRANCHES = 8;
 
 var CHECK_ICON = '<svg class="branch-option-check" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 var CHECK_PLACEHOLDER = '<span class="branch-option-check-placeholder"></span>';
@@ -16,6 +17,10 @@ export function createBranchSwitcher(options) {
     var current = '';
     var branches = [];
     var switching = false;
+    var refreshSeq = 0;
+    var filterText = '';
+    var searchInput = null;
+    var listEl = null;
 
     function setVisible(visible) {
         if (switcher) switcher.style.display = visible ? '' : 'none';
@@ -28,10 +33,23 @@ export function createBranchSwitcher(options) {
         renderDropdown();
     }
 
-    function renderDropdown() {
-        if (!dropdown) return;
-        dropdown.innerHTML = '';
-        branches.forEach(function (branch) {
+    function renderBranchList() {
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        var keyword = filterText.trim().toLowerCase();
+        var visible = keyword
+            ? branches.filter(function (branch) {
+                return branch.toLowerCase().indexOf(keyword) !== -1;
+            })
+            : branches;
+        if (visible.length === 0) {
+            var empty = document.createElement('div');
+            empty.className = 'branch-empty';
+            empty.textContent = '无匹配分支';
+            listEl.appendChild(empty);
+            return;
+        }
+        visible.forEach(function (branch) {
             var isActive = branch === current;
             var opt = document.createElement('button');
             opt.type = 'button';
@@ -47,12 +65,50 @@ export function createBranchSwitcher(options) {
                 e.stopPropagation();
                 selectBranch(branch);
             });
-            dropdown.appendChild(opt);
+            listEl.appendChild(opt);
         });
+    }
+
+    function renderDropdown() {
+        if (!dropdown) return;
+        dropdown.innerHTML = '';
+        searchInput = null;
+        listEl = null;
+        if (branches.length > SEARCH_MIN_BRANCHES) {
+            var searchWrap = document.createElement('div');
+            searchWrap.className = 'branch-search';
+            searchInput = document.createElement('input');
+            searchInput.className = 'branch-search-input';
+            searchInput.type = 'text';
+            searchInput.placeholder = '搜索分支…';
+            searchInput.value = filterText;
+            searchInput.addEventListener('input', function () {
+                filterText = searchInput.value;
+                renderBranchList();
+            });
+            searchInput.addEventListener('click', function (e) {
+                e.stopPropagation();
+            });
+            searchWrap.appendChild(searchInput);
+            dropdown.appendChild(searchWrap);
+        }
+        listEl = document.createElement('div');
+        listEl.className = 'branch-list';
+        dropdown.appendChild(listEl);
+        renderBranchList();
     }
 
     function setOpen(isOpen) {
         if (!switcher || !badge) return;
+        if (isOpen) {
+            filterText = '';
+            renderDropdown();
+            if (searchInput) {
+                setTimeout(function () {
+                    if (searchInput) searchInput.focus();
+                }, 0);
+            }
+        }
         switcher.classList.toggle('open', isOpen);
         badge.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     }
@@ -66,14 +122,17 @@ export function createBranchSwitcher(options) {
     }
 
     async function refresh() {
+        var seq = ++refreshSeq;
         try {
             var query = buildQuery();
             var res = await fetch('/api/git/branches' + (query ? '?' + query : ''));
+            if (seq !== refreshSeq) return;
             if (!res.ok) {
                 setVisible(false);
                 return;
             }
             var info = await res.json();
+            if (seq !== refreshSeq) return;
             if (!info || !info.isGitRepo) {
                 setVisible(false);
                 return;
@@ -83,6 +142,7 @@ export function createBranchSwitcher(options) {
             setVisible(true);
             render();
         } catch (_) {
+            if (seq !== refreshSeq) return;
             setVisible(false);
         }
     }
@@ -93,6 +153,7 @@ export function createBranchSwitcher(options) {
             setOpen(false);
             return;
         }
+        var seq = refreshSeq;
         switching = true;
         try {
             var query = buildQuery();
@@ -109,6 +170,7 @@ export function createBranchSwitcher(options) {
                 if (options.onError) options.onError(data.error || '切换分支失败');
                 return;
             }
+            if (seq !== refreshSeq) return;
             current = data.current || branch;
             render();
             setOpen(false);

@@ -64,7 +64,7 @@ export async function getGitBranchInfo(workdir: string): Promise<GitBranchInfo> 
     .split("\n")
     .map((name) => name.trim())
     .filter(Boolean)
-    .sort((a, b) => b.localeCompare(a));
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
   return { isGitRepo: true, current, branches };
 }

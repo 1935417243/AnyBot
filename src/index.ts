@@ -49,7 +49,7 @@ import {
   resetChannelSession,
   runPreparedChatTurn,
 } from "./chat-runner.js";
-import { abortAllActiveRuns } from "./web/active-runs.js";
+import { abortAllActiveRuns, clearActiveRun, createActiveRun } from "./web/active-runs.js";
 import * as db from "./web/db.js";
 
 ensureExecutablePathEnv();
@@ -91,6 +91,7 @@ async function generateReply(
     workdir,
     includeWorkspaceMemory: !dbSession.projectId,
   });
+  const activeRun = createActiveRun(dbSession.id, "message");
   const active = canStreamPreparedChatTurn(prepared) && !hasActiveAgentStream(dbSession.id)
     ? createActiveAgentStream(dbSession.id)
     : null;
@@ -100,12 +101,14 @@ async function generateReply(
 
   try {
     const result = await runPreparedChatTurn(prepared, {
+      signal: activeRun.controller.signal,
       stream: emit ? { emit } : undefined,
       logPrefix: "reply.generate",
       logFields: { chatId, source, dbSessionId: dbSession.id },
     });
     return result.content;
   } finally {
+    clearActiveRun(dbSession.id, activeRun.controller);
     if (active) {
       finishAgentStream(dbSession.id, active);
     }
