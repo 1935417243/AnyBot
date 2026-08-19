@@ -1,0 +1,241 @@
+src/web/public/styles/chat.css
+  s_2cb0c3aab8a8f7::t_22be423547a6ef 341-342
+  s_2cb0c3aab8a8f7::t_9171b30ea7089a 334,344,361-362,370,372,378
+  s_2cb0c3aab8a8f7::t_8f1ee8e6190e8f 379-380
+  s_11b3ff634dbbb4::t_d896aa00f1cf71 284-286
+  s_11b3ff634dbbb4::t_3df9bf78fa0f4e 248-283,287-333,335-340,343,345-360,363-369,371,373-377,381-395
+src/web/public/scripts/app/chat/input-events.js
+  s_11b3ff634dbbb4::t_7efff3d51d2836 14
+src/providers/codex.ts
+  s_fb35549dfd5c35::t_05ee0e3b33404e 731
+  s_fb35549dfd5c35::t_b42b700d0f5351 738-740
+  s_fb35549dfd5c35::t_811c927dad8227 774
+  s_fb35549dfd5c35::t_e5a77489d04364 891-892,898
+  s_fb35549dfd5c35::t_6638e386b00bf1 319
+  s_fb35549dfd5c35::t_fd738dd0b501f2 94-96
+package.json
+  s_fb35549dfd5c35::t_8f49398700cf86 26
+src/web/public/scripts/app/app/create-app.js
+  s_11b3ff634dbbb4::t_c064170bf9da47 293-296,298-304
+  s_d86eae450ceb6e::t_dd0bebec706347 117-120
+  s_11b3ff634dbbb4::t_c75d01a7300a0f 287-292,297,305
+  s_11b3ff634dbbb4::t_62acab5320121c 759
+  s_11b3ff634dbbb4::t_f2c37c51714d10 192
+  s_d86eae450ceb6e::t_a14ca0a3cf6191 354-357
+  s_d9224b17d33b9c::t_6494ecedab4a90 1035-1036,1038,1040-1041
+  s_11b3ff634dbbb4::t_199e29c722a1ab 1053
+  s_11b3ff634dbbb4::t_9d788ad23c3c53 1102
+  s_d86eae450ceb6e::t_5155d17005d295 388-391
+  s_d9224b17d33b9c::t_014a69adbc9db7 1034,1037,1039
+  s_11b3ff634dbbb4::t_984f6e47eafdc9 72-75
+  s_11b3ff634dbbb4::t_e217bfd8cc3212 666-671
+  s_11b3ff634dbbb4::t_568b2175b78095 1075
+  s_11b3ff634dbbb4::t_4172c7cfe9a776 12
+src/web/public/scripts/app/chat/send-message.js
+  s_11b3ff634dbbb4::t_b3522960e77007 307-309
+  s_11b3ff634dbbb4::t_c87a75a888aacb 24
+  s_11b3ff634dbbb4::t_e1c1887879bb75 160-163
+  s_11b3ff634dbbb4::t_d76fc7e9ac78fb 287
+src/web/public/scripts/app/settings/settings-controller.js
+  s_d86eae450ceb6e::t_2e985d65d40a5e 665-669
+  s_d86eae450ceb6e::t_883dbdd513b962 53-56
+src/providers/claude-code.ts
+  s_11b3ff634dbbb4::t_51f73720dafc72 432-433
+  s_11b3ff634dbbb4::t_005312ba66ab10 411
+  s_11b3ff634dbbb4::t_845eb7aa60ed1e 476
+  s_11b3ff634dbbb4::t_02197bad1a785d 585
+src/chat-runner.ts
+  s_11b3ff634dbbb4::t_2a8b985206c0dc 688
+  s_11b3ff634dbbb4::t_20ea5b1be71e38 707
+  s_11b3ff634dbbb4::t_982fedbe841ed4 56-57
+  s_11b3ff634dbbb4::t_44091471fdae44 330,348
+  s_fb35549dfd5c35::t_2376bdb356d379 12
+  s_11b3ff634dbbb4::t_c6ea55f1f2e861 79-80,90-91
+  s_11b3ff634dbbb4::t_124dcc0f0d6e7c 168,176,182,184-188
+  s_11b3ff634dbbb4::t_cf165d311122c5 509
+  s_11b3ff634dbbb4::t_bb526bbb10f6de 27
+  s_11b3ff634dbbb4::t_8ba8c5a9b3bc1b 667-668
+  s_fb35549dfd5c35::t_569ec9cba2ec9d 167,169-175,177-181,183
+  s_11b3ff634dbbb4::t_b83efe8c740773 372,383
+src/web/public/index.html
+  s_11b3ff634dbbb4::t_01c1ddcafd7548 217-219
+  s_fb35549dfd5c35::t_3ee13cb7a62a7f 216
+  s_fb35549dfd5c35::t_0ead986a42c2ed 215
+  s_d86eae450ceb6e::t_5ecfdaea97e96f 393-406
+  s_d9224b17d33b9c::t_f95f80db8b19a3 56-78
+  s_fb35549dfd5c35::t_8f511a99675652 213-214
+src/web/services/codex-openai-adapter.ts
+  s_fb35549dfd5c35::t_183ce869c6cdb7 1176
+src/providers/types.ts
+  s_11b3ff634dbbb4::t_0e65e93780b6f3 10-12,14-15,24
+  s_fb35549dfd5c35::t_ac9168c4f0fa78 23
+  s_2cb0c3aab8a8f7::t_6573a419a40d75 13
+  s_fb35549dfd5c35::t_7d7516bd245bee 16-18
+src/web/public/styles/sidebar.css
+  s_d9224b17d33b9c::t_eba1828a40c9cf 39
+  s_d9224b17d33b9c::t_69dd8d7c5c0bc8 58
+  s_d9224b17d33b9c::t_e35c270c6abbc3 377,387
+  s_d9224b17d33b9c::t_1fb5eb91f60be7 378-386
+  s_d9224b17d33b9c::t_03ecfe4a860042 61,143-144,146-148,388
+  s_d9224b17d33b9c::t_b1a40520c48755 40,44-57,59-60
+  s_d9224b17d33b9c::t_f073b8942e2a25 145
+  s_d9224b17d33b9c::t_1a71f4f63e8af2 575,581
+  s_d9224b17d33b9c::t_44fb76134f45fc 62
+  s_d9224b17d33b9c::t_329dbe16affac5 389
+src/web/public/scripts/app/sidebar/sidebar-controller.js
+  s_83a2d4dec74df5::t_e6e1a7dca5c1c4 322-326
+  s_83a2d4dec74df5::t_571545440bbdcf 299-305
+electron/main.cjs
+  s_fb1028c5a8c01c::t_420c36660b88b6 978-989
+  s_fb1028c5a8c01c::t_10d29e4be70153 964-967,970
+  s_fb1028c5a8c01c::t_1ff0656622d717 968-969
+src/web/public/scripts/app/chat/effort-mode.js
+  s_11b3ff634dbbb4::t_ebb401d49dc85e 21-22,27-33,36-43,49-50,54-58,62,65-72,78-80,83,87-90,92-94,96-97,100-102,104-113,115-126,129-130,132-143,145,147,151,153-175,178-202,204-205,219-223,225,227-252,257-274,279-280,282,284-286
+  s_fb35549dfd5c35::t_252ecb4b4c3d8d 2-20,34-35,44-48,51-53,59-61,63-64,81-82,84,91,95,99,103,127-128,131,146,149,152,176-177,203,206-218,281,283
+  s_2cb0c3aab8a8f7::t_9f24667830e664 23-25
+  s_11b3ff634dbbb4::t_5ba277996941c0 73-77,85-86
+  s_11b3ff634dbbb4::t_012b38caa59973 144,148,150
+  s_11b3ff634dbbb4::t_947b4ec8a4b829 253-256
+  s_2cb0c3aab8a8f7::t_3879585e5558f9 1
+  s_11b3ff634dbbb4::t_47d275de94dc3c 26
+  s_2cb0c3aab8a8f7::t_57af69f9d9adc1 114
+  s_11b3ff634dbbb4::t_343059b6b8929a 224,226
+  s_fb35549dfd5c35::t_ec3a403ffa3a97 98
+  s_11b3ff634dbbb4::t_1af4ff449c72b8 275-278
+src/index.ts
+  s_5461166b482a77::t_eb4a3981bb11fd 154-156,159
+  s_5461166b482a77::t_72bd90898b59c4 142-143,145
+  s_5461166b482a77::t_ab77f5e1648147 23
+src/web/routes/messages.ts
+  s_11b3ff634dbbb4::t_902b339ca0e89f 119
+  s_11b3ff634dbbb4::t_53538db6f59831 346,354,365
+  s_11b3ff634dbbb4::t_d2912fb248f0dd 66-67,74
+  s_11b3ff634dbbb4::t_6b08f600b84ddb 88
+  s_11b3ff634dbbb4::t_c0a78dedc18920 185,192
+  s_11b3ff634dbbb4::t_50ba03a826d0fb 252,261,272
+src/web/public/scripts/app/app/dom.js
+  s_d86eae450ceb6e::t_24826d1c02c928 78-81
+  s_11b3ff634dbbb4::t_47e0ea1bc68bb4 29-33
+src/channels/commands.ts
+  s_5461166b482a77::t_02cbe6b031b5f4 177-178,180,182
+src/web/routes/providers.ts
+  s_d86eae450ceb6e::t_ad21ee38a15856 58-64
+  s_d86eae450ceb6e::t_f2a191681862c9 13
+  s_11b3ff634dbbb4::t_ffe6d29e540955 10,16
+  s_11b3ff634dbbb4::t_a418dfa8f2efd6 48-54,65-71
+src/web/public/scripts/app/settings/settings-provider-controller.js
+  s_d86eae450ceb6e::t_f25aae9862f987 28,34-52
+  s_d86eae450ceb6e::t_389da8a945648e 157-161
+  s_fb35549dfd5c35::t_005a50ff840ac7 872-873
+  s_d86eae450ceb6e::t_019cff68b30075 192,198-213
+  s_d86eae450ceb6e::t_1b531401c3310d 214,1315-1339
+  s_d86eae450ceb6e::t_5e069f4449135a 16-19
+  s_d86eae450ceb6e::t_9132db11d931b5 744,1451,1461-1463,1475-1477,1479
+  s_d86eae450ceb6e::t_d1c864f663994a 1156,1166-1181
+  s_d86eae450ceb6e::t_2453a851489232 1234
+  s_fb35549dfd5c35::t_53d09af7974a9c 1059
+  s_d86eae450ceb6e::t_e9b108aaf66250 733-734,737,742-743
+  s_d86eae450ceb6e::t_c046dfac7b885b 215
+  s_d86eae450ceb6e::t_a38413bd611522 1182-1183
+  s_d86eae450ceb6e::t_4f9f95a1f47e0d 1478
+src/web/public/styles/main.css
+  s_fb1028c5a8c01c::t_bdd5c519dfb2fc 106-107
+  s_fb1028c5a8c01c::t_16c66ad527a34d 96-97,104,108-121,133-135
+  s_fb1028c5a8c01c::t_82d87802654899 103,105
+  s_fb1028c5a8c01c::t_03bf486a7d7d90 98-102
+  s_4bb036f303c86a::t_de24f76e5ef586 122-132
+src/web/model-config.ts
+  s_d86eae450ceb6e::t_06daa9851c3008 11
+  s_d86eae450ceb6e::t_da950a96e48980 117-119,122-128
+  s_11b3ff634dbbb4::t_877746a194b1b6 29
+  s_11b3ff634dbbb4::t_31fa160e6b677c 157
+  s_d86eae450ceb6e::t_d6932e4b3802c4 167,172,174-176,183-194,196-200
+  s_11b3ff634dbbb4::t_d92d8a9842dd1b 168-171,173,177-178,180-182,201-202
+  s_d86eae450ceb6e::t_3e522aadb480e6 156
+  s_d86eae450ceb6e::t_5c1561d40d9979 179
+  s_d86eae450ceb6e::t_521952a745cf12 28,30-38
+  s_d86eae450ceb6e::t_f8f1a68e524e74 195
+  s_d86eae450ceb6e::t_0383d28216c5b3 218-220,229-232,238
+package-lock.json
+  s_fb35549dfd5c35::t_fc62aa72bce95a 13,1299-1301,1310-1315,1320-1322,1337-1339,1354-1356,1371-1373,1387-1389,1392,1400-1402,1417-1419
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "53ce48fb8e62167710d7a2f304736bf590a8d918",
+  "prompts": {},
+  "sessions": {
+    "s_11b3ff634dbbb4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f8ff38c4-2b3f-4a4d-b50f-d4a3d6c66f56",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_2cb0c3aab8a8f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e8995d3d-8441-49a8-a232-e48dba87a20b",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_4bb036f303c86a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55ff04fe-c6a4-4dbd-9ecf-8fa8ada8dbbe",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_5461166b482a77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7c61ca4c-129f-4169-a1cb-fecd49291313",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_83a2d4dec74df5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f52797e6-de7e-4d76-a49f-9915aa6d36fb",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_d86eae450ceb6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea3b81f1-6b2b-4f4c-9681-9de7eda406b5",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_d9224b17d33b9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "56f41f57-f4b6-478d-b7d7-e3ed67049928",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_fb1028c5a8c01c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "65427d9f-ee55-473d-b972-e8492cbd22aa",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_fb35549dfd5c35": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6b3c233-dc20-482b-8ee0-707e5b0b3733",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
