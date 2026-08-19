@@ -295,7 +295,7 @@ copy(path.join(root, "node_modules"), path.join(releaseDir, "node_modules"));
 copy(path.join(root, "package.json"), path.join(releaseDir, "package.json"));
 copy(path.join(root, "package-lock.json"), path.join(releaseDir, "package-lock.json"));
 copyFileIfExists(path.join(root, "README.md"), path.join(releaseDir, "README.md"));
-copyFileIfExists(path.join(root, "README_EN.md"), path.join(releaseDir, "README_EN.md"));
+copyFileIfExists(path.join(root, "README_CN.md"), path.join(releaseDir, "README_CN.md"));
 
 copyNodeRuntime();
 copy(path.join(root, "dist", "agent", "md_files"), path.join(releaseDir, "resources", "md_files"));
