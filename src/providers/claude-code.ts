@@ -408,6 +408,7 @@ export class ClaudeCodeProvider implements IProvider {
         const {
             workdir,
             model,
+            effort,
             sessionId,
             newSessionId,
             timeoutMs = this.timeoutMs,
@@ -428,6 +429,8 @@ export class ClaudeCodeProvider implements IProvider {
         const resultModel = this.resolveModelAlias(model && model !== "auto" ? model : undefined)
             || this.anthropicAutoModel
             || this.defaultModel;
+        // ultracode 是 AnyBot 的 UI 档位，SDK 侧没有对应取值，等价于 xhigh
+        const sdkEffort = effort === "ultracode" ? "xhigh" : effort;
         const mcpServers = getClaudeMcpServersConfig() as Options["mcpServers"] | undefined;
 
         let timedOut = false;
@@ -470,6 +473,7 @@ export class ClaudeCodeProvider implements IProvider {
             workdir,
             sandbox,
             model: resultModel || null,
+            effort: sdkEffort || null,
             anthropicBaseUrl: this.anthropicBaseUrl || null,
             anthropicAutoModel: this.anthropicAutoModel || this.defaultModel || null,
             anthropicOpusModel: this.anthropicOpusModel || null,
@@ -578,6 +582,7 @@ export class ClaudeCodeProvider implements IProvider {
                     abortController,
                     cwd: workdir,
                     model: resultModel,
+                    effort: sdkEffort,
                     resume: sessionId,
                     sessionId: sessionId ? undefined : newSessionId,
                     pathToClaudeCodeExecutable: this.pathToClaudeCodeExecutable,

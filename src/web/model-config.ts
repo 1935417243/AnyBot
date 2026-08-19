@@ -8,6 +8,7 @@ import {
   createProvider,
   getProviderInstallationStatus,
 } from "../providers/index.js";
+import { EFFORT_LEVELS, CODEX_EFFORT_LEVELS, type EffortLevel } from "../providers/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DATA_DIR || process.env.CODEX_DATA_DIR || path.resolve(__dirname, "../../.data");
@@ -24,6 +25,17 @@ export interface ModelConfig {
   currentModel: string;
   models: ModelEntry[];
   lastSelected: Record<string, string>;
+  /** 推理强度默认档位（当前 provider 生效的档位；未设置时由 SDK 用默认值 high） */
+  effort?: EffortLevel;
+  /** 各 provider 各自持久化的推理强度档位（claude-code 与 codex 档位集合不同） */
+  lastEffort?: Record<string, EffortLevel>;
+}
+
+/** 各 provider 支持的推理强度档位；不支持的 provider 返回 null */
+function effortLevelsForProvider(providerType: string): EffortLevel[] | null {
+  if (providerType === "claude-code") return EFFORT_LEVELS;
+  if (providerType === "codex") return CODEX_EFFORT_LEVELS;
+  return null;
 }
 
 function buildDefaultConfig(): ModelConfig {
@@ -102,8 +114,18 @@ export function readModelConfig(): ModelConfig {
   if (!config.lastSelected) {
     config.lastSelected = {};
   }
+  if (!config.lastEffort) {
+    config.lastEffort = {};
+  }
 
   const provider = getProvider();
+  // 旧配置迁移：全局 effort 视为当前 provider 的档位
+  if (config.effort && !config.lastEffort[provider.type]) {
+    config.lastEffort[provider.type] = config.effort;
+    writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
+  }
+  // effort 字段始终镜像当前 provider 的档位，保证 GET 返回值与 provider 一致
+  config.effort = config.lastEffort[provider.type];
   const providerModels = provider.listModels();
   const needsRefresh =
     config.provider !== provider.type ||
@@ -131,6 +153,8 @@ export function writeModelConfig(config: ModelConfig): ModelConfig {
     currentModel: config.currentModel || "",
     models: Array.isArray(config.models) ? config.models : [],
     lastSelected: config.lastSelected || {},
+    lastEffort: config.lastEffort || {},
+    effort: config.effort,
   };
   writeFileSync(CONFIG_PATH, JSON.stringify(next, null, 2), "utf-8");
   return next;
@@ -138,6 +162,42 @@ export function writeModelConfig(config: ModelConfig): ModelConfig {
 
 export function getCurrentModel(): string {
   return readModelConfig().currentModel;
+}
+
+/** 读取持久化的推理强度档位（当前 provider；未设置时返回 undefined，运行时由 SDK 使用默认档位） */
+export function getCurrentEffort(): EffortLevel | undefined {
+  return readModelConfig().effort;
+}
+
+/** 校验并持久化当前 provider 的推理强度档位 */
+export function setCurrentEffort(effort: EffortLevel): ModelConfig {
+  const config = readModelConfig();
+  const supportedLevels = effortLevelsForProvider(config.provider) || EFFORT_LEVELS;
+  if (!supportedLevels.includes(effort)) {
+    throw new Error(`不支持的强度: ${effort}`);
+  }
+  config.lastEffort![config.provider] = effort;
+  config.effort = effort;
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
+  return config;
+}
+
+/** 校验并持久化指定 provider 的推理强度档位（设置面板可为非当前 provider 配置默认强度） */
+export function setEffortForProvider(providerType: string, effort: EffortLevel): ModelConfig {
+  const supportedLevels = effortLevelsForProvider(providerType);
+  if (!supportedLevels) {
+    throw new Error(`该 Provider 不支持强度设置: ${providerType}`);
+  }
+  if (!supportedLevels.includes(effort)) {
+    throw new Error(`不支持的强度: ${effort}`);
+  }
+  const config = readModelConfig();
+  config.lastEffort![providerType] = effort;
+  if (config.provider === providerType) {
+    config.effort = effort;
+  }
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
+  return readModelConfigForProvider(providerType);
 }
 
 export function getCurrentProviderType(): string {
@@ -155,6 +215,9 @@ export function readModelConfigForProvider(providerType: string): ModelConfig {
   if (!config.lastSelected) {
     config.lastSelected = {};
   }
+  if (!config.lastEffort) {
+    config.lastEffort = {};
+  }
 
   const provider = createProvider(providerType);
   const models = provider.listModels();
@@ -163,11 +226,16 @@ export function readModelConfigForProvider(providerType: string): ModelConfig {
     config.lastSelected[provider.type] = model;
     writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
   }
+  // 目标 provider 的持久化档位；旧配置的全局 effort 仅在其本就是当前 provider 时作为回落
+  const effort =
+    config.lastEffort[provider.type] ??
+    (config.provider === provider.type ? config.effort : undefined);
   return {
     ...config,
     provider: provider.type,
     currentModel: model,
     models,
+    effort,
   };
 }
 

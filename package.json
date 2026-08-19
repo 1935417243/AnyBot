@@ -23,7 +23,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.139",
     "@larksuiteoapi/node-sdk": "^1.59.0",
-    "@openai/codex-sdk": "^0.130.0",
+    "@openai/codex-sdk": "^0.148.0",
     "better-sqlite3": "^12.6.2",
     "dingtalk-stream": "^2.1.6-beta.1",
     "electron-updater": "^6.8.3",

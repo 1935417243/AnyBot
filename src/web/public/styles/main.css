@@ -93,3 +93,43 @@
             font-size: 14px;
         }
 
+        /* ===== macOS 桌面端：隐藏系统标题栏后的顶部融合样式 ===== */
+
+        /* 压缩侧边栏顶部留白，Logo 行上移与红黄绿按钮对齐并预留空间 */
+        body.platform-macos-desktop .sidebar-top {
+            padding-top: 8px;
+        }
+
+        /* 隐藏 Logo 行内容，但保留占位高度，为红黄绿按钮腾出空间 */
+        body.platform-macos-desktop .sidebar-top .logo {
+            visibility: hidden;
+        }
+
+        /* 顶部区域可拖动窗口，交互元素保持可点击 */
+        body.platform-macos-desktop .sidebar-top,
+        body.platform-macos-desktop .conversation-header,
+        body.platform-macos-desktop .home-hero {
+            -webkit-app-region: drag;
+        }
+
+        body.platform-macos-desktop .sidebar-top button,
+        body.platform-macos-desktop .conversation-header button,
+        body.platform-macos-desktop .conversation-header input,
+        body.platform-macos-desktop .conversation-header textarea,
+        body.platform-macos-desktop .conversation-header select,
+        body.platform-macos-desktop .conversation-header a,
+        body.platform-macos-desktop .home-hero button,
+        body.platform-macos-desktop .home-hero .home-project-dropdown {
+            -webkit-app-region: no-drag;
+        }
+
+        /* 输入区弹层向上展开时会覆盖 .home-hero 拖拽区，需要 no-drag，
+           否则滚轮事件被拖拽区拦截，弹层内列表无法滚动 */
+        body.platform-macos-desktop .branch-dropdown,
+        body.platform-macos-desktop .permission-dropdown,
+        body.platform-macos-desktop .model-dropdown,
+        body.platform-macos-desktop .effort-dropdown,
+        body.platform-macos-desktop .skill-picker {
+            -webkit-app-region: no-drag;
+        }
+

@@ -50,6 +50,10 @@ export function createSettingsController(options) {
     const settingsProviderModelMenu = options.settingsProviderModelMenu;
     const settingsProviderModelSelect = options.settingsProviderModelSelect;
     const settingsProviderModelTrigger = options.settingsProviderModelTrigger;
+    const settingsProviderEffortCombobox = options.settingsProviderEffortCombobox;
+    const settingsProviderEffortCurrent = options.settingsProviderEffortCurrent;
+    const settingsProviderEffortMenu = options.settingsProviderEffortMenu;
+    const settingsProviderEffortTrigger = options.settingsProviderEffortTrigger;
     const settingsProviderTimeoutFields = options.settingsProviderTimeoutFields;
     const settingsProviderSelect = options.settingsProviderSelect;
     const settingsProviderTrigger = options.settingsProviderTrigger;
@@ -658,6 +662,11 @@ export function createSettingsController(options) {
         settingsProviderModelMenu: settingsProviderModelMenu,
         settingsProviderModelSelect: settingsProviderModelSelect,
         settingsProviderModelTrigger: settingsProviderModelTrigger,
+        settingsProviderEffortCombobox: settingsProviderEffortCombobox,
+        settingsProviderEffortCurrent: settingsProviderEffortCurrent,
+        settingsProviderEffortMenu: settingsProviderEffortMenu,
+        settingsProviderEffortTrigger: settingsProviderEffortTrigger,
+        syncEffortModeConfig: options.syncEffortModeConfig,
         settingsProviderTimeoutFields: settingsProviderTimeoutFields,
         settingsProviderSelect: settingsProviderSelect,
         settingsProviderTrigger: settingsProviderTrigger,

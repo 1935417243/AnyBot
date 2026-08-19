@@ -174,10 +174,12 @@ function formatModelList(
   const lines = [style === "markdown" ? "🤖 **可用模型**" : "🤖 可用模型："];
   for (const [index, m] of models.entries()) {
     const marker = m.isCurrent ? " ✅" : "";
+    // 与 Web 端模型下拉一致：优先展示映射后的名字（如 k3-256k），无映射时回退到原始 id
+    const label = m.name || m.id;
     if (style === "markdown") {
-      lines.push(`${index + 1}. \`${m.id}\`${marker}`);
+      lines.push(`${index + 1}. \`${label}\`${marker}`);
     } else {
-      lines.push(`${index + 1}. ${m.id}${marker}`);
+      lines.push(`${index + 1}. ${label}${marker}`);
     }
   }
   if (invalidSelection) {

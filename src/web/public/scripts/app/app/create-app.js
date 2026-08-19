@@ -9,6 +9,7 @@ import { createChatInputUiController } from '../chat/input-ui.js';
 import { createMessageListController } from '../chat/message-list-controller.js';
 import { createMessageMetaController } from '../chat/message-meta.js';
 import { createPermissionMode } from '../chat/permission-mode.js';
+import { createEffortMode } from '../chat/effort-mode.js';
 import { createHomeHero } from '../chat/home-hero.js';
 import { createSendMessageController } from '../chat/send-message.js';
 import { createSessionController } from '../chat/session-controller.js';
@@ -68,6 +69,10 @@ export function createAnyBotApp(dom, deps) {
         modelBadge,
         modelDropdown,
         currentModelNameEl,
+        effortSwitcher,
+        effortBadge,
+        effortName,
+        effortDropdown,
         permissionSwitcher,
         permissionBadge,
         permissionName,
@@ -109,6 +114,10 @@ export function createAnyBotApp(dom, deps) {
         settingsProviderModelCurrent,
         settingsProviderModelMenu,
         settingsProviderModelSelect,
+        settingsProviderEffortCombobox,
+        settingsProviderEffortTrigger,
+        settingsProviderEffortCurrent,
+        settingsProviderEffortMenu,
         settingsProviderTimeoutFields,
         settingsProviderCompatToggleFields,
         settingsProviderBinFields,
@@ -180,6 +189,7 @@ export function createAnyBotApp(dom, deps) {
     let inputHistoryController = null;
     let permissionModeController = null;
     let branchSwitcherController = null;
+    let effortModeController = null;
     let homeHeroController = null;
     let appEventsBound = false;
     let pendingAttachments = [];
@@ -274,6 +284,25 @@ export function createAnyBotApp(dom, deps) {
         onError: showError,
     });
 
+    effortModeController = createEffortMode({
+        switcher: effortSwitcher,
+        badge: effortBadge,
+        nameEl: effortName,
+        dropdown: effortDropdown,
+        onError: showError,
+        onOpen: function () {
+            // 强度弹层与模型下拉都靠右对齐，打开强度弹层时关闭模型下拉，避免重叠
+            requireSettingsController().handleDocumentClick({ target: effortBadge });
+        },
+    });
+
+    // 反向互斥：打开模型下拉时关闭强度弹层
+    if (modelBadge) {
+        modelBadge.addEventListener('click', function () {
+            if (effortModeController) effortModeController.close();
+        });
+    }
+
     homeHeroController = createHomeHero({
         hero: homeHero,
         picker: homeProjectPicker,
@@ -322,6 +351,10 @@ export function createAnyBotApp(dom, deps) {
         modelBadge: modelBadge,
         modelDropdown: modelDropdown,
         modelSwitcher: modelSwitcher,
+        // 设置面板修改当前 provider 的默认强度后，同步聊天输入区的强度滑块
+        syncEffortModeConfig: function (config) {
+            if (effortModeController) effortModeController.applyModelConfig(config);
+        },
         onFontSizeChanged: function () {
             // zoom 变化后输入框的内联像素高度已过期,需要按新字号重新自适应
             resizeChatInput();
@@ -352,6 +385,10 @@ export function createAnyBotApp(dom, deps) {
         settingsProviderModelSelect: settingsProviderModelSelect,
         settingsProviderTimeoutFields: settingsProviderTimeoutFields,
         settingsProviderModelTrigger: settingsProviderModelTrigger,
+        settingsProviderEffortCombobox: settingsProviderEffortCombobox,
+        settingsProviderEffortCurrent: settingsProviderEffortCurrent,
+        settingsProviderEffortMenu: settingsProviderEffortMenu,
+        settingsProviderEffortTrigger: settingsProviderEffortTrigger,
         settingsProviderSelect: settingsProviderSelect,
         settingsProviderTrigger: settingsProviderTrigger,
         settingsSaveBtn: settingsSaveBtn,
@@ -626,7 +663,12 @@ export function createAnyBotApp(dom, deps) {
             return requireSidebarController().expandProject(projectId);
         },
         fetchModelConfig: function (providerType) {
-            return requireSettingsController().fetchModelConfig(providerType);
+            return requireSettingsController().fetchModelConfig(providerType).then(function () {
+                // provider 切换会影响强度选择器的显隐，模型配置刷新后同步一次
+                if (effortModeController) {
+                    effortModeController.applyModelConfig(requireSettingsController().getModelConfig());
+                }
+            });
         },
         fetchSessions: function () {
             return requireSidebarController().fetchSessions();
@@ -714,6 +756,7 @@ export function createAnyBotApp(dom, deps) {
                 currentSessionProvider: session.getCurrentSessionProvider(),
                 isTyping: session.getIsTyping(),
                 modelConfig: settings.getModelConfig(),
+                effort: effortModeController ? effortModeController.getEffort() : null,
                 pendingAttachments: pendingAttachments,
                 fileReferences: fileReferencePickerController ? fileReferencePickerController.getSelection() : [],
                 promptProjects: promptSelection.projects,
@@ -988,6 +1031,14 @@ export function createAnyBotApp(dom, deps) {
             requireSessionController().createNewChat(null, { force: true });
         });
 
+        // 侧边栏顶部在滚离顶部后显示分割线，滚回顶部后隐藏
+        var sidebarScrollEl = sidebar ? sidebar.querySelector('.sidebar-scroll') : null;
+        if (sidebar && sidebarScrollEl) {
+            sidebarScrollEl.addEventListener('scroll', function () {
+                sidebar.classList.toggle('sidebar-scrolled', sidebarScrollEl.scrollTop > 0);
+            });
+        }
+
         documentRef.addEventListener('click', function (e) {
             var slashPicker = requireSlashPickerController();
             var filePicker = requireFileReferencePickerController();
@@ -999,6 +1050,7 @@ export function createAnyBotApp(dom, deps) {
             }
             if (permissionModeController) permissionModeController.handleDocumentClick(e);
             if (branchSwitcherController) branchSwitcherController.handleDocumentClick(e);
+            if (effortModeController) effortModeController.handleDocumentClick(e);
             if (homeHeroController) homeHeroController.handleDocumentClick(e);
             if (pluginsPageController) pluginsPageController.handleDocumentClick(e);
             requireSettingsController().handleDocumentClick(e);
@@ -1020,6 +1072,7 @@ export function createAnyBotApp(dom, deps) {
                 }
                 if (permissionModeController && permissionModeController.handleEscape()) return;
                 if (branchSwitcherController && branchSwitcherController.handleEscape()) return;
+                if (effortModeController && effortModeController.handleEscape()) return;
                 if (homeHeroController && homeHeroController.handleEscape()) return;
                 if (requireSettingsController().handleDocumentEscape(e)) return;
             }
@@ -1046,6 +1099,7 @@ export function createAnyBotApp(dom, deps) {
             settings.fetchAppSettings(),
             settings.fetchProxyConfig(),
             permissionModeController ? permissionModeController.refresh() : Promise.resolve(),
+            effortModeController ? effortModeController.refresh() : Promise.resolve(),
         ]);
         settings.startDesktopUpdateStatusRefresh();
         var initialSessions = sidebar.getSessions();

@@ -21,7 +21,7 @@ export function createSendMessageController(config) {
         options = options || {};
         beginOutgoingMessage(outgoing);
 
-        var body = buildMessageRequestBody(outgoing, config.getState().modelConfig);
+        var body = buildMessageRequestBody(outgoing, config.getState().modelConfig, config.getState().effort);
         if (options.providerCommand) {
             body.providerCommand = options.providerCommand;
         }
@@ -157,6 +157,10 @@ export function createSendMessageController(config) {
         if (modelConfig && modelConfig.currentModel) {
             body.modelId = modelConfig.currentModel;
         }
+        var effort = config.getState().effort;
+        if (effort) {
+            body.effort = effort;
+        }
 
         try {
             var res = await fetch('/api/sessions/' + outgoing.sessionId + '/compact', {
@@ -280,7 +284,7 @@ export function createSendMessageController(config) {
         config.showTyping();
     }
 
-    function buildMessageRequestBody(outgoing, modelConfig) {
+    function buildMessageRequestBody(outgoing, modelConfig, effort) {
         var body = { content: outgoing.text };
         if (outgoing.skills.length > 0) {
             body.skills = outgoing.skills.map(function (skill) {
@@ -299,6 +303,9 @@ export function createSendMessageController(config) {
         }
         if (modelConfig && modelConfig.currentModel) {
             body.modelId = modelConfig.currentModel;
+        }
+        if (effort) {
+            body.effort = effort;
         }
         if (outgoing.attachments.length > 0) {
             body.attachments = outgoing.attachments.map(function (attachment) {

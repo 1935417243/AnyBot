@@ -1173,7 +1173,7 @@ function outputToAnthropicContent(
 
 export function listCodexAdapterModels(): JsonObject {
   const models = [
-    "gpt-5.5",
+    "gpt-5.6-sol",
     "gpt-mini",
     "gpt-codex",
   ];

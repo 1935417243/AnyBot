@@ -7,10 +7,21 @@ export interface ProviderModel {
   description: string;
 }
 
+/** 推理强度档位；ultracode 是 UI 档位，传给 Claude Agent SDK 时会映射为 xhigh */
+export type EffortLevel = "low" | "medium" | "high" | "xhigh" | "max" | "ultracode";
+
+/** 全部可选强度档位，顺序即前端滑块从左到右（快速 → 深度）的顺序 */
+export const EFFORT_LEVELS: EffortLevel[] = ["low", "medium", "high", "xhigh", "max", "ultracode"];
+
+/** Codex 支持的强度档位（与 Codex CLI 选择器一致，共 4 档） */
+export const CODEX_EFFORT_LEVELS: EffortLevel[] = ["low", "medium", "high", "xhigh"];
+
 export interface RunOptions {
   workdir: string;
   prompt: string;
   model?: string;
+  /** 推理强度档位，仅支持的 provider（claude-code、codex）会生效，其余 provider 忽略 */
+  effort?: EffortLevel;
   imagePaths?: string[];
   sessionId?: string;
   /** Optional UUID used by providers that can explicitly create a fresh session. */

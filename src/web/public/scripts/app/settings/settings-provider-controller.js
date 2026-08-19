@@ -13,6 +13,10 @@ export function createSettingsProviderController(options) {
     const settingsProviderModelMenu = options.settingsProviderModelMenu;
     const settingsProviderModelSelect = options.settingsProviderModelSelect;
     const settingsProviderModelTrigger = options.settingsProviderModelTrigger;
+    const settingsProviderEffortCombobox = options.settingsProviderEffortCombobox;
+    const settingsProviderEffortCurrent = options.settingsProviderEffortCurrent;
+    const settingsProviderEffortMenu = options.settingsProviderEffortMenu;
+    const settingsProviderEffortTrigger = options.settingsProviderEffortTrigger;
     const settingsProviderTimeoutFields = options.settingsProviderTimeoutFields;
     const settingsProviderSelect = options.settingsProviderSelect;
     const settingsProviderTrigger = options.settingsProviderTrigger;
@@ -21,11 +25,31 @@ export function createSettingsProviderController(options) {
     let providerData = null;
     let settingsModelConfig = null;
     let settingsProviderModelComboboxController = null;
+    let settingsProviderEffortComboboxController = null;
     let remoteProviderModelSuggestions = [];
     let remoteProviderModelFetchTimer = null;
     let remoteProviderModelFetchSeq = 0;
 
     const DEFAULT_PROVIDER_TIMEOUT_MINUTES = 30;
+    // 各 provider 的推理强度档位（与聊天输入区强度滑块一致）：claude-code 6 档，codex 4 档
+    const PROVIDER_EFFORT_LEVELS = {
+        'claude-code': [
+            { id: 'low', name: 'Low' },
+            { id: 'medium', name: 'Medium' },
+            { id: 'high', name: 'High' },
+            { id: 'xhigh', name: 'XHigh' },
+            { id: 'max', name: 'Max' },
+            { id: 'ultracode', name: 'Ultracode' },
+        ],
+        'codex': [
+            { id: 'low', name: 'Low' },
+            { id: 'medium', name: 'Medium' },
+            { id: 'high', name: 'High' },
+            { id: 'xhigh', name: 'XHigh' },
+        ],
+    };
+    // 未持久化过时展示的默认档位（各 provider 的档位列表里都包含它）
+    const DEFAULT_PROVIDER_EFFORT = 'high';
     const ALIYUN_TOKEN_PLAN_BASE_URL = 'https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic';
     const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
     const KIMI_CODING_MODELS = ['kimi-for-coding', 'k3', 'k3-256k', 'kimi-for-coding-highspeed'];
@@ -130,6 +154,11 @@ export function createSettingsProviderController(options) {
         if (options.applyModelConfig) options.applyModelConfig(config);
     }
 
+    // 同步聊天输入区的强度滑块（修改的是当前 provider 的默认强度时）
+    function syncEffortModeConfig(config) {
+        if (options.syncEffortModeConfig) options.syncEffortModeConfig(config);
+    }
+
     function refreshModelBadge() {
         if (options.refreshModelBadge) options.refreshModelBadge();
     }
@@ -160,9 +189,28 @@ export function createSettingsProviderController(options) {
             if (!res.ok) return;
             settingsModelConfig = await res.json();
             renderSettingsModelSelect();
+            renderSettingsEffortSelect();
         } catch (e) {
             console.error('Failed to fetch settings model config:', e);
         }
+    }
+
+    // 渲染「默认强度」下拉：档位按当前选中 provider 区分，值取该 provider 已持久化的档位
+    function renderSettingsEffortSelect() {
+        if (!settingsProviderEffortComboboxController) return;
+        var provider = getSelectedSettingsProvider();
+        var levels = (provider && PROVIDER_EFFORT_LEVELS[provider.type]) || [];
+        var current = settingsModelConfig && settingsModelConfig.effort;
+        var matched = levels.some(function (level) {
+            return level.id === current;
+        });
+        if (!matched) current = DEFAULT_PROVIDER_EFFORT;
+        settingsProviderEffortComboboxController.render(levels.map(function (level) {
+            return {
+                value: level.id,
+                label: level.name,
+            };
+        }), current);
     }
 
     function renderSettingsModelSelect() {
@@ -682,11 +730,17 @@ export function createSettingsProviderController(options) {
         var hasProviderSettings = !!definition;
         var showProviderFields = !!(definition && definition.isExpanded(cfg));
         var showModelSelect = isProviderInstalled(provider);
+        // 默认强度仅 claude-code / codex 支持，其余 provider 隐藏该字段
+        var showEffortSelect = showModelSelect && !!PROVIDER_EFFORT_LEVELS[provider.type];
         var showTimeoutField = provider.type === 'codex' || provider.type === 'claude-code';
         var providerModelField = settingsProviderModelSelect && settingsProviderModelSelect.closest('.settings-field');
+        var providerEffortField = settingsProviderEffortCombobox && settingsProviderEffortCombobox.closest('.settings-field');
         var providerActions = settingsSaveBtn && settingsSaveBtn.closest('.settings-button-row');
         if (providerModelField) {
             providerModelField.style.display = showModelSelect ? '' : 'none';
+        }
+        if (providerEffortField) {
+            providerEffortField.style.display = showEffortSelect ? '' : 'none';
         }
         if (providerActions) providerActions.style.display = showProviderFields ? '' : 'none';
         if (settingsProviderTimeoutFields) {
@@ -815,8 +869,8 @@ export function createSettingsProviderController(options) {
         return '<div class="settings-row"><span><strong>Anthropic Base URL</strong><small>兼容 Anthropic API 的服务地址</small></span>' +
             buildProviderBaseUrlInput(cfg.codexAnthropicBaseUrl || '', 'Anthropic Base URL') + '</div>' +
             buildProviderApiKeyRow(cfg.codexApiKey || '') +
-            '<div class="settings-row"><span><strong>gpt-5.5</strong><small>映射到默认通用模型</small></span>' +
-            buildProviderModelInput('settings-provider-codex-default-model', cfg.codexDefaultModel || '', 'gpt-5.5') + '</div>' +
+            '<div class="settings-row"><span><strong>gpt-5.6-sol</strong><small>映射到默认通用模型</small></span>' +
+            buildProviderModelInput('settings-provider-codex-default-model', cfg.codexDefaultModel || '', 'gpt-5.6-sol') + '</div>' +
             '<div class="settings-row"><span><strong>gpt-mini</strong><small>映射到轻量快速模型</small></span>' +
             buildProviderModelInput('settings-provider-codex-fast-model', cfg.codexFastModel || '', 'gpt-mini') + '</div>' +
             '<div class="settings-row"><span><strong>gpt-codex</strong><small>映射到编程模型</small></span>' +
@@ -1002,7 +1056,7 @@ export function createSettingsProviderController(options) {
         var fields = [
             ['Anthropic Base URL', baseUrlInput],
             ['API Key', document.getElementById('settings-provider-api-key')],
-            ['gpt-5.5', document.getElementById('settings-provider-codex-default-model')],
+            ['gpt-5.6-sol', document.getElementById('settings-provider-codex-default-model')],
             ['gpt-mini', document.getElementById('settings-provider-codex-fast-model')],
             ['gpt-codex', document.getElementById('settings-provider-codex-code-model')],
         ];
@@ -1099,12 +1153,31 @@ export function createSettingsProviderController(options) {
         closeOthers: function () {
             closeOtherSettingsMenus();
             setSettingsProviderMenuOpen(false);
+            if (settingsProviderEffortComboboxController) settingsProviderEffortComboboxController.setOpen(false);
         },
         onChange: function (modelId) {
             if (settingsProviderModelSelect) settingsProviderModelSelect.value = modelId;
             var provider = getSelectedSettingsProvider();
             if (!provider) return;
             saveSettingsProviderModel(provider.type, modelId);
+        },
+    });
+
+    settingsProviderEffortComboboxController = createSettingsSingleSelectCombobox({
+        combobox: settingsProviderEffortCombobox,
+        trigger: settingsProviderEffortTrigger,
+        current: settingsProviderEffortCurrent,
+        menu: settingsProviderEffortMenu,
+        placeholder: '请选择强度',
+        closeOthers: function () {
+            closeOtherSettingsMenus();
+            setSettingsProviderMenuOpen(false);
+            if (settingsProviderModelComboboxController) settingsProviderModelComboboxController.setOpen(false);
+        },
+        onChange: function (effortId) {
+            var provider = getSelectedSettingsProvider();
+            if (!provider) return;
+            saveSettingsProviderEffort(provider.type, effortId);
         },
     });
 
@@ -1158,6 +1231,7 @@ export function createSettingsProviderController(options) {
         if (isOpen) {
             closeOtherSettingsMenus();
             if (settingsProviderModelComboboxController) settingsProviderModelComboboxController.setOpen(false);
+            if (settingsProviderEffortComboboxController) settingsProviderEffortComboboxController.setOpen(false);
         }
         settingsProviderCombobox.classList.toggle('open', isOpen);
         settingsProviderTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
@@ -1235,6 +1309,31 @@ export function createSettingsProviderController(options) {
             showSettingsStatus('已保存');
         } catch (e) {
             showError('保存默认模型失败');
+        }
+    }
+
+    // 保存指定 provider 的默认强度；若改的是当前会话 provider，同步模型配置与聊天区强度滑块
+    async function saveSettingsProviderEffort(providerType, effortId) {
+        try {
+            var res = await fetch('/api/model-config', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({provider: providerType, effort: effortId}),
+            });
+            if (!res.ok) {
+                var err = await res.json().catch(function () { return {}; });
+                showError(err.error || '保存默认强度失败');
+                return false;
+            }
+            var savedConfig = await res.json();
+            settingsModelConfig = savedConfig;
+            if (!getCurrentSessionProvider() || getCurrentSessionProvider() === providerType) {
+                applyModelConfig(savedConfig);
+                syncEffortModeConfig(savedConfig);
+            }
+            showSettingsStatus('已保存');
+        } catch (e) {
+            showError('保存默认强度失败');
         }
     }
 
@@ -1349,6 +1448,7 @@ export function createSettingsProviderController(options) {
         setSettingsProviderMenuOpen(false);
         closeProviderModelSuggestionMenus();
         if (settingsProviderModelComboboxController) settingsProviderModelComboboxController.setOpen(false);
+        if (settingsProviderEffortComboboxController) settingsProviderEffortComboboxController.setOpen(false);
     }
 
     function handleDocumentClick(e) {
@@ -1357,6 +1457,9 @@ export function createSettingsProviderController(options) {
         }
         if (settingsProviderModelComboboxController && !settingsProviderModelComboboxController.contains(e.target)) {
             settingsProviderModelComboboxController.setOpen(false);
+        }
+        if (settingsProviderEffortComboboxController && !settingsProviderEffortComboboxController.contains(e.target)) {
+            settingsProviderEffortComboboxController.setOpen(false);
         }
         if (!e.target.closest || !e.target.closest('.provider-model-input-control')) {
             closeProviderModelSuggestionMenus();
@@ -1367,6 +1470,11 @@ export function createSettingsProviderController(options) {
         if (settingsProviderModelComboboxController && settingsProviderModelComboboxController.isOpen()) {
             settingsProviderModelComboboxController.setOpen(false);
             settingsProviderModelComboboxController.focusTrigger();
+            return true;
+        }
+        if (settingsProviderEffortComboboxController && settingsProviderEffortComboboxController.isOpen()) {
+            settingsProviderEffortComboboxController.setOpen(false);
+            settingsProviderEffortComboboxController.focusTrigger();
             return true;
         }
         if (document.querySelector('.provider-model-input-control.open')) {

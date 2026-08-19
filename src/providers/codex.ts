@@ -91,6 +91,9 @@ const CODEX_BUNDLED_BIN_LABEL = "bundled Codex CLI";
 const moduleRequire = createRequire(import.meta.url);
 
 const CODEX_MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  "gpt-5.6-sol": 1_000_000,
+  "gpt-5.6-terra": 1_000_000,
+  "gpt-5.6-luna": 400_000,
   "gpt-5.4": 1_000_000,
   "gpt-5.4-mini": 400_000,
   "gpt-5.3-codex": 258_000,
@@ -313,7 +316,7 @@ export function resolveBundledCodexExecutable(): string | null {
       path.dirname(platformPackageJsonPath),
       "vendor",
       targetTriple,
-      "codex",
+      "bin",
       binaryName,
     );
     return canRun(binaryPath) ? binaryPath : null;
@@ -725,18 +728,16 @@ export class CodexProvider implements IProvider {
   listModels(): ProviderModel[] {
     if (this.codexCompatEnabled) {
       return [
-        { id: "gpt-5.5", name: this.codexDefaultModel || "gpt-5.5", description: "默认通用模型" },
+        { id: "gpt-5.6-sol", name: this.codexDefaultModel || "gpt-5.6-sol", description: "默认通用模型" },
         { id: "gpt-mini", name: this.codexFastModel || this.codexDefaultModel || "gpt-mini", description: "轻量快速模型" },
         { id: "gpt-codex", name: this.codexCodeModel || this.codexDefaultModel || "gpt-codex", description: "编程模型" },
       ];
     }
 
     return [
-      { id: "gpt-5.5", name: "GPT-5.5", description: "最新通用模型" },
-      { id: "gpt-5.4", name: "GPT-5.4", description: "通用模型" },
-      { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", description: "轻量快速模型" },
-      { id: "gpt-5.3-codex", name: "GPT-5.3 Codex", description: "编程模型" },
-      { id: "gpt-5.2", name: "GPT-5.2", description: "稳定通用模型" },
+      { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", description: "最新通用模型" },
+      { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", description: "通用模型" },
+      { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", description: "轻量快速模型" },
     ];
   }
 
@@ -770,6 +771,7 @@ export class CodexProvider implements IProvider {
       workdir,
       prompt,
       model,
+      effort,
       imagePaths = [],
       sessionId,
       timeoutMs = this.timeoutMs,
@@ -886,11 +888,14 @@ export class CodexProvider implements IProvider {
         message: "Codex Agent 已启动",
       });
 
+      // max / ultracode 是 AnyBot 的 UI 档位，Codex 最高只到 xhigh
+      const codexEffort = effort === "max" || effort === "ultracode" ? "xhigh" : effort;
       const threadOptions: ThreadOptions = {
         workingDirectory: workdir,
         skipGitRepoCheck: true,
         sandboxMode: sandbox as ThreadOptions["sandboxMode"],
         model: model || undefined,
+        modelReasoningEffort: codexEffort as ThreadOptions["modelReasoningEffort"],
       };
       const codex = this.createCodexForAdapterRun(adapterRunId);
       const thread = sessionId

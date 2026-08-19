@@ -7,10 +7,13 @@ import {
   getProviderTypes,
   readModelConfig,
   readModelConfigForProvider,
+  setCurrentEffort,
   setCurrentModel,
   setCurrentProvider,
+  setEffortForProvider,
   setModelForProvider,
 } from "../model-config.js";
+import type { EffortLevel } from "../../providers/types.js";
 import { fetchProviderModels, ProviderModelFetchError } from "../services/provider-models.js";
 
 export function createProvidersRouter(): Router {
@@ -42,14 +45,30 @@ export function createProvidersRouter(): Router {
   });
 
   router.put("/model-config", (req: Request, res: Response) => {
-    const { modelId, provider } = req.body as { modelId?: string; provider?: string };
-    if (!modelId) {
-      res.status(400).json({ error: "缺少 modelId" });
+    const { modelId, provider, effort } = req.body as {
+      modelId?: string;
+      provider?: string;
+      effort?: string;
+    };
+    if (!modelId && !effort) {
+      res.status(400).json({ error: "缺少 modelId 或 effort" });
       return;
     }
     try {
-      const config = provider ? setModelForProvider(provider, modelId) : setCurrentModel(modelId);
-      logger.info("model.switched", { modelId, provider: provider || config.provider });
+      // 强度档位与模型互不依赖，允许同请求一起更新，后者覆盖返回体；
+      // 带 provider 时按该 provider 校验并持久化档位（claude-code 与 codex 档位集合不同）
+      let config = effort
+        ? provider
+          ? setEffortForProvider(provider, effort as EffortLevel)
+          : setCurrentEffort(effort as EffortLevel)
+        : undefined;
+      if (modelId) {
+        config = provider ? setModelForProvider(provider, modelId) : setCurrentModel(modelId);
+        logger.info("model.switched", { modelId, provider: provider || config.provider });
+      }
+      if (effort) {
+        logger.info("model.effort_switched", { effort, provider: config?.provider });
+      }
       res.json(config);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "切换模型失败";

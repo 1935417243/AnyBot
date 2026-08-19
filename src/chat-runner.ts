@@ -9,7 +9,7 @@ import {
 } from "./providers/index.js";
 import type { IProvider, RunResult } from "./providers/index.js";
 import type { ClaudeAgentStreamEvent } from "./providers/claude-code-agent-events.js";
-import { ProviderCancelledError } from "./providers/types.js";
+import { ProviderCancelledError, EFFORT_LEVELS, CODEX_EFFORT_LEVELS, type EffortLevel } from "./providers/types.js";
 import {
   includeContentInLogs,
   includePromptInLogs,
@@ -24,7 +24,7 @@ import {
   getSandbox,
   getWorkdir,
 } from "./shared.js";
-import { getModelForProvider } from "./web/model-config.js";
+import { getCurrentEffort, getModelForProvider } from "./web/model-config.js";
 import * as db from "./web/db.js";
 import { buildAssistantMetadata, type AgentStreamEvent } from "./web/agent-stream.js";
 import {
@@ -53,6 +53,8 @@ export type PreparedChatTurn = {
   session: ChatSessionRecord;
   provider: IProvider;
   model: string;
+  /** 本次运行的推理强度档位，仅 claude-code provider 有值 */
+  effort?: EffortLevel;
   workdir: string;
   sandbox: ReturnType<typeof getSandbox>;
   source: string;
@@ -74,6 +76,8 @@ export type PrepareChatTurnOptions = {
   userMetadata?: string | null;
   imagePaths?: string[];
   modelId?: string;
+  /** 请求方指定的推理强度档位（原始字符串，prepare 时校验合法性） */
+  effort?: string;
   workdir?: string;
   includeWorkspaceMemory?: boolean;
   requireStreaming?: boolean;
@@ -83,6 +87,8 @@ export type PrepareProviderCommandTurnOptions = {
   session: ChatSessionRecord;
   commandText: string;
   modelId?: string;
+  /** 请求方指定的推理强度档位（原始字符串，prepare 时校验合法性） */
+  effort?: string;
   workdir?: string;
 };
 
@@ -156,6 +162,28 @@ function resolveRunModel(provider: IProvider, requestedModelId?: string): string
     throw new ChatTurnValidationError(`不支持的模型: ${modelId}`);
   }
   return modelId;
+}
+
+/** 解析本次运行的推理强度：仅 claude-code / codex 支持；未指定时回落到持久化的默认档位 */
+function resolveRunEffort(provider: IProvider, requestedEffort?: string): EffortLevel | undefined {
+  // 各 provider 支持的强度档位；不在表中的 provider 忽略强度参数
+  const supportedLevels = provider.type === "claude-code"
+    ? EFFORT_LEVELS
+    : provider.type === "codex"
+      ? CODEX_EFFORT_LEVELS
+      : null;
+  if (!supportedLevels) return undefined;
+  const effort = requestedEffort?.trim();
+  if (!effort) {
+    const persisted = getCurrentEffort();
+    // 持久化档位可能超出当前 provider 的支持范围（如 codex 不支持 max/ultracode），此时回落到 high
+    return persisted && supportedLevels.includes(persisted) ? persisted : "high";
+  }
+
+  if (!supportedLevels.includes(effort as EffortLevel)) {
+    throw new ChatTurnValidationError(`不支持的强度: ${effort}`);
+  }
+  return effort as EffortLevel;
 }
 
 function normalizeProviderCommandText(value: string): string {
@@ -299,6 +327,7 @@ export function prepareChatTurn(opts: PrepareChatTurnOptions): PreparedChatTurn 
   }
 
   const model = resolveRunModel(provider, opts.modelId);
+  const effort = resolveRunEffort(provider, opts.effort);
   const workdir = opts.workdir || getWorkdir();
   const sandbox = getSandbox();
   const source = opts.session.source || "web";
@@ -316,6 +345,7 @@ export function prepareChatTurn(opts: PrepareChatTurnOptions): PreparedChatTurn 
     session: opts.session,
     provider,
     model,
+    effort,
     workdir,
     sandbox,
     source,
@@ -339,6 +369,7 @@ export function prepareProviderCommandTurn(
   }
 
   const model = resolveRunModel(provider, opts.modelId);
+  const effort = resolveRunEffort(provider, opts.effort);
   const workdir = opts.workdir || getWorkdir();
   const sandbox = getSandbox();
   const source = opts.session.source || "web";
@@ -349,6 +380,7 @@ export function prepareProviderCommandTurn(
     session: opts.session,
     provider,
     model,
+    effort,
     workdir,
     sandbox,
     source,
@@ -474,6 +506,7 @@ export async function runPreparedChatTurn(
       workdir: prepared.workdir,
       sandbox: prepared.sandbox,
       model: prepared.model,
+      effort: prepared.effort,
       prompt: prepared.prompt,
       imagePaths: prepared.imagePaths.length > 0 ? prepared.imagePaths : undefined,
       sessionId: prepared.providerSessionId || undefined,
@@ -631,6 +664,8 @@ export async function compactChatSession(opts: {
   session: ChatSessionRecord;
   workdir?: string;
   modelId?: string;
+  /** 请求方指定的推理强度档位（原始字符串，此处校验合法性） */
+  effort?: string;
   signal?: AbortSignal;
   logPrefix: string;
   logFields?: Record<string, unknown>;
@@ -650,6 +685,7 @@ export async function compactChatSession(opts: {
 
   const workdir = opts.workdir || getWorkdir();
   const model = resolveRunModel(provider, opts.modelId);
+  const effort = resolveRunEffort(provider, opts.effort);
   const sandbox = getSandbox();
   const prompt = command.command || "/compact";
 
@@ -668,6 +704,7 @@ export async function compactChatSession(opts: {
       workdir,
       sandbox,
       model,
+      effort,
       prompt,
       sessionId: opts.session.sessionId,
       rawProviderCommand: true,

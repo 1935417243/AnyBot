@@ -20,6 +20,7 @@ import {
   getCurrentModel,
   readPersistedProviderType,
   readModelConfig,
+  readModelConfigForProvider,
   setCurrentProvider,
   setCurrentModel,
   getProviderTypes,
@@ -138,8 +139,10 @@ function handleSwitchProvider(providerType: string) {
   }
 }
 
+// 与 Web 端模型下拉（/api/model-config?provider=xxx）使用同一数据源：
+// 通过 readModelConfigForProvider 实时从 provider 构建模型列表，避免渠道 /model 返回旧的持久化缓存
 function listModels() {
-  const config = readModelConfig();
+  const config = readModelConfigForProvider(readModelConfig().provider);
   return config.models.map((m) => ({
     ...m,
     isCurrent: m.id === config.currentModel,
@@ -148,10 +151,12 @@ function listModels() {
 
 function handleSwitchModel(modelId: string) {
   try {
-    const config = setCurrentModel(modelId);
+    // /model 列表展示的是映射后的名字（如 k3-256k），允许直接按展示名切换，先解析回模型 id 再持久化
+    const target = listModels().find((m) => m.id === modelId || m.name === modelId);
+    const config = setCurrentModel(target?.id ?? modelId);
     return {
       success: true,
-      message: `已切换到模型: ${config.currentModel}`,
+      message: `已切换到模型: ${target?.name || config.currentModel}`,
     };
   } catch (e: any) {
     return { success: false, message: e.message || "切换模型失败" };

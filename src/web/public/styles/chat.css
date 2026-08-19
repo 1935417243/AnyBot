@@ -151,19 +151,6 @@
             text-overflow: ellipsis;
         }
 
-        .model-badge-arrow {
-            width: 13px;
-            height: 13px;
-            color: currentColor;
-            opacity: 0.72;
-            transition: transform 0.2s ease;
-            flex-shrink: 0;
-        }
-
-        .model-switcher.open .model-badge-arrow {
-            transform: rotate(180deg);
-        }
-
         .model-switcher.open .model-badge {
             background: var(--subtle-active);
             color: var(--text);
@@ -256,6 +243,154 @@
             font-size: 12px;
             color: var(--text-muted);
             padding-left: 20px;
+        }
+
+        .effort-switcher {
+            position: relative;
+            flex: 0 0 auto;
+        }
+
+        .effort-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            height: 32px;
+            padding: 0 5px 0 7px;
+            background: transparent;
+            border: 0;
+            border-radius: 7px;
+            color: var(--text-muted);
+            cursor: pointer;
+            outline: none;
+            transition: background 0.18s ease, color 0.18s ease;
+            user-select: none;
+            font-family: 'Sora', sans-serif;
+        }
+
+        .effort-badge:hover {
+            background: var(--subtle-hover);
+            color: var(--text);
+        }
+
+        .effort-badge:focus-visible {
+            background: var(--subtle-active);
+        }
+
+        .effort-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: currentColor;
+            white-space: nowrap;
+            /* 按最长档位名 Ultracode 预留固定宽度，切换档位时 badge 宽度不变、相邻按钮不位移 */
+            min-width: 68px;
+            text-align: center;
+        }
+
+        .effort-switcher.open .effort-badge {
+            background: var(--subtle-active);
+            color: var(--text);
+        }
+
+        .effort-dropdown {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            right: 0;
+            width: min(260px, calc(100vw * var(--app-viewport-scale) - 48px));
+            background: var(--popover-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px 16px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(4px);
+            transition: all 0.18s ease;
+            z-index: 50;
+            box-shadow: 0 -8px 32px var(--popover-shadow);
+        }
+
+        .effort-switcher.open .effort-dropdown {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .effort-dropdown-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 12px;
+        }
+
+        .effort-slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .effort-slider {
+            position: relative;
+            height: 28px;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        .effort-slider-track {
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            top: 50%;
+            height: 16px;
+            transform: translateY(-50%);
+            border-radius: 999px;
+            background: var(--border);
+        }
+
+        .effort-slider-fill {
+            height: 100%;
+            width: 0;
+            border-radius: 999px;
+            background: var(--accent);
+            transition: width 0.12s ease;
+        }
+
+        .effort-slider-stop {
+            position: absolute;
+            top: 50%;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            transform: translate(-50%, -50%);
+            transition: background 0.12s ease;
+            pointer-events: none;
+        }
+
+        /* 已覆盖的刻度位于紫色填充之上，用白色避免与填充同色不可见 */
+        .effort-slider-stop.filled {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .effort-slider-thumb {
+            position: absolute;
+            top: 50%;
+            width: 12px;
+            height: 16px;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+            transform: translate(-50%, -50%);
+            transition: left 0.12s ease;
+            pointer-events: none;
+        }
+
+        .effort-slider.dragging .effort-slider-thumb {
+            transition: none;
+        }
+
+        .effort-slider.dragging .effort-slider-fill {
+            transition: none;
         }
 
         #main {

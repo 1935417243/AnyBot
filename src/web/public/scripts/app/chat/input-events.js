@@ -11,7 +11,7 @@ function bindInputWrapper(config) {
     if (!config.inputWrapper) return;
     config.inputWrapper.addEventListener('click', function (event) {
         if (event.target === config.inputEl) return;
-        if (event.target.closest && event.target.closest('button, input, textarea, [tabindex], .model-switcher')) return;
+        if (event.target.closest && event.target.closest('button, input, textarea, [tabindex], .model-switcher, .effort-switcher')) return;
         focusInputEnd(config.inputEl);
     });
 }

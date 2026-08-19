@@ -961,12 +961,31 @@ function createWindow() {
       nodeIntegration: false,
     },
   };
+
+  // macOS：隐藏系统标题栏，仅保留原生红黄绿按钮并融入应用顶部 UI
+  if (process.platform === "darwin") {
+    browserWindowOptions.titleBarStyle = "hidden";
+    // 红黄绿按钮位置：靠近窗口顶边，与侧边栏 Logo 行垂直居中对齐
+    browserWindowOptions.trafficLightPosition = { x: 14, y: 16 };
+  }
   const iconPath = resolveAppIconPath();
   if (iconPath) {
     browserWindowOptions.icon = iconPath;
   }
 
   mainWindow = new BrowserWindow(browserWindowOptions);
+
+  // macOS：给页面 body 打上平台标记，用于启用顶部拖拽区域与红黄绿按钮避让样式
+  if (process.platform === "darwin") {
+    mainWindow.webContents.on("dom-ready", () => {
+      if (!mainWindow) {
+        return;
+      }
+      mainWindow.webContents
+        .executeJavaScript('document.body && document.body.classList.add("platform-macos-desktop")')
+        .catch(() => {});
+    });
+  }
 
   mainWindow.loadURL(appUrl);
   mainWindow.once("ready-to-show", () => mainWindow.show());

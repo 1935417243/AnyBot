@@ -296,6 +296,13 @@ export function createSidebarController(options) {
         isProjectsCollapsed = !!collapsed;
         localStorage.setItem("projectsCollapsed", String(isProjectsCollapsed));
         updateProjectsCollapsedState();
+        // 折叠项目列表时，同时收起所有已展开的项目；再次展开时保持全部收起状态
+        if (isProjectsCollapsed && expandedProjectIds.size > 0) {
+            expandedProjectIds.clear();
+            expandedProjectSessionIds.clear();
+            saveStoredSet("expandedProjectIds", expandedProjectIds);
+            renderProjects();
+        }
     }
 
     function toggleProjects() {
@@ -312,6 +319,11 @@ export function createSidebarController(options) {
         isHistoryCollapsed = !!collapsed;
         localStorage.setItem("historyCollapsed", String(isHistoryCollapsed));
         updateHistoryCollapsedState();
+        // 折叠对话列表时，把"查看更多"的展开状态重置，下次展开恢复为预览数量
+        if (isHistoryCollapsed && isHistorySessionsExpanded) {
+            isHistorySessionsExpanded = false;
+            renderHistory();
+        }
     }
 
     function toggleHistory() {

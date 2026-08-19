@@ -26,6 +26,11 @@ export function getAppDom(documentRef) {
         modelDropdown: byId(documentRef, 'model-dropdown'),
         currentModelNameEl: byId(documentRef, 'current-model-name'),
 
+        effortSwitcher: byId(documentRef, 'effort-switcher'),
+        effortBadge: byId(documentRef, 'effort-badge'),
+        effortName: byId(documentRef, 'effort-name'),
+        effortDropdown: byId(documentRef, 'effort-dropdown'),
+
         permissionSwitcher: byId(documentRef, 'permission-switcher'),
         permissionBadge: byId(documentRef, 'permission-badge'),
         permissionName: byId(documentRef, 'permission-name'),
@@ -70,6 +75,10 @@ export function getAppDom(documentRef) {
         settingsProviderModelCurrent: byId(documentRef, 'settings-provider-model-current'),
         settingsProviderModelMenu: byId(documentRef, 'settings-provider-model-menu'),
         settingsProviderModelSelect: byId(documentRef, 'settings-provider-model-select'),
+        settingsProviderEffortCombobox: byId(documentRef, 'settings-provider-effort-combobox'),
+        settingsProviderEffortTrigger: byId(documentRef, 'settings-provider-effort-trigger'),
+        settingsProviderEffortCurrent: byId(documentRef, 'settings-provider-effort-current'),
+        settingsProviderEffortMenu: byId(documentRef, 'settings-provider-effort-menu'),
         settingsProviderTimeoutFields: byId(documentRef, 'settings-provider-timeout-fields'),
         settingsProviderCompatToggleFields: byId(documentRef, 'settings-provider-compat-toggle-fields'),
         settingsProviderBinFields: byId(documentRef, 'settings-provider-bin-fields'),

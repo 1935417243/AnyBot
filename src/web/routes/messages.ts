@@ -63,12 +63,15 @@ type WebMessageRequestBody = {
   skills?: ChatPromptSkill[];
   projects?: ChatPromptProject[];
   modelId?: string;
+  /** 推理强度档位（原始字符串，chat-runner 里校验合法性） */
+  effort?: string;
   providerCommand?: string;
 };
 
 type PreparedWebMessageRequest = {
   input: ReturnType<typeof prepareWebChatInput>;
   modelId?: string;
+  effort?: string;
   providerCommandText: string;
 };
 
@@ -82,7 +85,7 @@ function prepareWebMessageRequest(
   session: db.ChatSessionMetadata,
   workdir: string,
 ): PreparedWebMessageRequest | WebMessageRequestError {
-  const { content, attachments, fileReferences, skills, projects, modelId, providerCommand } = body;
+  const { content, attachments, fileReferences, skills, projects, modelId, effort, providerCommand } = body;
   const explicitProviderCommand = cleanProviderCommand(providerCommand);
   const requestAttachments = Array.isArray(attachments) ? attachments : [];
   const requestFileReferences = Array.isArray(fileReferences) ? fileReferences : [];
@@ -113,7 +116,7 @@ function prepareWebMessageRequest(
     return { statusCode: 400, error: "执行命令时不能同时附加文件、技能或项目" };
   }
 
-  return { input, modelId, providerCommandText };
+  return { input, modelId, effort, providerCommandText };
 }
 
 function isWebMessageRequestError(
@@ -179,13 +182,14 @@ export function createMessagesRouter(): Router {
       return;
     }
 
-    const { modelId } = req.body as { modelId?: string };
+    const { modelId, effort } = req.body as { modelId?: string; effort?: string };
     const activeRun = createActiveRun(id, "compact");
 
     try {
       const result = await compactChatSession({
         session,
         modelId,
+        effort,
         workdir: sessionWorkdir,
         signal: activeRun.controller.signal,
         logPrefix: "web.chat.compact",
@@ -245,7 +249,7 @@ export function createMessagesRouter(): Router {
       res.status(request.statusCode).json({ error: request.error });
       return;
     }
-    const { input, modelId, providerCommandText } = request;
+    const { input, modelId, effort, providerCommandText } = request;
 
     let prepared: PreparedChatTurn;
     try {
@@ -254,6 +258,7 @@ export function createMessagesRouter(): Router {
             session,
             commandText: providerCommandText,
             modelId,
+            effort,
             workdir: sessionWorkdir,
           })
         : prepareChatTurn({
@@ -264,6 +269,7 @@ export function createMessagesRouter(): Router {
             userMetadata: input.userMetadata,
             imagePaths: input.imagePaths,
             modelId,
+            effort,
             workdir: sessionWorkdir,
             includeWorkspaceMemory: !session.projectId,
             requireStreaming: true,
@@ -337,7 +343,7 @@ export function createMessagesRouter(): Router {
       res.status(request.statusCode).json({ error: request.error });
       return;
     }
-    const { input, modelId, providerCommandText } = request;
+    const { input, modelId, effort, providerCommandText } = request;
 
     try {
       const prepared = providerCommandText
@@ -345,6 +351,7 @@ export function createMessagesRouter(): Router {
             session,
             commandText: providerCommandText,
             modelId,
+            effort,
             workdir: sessionWorkdir,
           })
         : prepareChatTurn({
@@ -355,6 +362,7 @@ export function createMessagesRouter(): Router {
             userMetadata: input.userMetadata,
             imagePaths: input.imagePaths,
             modelId,
+            effort,
             workdir: sessionWorkdir,
             includeWorkspaceMemory: !session.projectId,
           });

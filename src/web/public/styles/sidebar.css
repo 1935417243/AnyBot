@@ -36,9 +36,28 @@
         }
 
         .sidebar-top {
-            padding: 20px 8px 12px;
-            border-bottom: 1px solid var(--border);
+            padding: 20px 8px 0;
+            position: relative;
             flex-shrink: 0;
+        }
+
+        /* 半透明 hairline 分割线：左右边缘渐隐，默认隐藏，滚动后淡入 */
+        .sidebar-top::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--border) 12%, var(--border) 88%, transparent);
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            pointer-events: none;
+        }
+
+        /* 滚动区域离开顶部后才显示分割线，滚回顶部时隐藏 */
+        #sidebar.sidebar-scrolled .sidebar-top::after {
+            opacity: 0.5;
         }
 
         .logo {
@@ -118,6 +137,12 @@
         }
 
         .sidebar-section {
+            flex-shrink: 0;
+        }
+
+        /* 滚动区顶部的导航按钮组（插件/频道/自动化），与下方区块保持左右对齐 */
+        .sidebar-nav {
+            padding: 0 8px;
             flex-shrink: 0;
         }
 
@@ -342,12 +367,24 @@
             z-index: 5;
             margin-top: auto;
             padding: 4px 8px 8px;
-            border-top: 1px solid var(--border);
             background: var(--sidebar);
             flex-shrink: 0;
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        /* 半透明 hairline 分割线：左右边缘渐隐，常显 */
+        .sidebar-footer::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--border) 12%, var(--border) 88%, transparent);
+            opacity: 0.5;
+            pointer-events: none;
         }
 
         #settings-btn {
@@ -535,15 +572,13 @@
         }
 
         .project-item:hover .project-create-chat,
-        .project-item:focus-within .project-create-chat,
-        .project-item.active .project-create-chat {
+        .project-item:focus-within .project-create-chat {
             opacity: 1;
             pointer-events: auto;
         }
 
         .project-item:hover .project-delete,
-        .project-item:focus-within .project-delete,
-        .project-item.active .project-delete {
+        .project-item:focus-within .project-delete {
             opacity: 1;
             pointer-events: auto;
         }

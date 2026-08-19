@@ -50,29 +50,32 @@
             </svg>
             新对话
         </button>
-        <button id="plugins-btn">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M5.5 1.5h3v2a1.5 1.5 0 1 0 3 0v-2h1a1 1 0 0 1 1 1v3h-2a1.5 1.5 0 1 0 0 3h2v3a1 1 0 0 1-1 1h-3v-2a1.5 1.5 0 1 0-3 0v2h-3a1 1 0 0 1-1-1v-3h2a1.5 1.5 0 1 0 0-3h-2v-3a1 1 0 0 1 1-1h1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            插件
-        </button>
-        <button id="channels-btn">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M1.5 5h11M1.5 9h11M5 1.5l-1.5 11M10.5 1.5L9 12.5" stroke="currentColor" stroke-width="1.2"
-                      stroke-linecap="round"/>
-            </svg>
-            频道
-        </button>
-        <button id="automations-btn" type="button">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <path d="M7 3.8v3.4l2.1 1.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12.5 7A5.5 5.5 0 1 1 1.5 7a5.5 5.5 0 0 1 11 0Z" stroke="currentColor" stroke-width="1.1"/>
-            </svg>
-            自动化
-        </button>
     </div>
 
     <div class="sidebar-scroll">
+        <div class="sidebar-nav">
+            <button id="plugins-btn">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M5.5 1.5h3v2a1.5 1.5 0 1 0 3 0v-2h1a1 1 0 0 1 1 1v3h-2a1.5 1.5 0 1 0 0 3h2v3a1 1 0 0 1-1 1h-3v-2a1.5 1.5 0 1 0-3 0v2h-3a1 1 0 0 1-1-1v-3h2a1.5 1.5 0 1 0 0-3h-2v-3a1 1 0 0 1 1-1h1Z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                插件
+            </button>
+            <button id="channels-btn">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M1.5 5h11M1.5 9h11M5 1.5l-1.5 11M10.5 1.5L9 12.5" stroke="currentColor" stroke-width="1.2"
+                          stroke-linecap="round"/>
+                </svg>
+                频道
+            </button>
+            <button id="automations-btn" type="button">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M7 3.8v3.4l2.1 1.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12.5 7A5.5 5.5 0 1 1 1.5 7a5.5 5.5 0 0 1 11 0Z" stroke="currentColor" stroke-width="1.1"/>
+                </svg>
+                自动化
+            </button>
+        </div>
+
         <div class="sidebar-section">
             <div class="sidebar-section-header">
                 <button class="sidebar-label project-toggle" id="project-toggle" type="button" aria-expanded="true">
@@ -207,10 +210,13 @@
                         <div class="model-dropdown" id="model-dropdown"></div>
                         <button class="model-badge" id="model-badge" type="button" aria-haspopup="listbox" aria-expanded="false">
                             <span class="model-name" id="current-model-name">加载中…</span>
-                            <svg class="model-badge-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
-                                      stroke-linejoin="round"/>
-                            </svg>
+                        </button>
+                    </div>
+                    <!-- 推理强度选择器：仅支持强度档位的 provider（claude-code / codex）显示；其他 provider 用 display:none 隐藏，不占位 -->
+                    <div class="effort-switcher" id="effort-switcher" style="display:none;">
+                        <div class="effort-dropdown" id="effort-dropdown"></div>
+                        <button class="effort-badge" id="effort-badge" type="button" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="effort-name" id="effort-name">High</span>
                         </button>
                     </div>
                     <button id="send-btn" disabled>
@@ -383,6 +389,20 @@
                                             <div class="settings-combobox-menu" id="settings-provider-model-menu" role="listbox" aria-labelledby="settings-provider-model-label"></div>
                                         </div>
                                         <select class="settings-select" id="settings-provider-model-select" aria-hidden="true" tabindex="-1"></select>
+                                    </div>
+                                    <div class="settings-field">
+                                        <span class="settings-field-label" id="settings-provider-effort-label">默认强度</span>
+                                        <div class="settings-combobox" id="settings-provider-effort-combobox">
+                                            <button class="settings-combobox-trigger" id="settings-provider-effort-trigger" type="button"
+                                                    aria-haspopup="listbox" aria-expanded="false"
+                                                    aria-labelledby="settings-provider-effort-label settings-provider-effort-current">
+                                                <span class="settings-combobox-value" id="settings-provider-effort-current">加载中…</span>
+                                                <svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                            </button>
+                                            <div class="settings-combobox-menu" id="settings-provider-effort-menu" role="listbox" aria-labelledby="settings-provider-effort-label"></div>
+                                        </div>
                                     </div>
                                     <div class="settings-field" id="settings-provider-timeout-fields"></div>
                                     <div id="settings-provider-compat-toggle-fields"></div>
