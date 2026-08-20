@@ -1,11 +1,19 @@
 [English](./README.md) | **中文**
 
-# AnyBot
+<div align="center">
+  <img src="assets/logo.png" alt="AnyBot logo" width="120">
+  <h1>AnyBot</h1>
+  <p>本机 AI Coding Agent 控制台，桌面端、网页和聊天频道一个入口。</p>
 
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Stars](https://img.shields.io/github/stars/1935417243/AnyBot)
-![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
+  <p>
+    <a href="https://github.com/1935417243/AnyBot/actions/workflows/build-portable.yml"><img src="https://github.com/1935417243/AnyBot/actions/workflows/build-portable.yml/badge.svg" alt="Build"></a>
+    <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
+    <img src="https://img.shields.io/github/stars/1935417243/AnyBot" alt="Stars">
+    <img src="https://img.shields.io/github/v/release/1935417243/AnyBot" alt="Release">
+    <img src="https://img.shields.io/github/downloads/1935417243/AnyBot/total" alt="Downloads">
+    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue" alt="Platform">
+  </p>
+</div>
 
 AnyBot 是一个本机 AI Coding Agent 控制台与远程入口，可以让你通过桌面 App、Web UI、微信、QQ、Telegram、飞书、钉钉等渠道控制和管理电脑上的 AI Coding Agent。
 
@@ -36,13 +44,24 @@ AnyBot 默认使用随 `@openai/codex-sdk` 和 `@anthropic-ai/claude-agent-sdk` 
 
 ## 截图预览
 
-![新对话](assets/主页.png)
-
-![自动化](assets/自动化.png)
-
-![频道](assets/频道页.png)
-
-![设置](assets/设置页.png)
+<table>
+  <tr>
+    <td><img src="assets/主页.png" alt="新对话"></td>
+    <td><img src="assets/流式过程.png" alt="流式过程"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/变更审核.png" alt="变更审核"></td>
+    <td><img src="assets/自动化.png" alt="自动化"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/频道页.png" alt="频道"></td>
+    <td><img src="assets/设置页.png" alt="设置"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/插件页.png" alt="插件"></td>
+    <td></td>
+  </tr>
+</table>
 
 ---
 
@@ -228,7 +247,7 @@ Web UI 是当前推荐入口，主要能力包括：
 }
 ```
 
-`weixin.botAgent` 留空时默认按当前应用版本生成（例如 `AnyBot/1.0.0`）。
+`weixin.botAgent` 留空时默认按当前应用版本生成（例如 `AnyBot/1.0.3`）。
 
 ### 飞书
 
@@ -319,7 +338,10 @@ curl -X POST http://localhost:19981/api/send \
 
 ---
 
-## 工作原理
+<details>
+<summary><b>开发者文档：工作原理、项目结构和开发命令</b></summary>
+
+### 工作原理
 
 - `src/index.ts` 启动 Provider、Web 服务、已启用频道、桌面更新检查和 MCP Server 启动校验。
 - `src/chat-runner.ts` 是 Web UI 和频道进入模型调用的统一编排层，负责 Provider session、项目工作目录、prompt、消息落库、流式事件和变更审核。
@@ -331,9 +353,7 @@ curl -X POST http://localhost:19981/api/send \
 - Agent 回复中的本机图片路径和 `FILE: /path/to/file.ext` 只会在支持附件回传的频道中上传发送。
 - 日志为单行 JSON，按日期和时间分片写入 `.run/`，默认保留 3 天。
 
----
-
-## 项目结构
+### 项目结构
 
 ```text
 AnyBot/
@@ -364,9 +384,7 @@ AnyBot/
 └── package.json
 ```
 
----
-
-## 开发命令
+### 开发命令
 
 ```bash
 npm ci
@@ -380,9 +398,7 @@ npm run electron:build
 
 提交前至少运行 `npm run check`。涉及桌面壳、发布资源或安装包时，运行对应 build/electron 命令。
 
----
-
-## 添加新 Provider
+### 添加新 Provider
 
 1. 在 `src/providers/` 下实现 `IProvider`。
 2. 在 `src/providers/index.ts` 中注册 Provider 工厂。
@@ -391,8 +407,18 @@ npm run electron:build
 
 可参考 `src/providers/codex.ts` 和 `src/providers/claude-code.ts`。
 
+</details>
+
 ---
+
+## 更新日志
+
+各版本的更新记录见 [release-notes.md](./release-notes.md)。
+
+## 参与贡献
+
+欢迎提交 Issue 和 Pull Request。提交代码前请先运行 `npm run check`。
 
 ## License
 
-MIT
+MIT — 详见 [LICENSE](./LICENSE)。

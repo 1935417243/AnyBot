@@ -1,11 +1,19 @@
 **English** | [中文](./README_CN.md)
 
-# AnyBot
+<div align="center">
+  <img src="assets/logo.png" alt="AnyBot logo" width="120">
+  <h1>AnyBot</h1>
+  <p>Your local AI Coding Agent console — one entry point for desktop, web, and chat channels.</p>
 
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Stars](https://img.shields.io/github/stars/1935417243/AnyBot)
-![Release](https://img.shields.io/github/v/release/1935417243/AnyBot)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
+  <p>
+    <a href="https://github.com/1935417243/AnyBot/actions/workflows/build-portable.yml"><img src="https://github.com/1935417243/AnyBot/actions/workflows/build-portable.yml/badge.svg" alt="Build"></a>
+    <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
+    <img src="https://img.shields.io/github/stars/1935417243/AnyBot" alt="Stars">
+    <img src="https://img.shields.io/github/v/release/1935417243/AnyBot" alt="Release">
+    <img src="https://img.shields.io/github/downloads/1935417243/AnyBot/total" alt="Downloads">
+    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue" alt="Platform">
+  </p>
+</div>
 
 AnyBot is a local AI Coding Agent console and remote entry point that lets you control and manage AI Coding Agents on your computer through the desktop app, Web UI, Weixin, QQ, Telegram, Feishu, DingTalk, and other channels.
 
@@ -36,13 +44,24 @@ The desktop app supports **macOS** and **Windows**; running from source supports
 
 ## Screenshots
 
-![New Chat](assets/主页.png)
-
-![Automations](assets/自动化.png)
-
-![Channels](assets/频道页.png)
-
-![Settings](assets/设置页.png)
+<table>
+  <tr>
+    <td><img src="assets/主页.png" alt="New Chat"></td>
+    <td><img src="assets/流式过程.png" alt="Streamed Agent Activity"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/变更审核.png" alt="Change Review"></td>
+    <td><img src="assets/自动化.png" alt="Automations"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/频道页.png" alt="Channels"></td>
+    <td><img src="assets/设置页.png" alt="Settings"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/插件页.png" alt="Plugins"></td>
+    <td></td>
+  </tr>
+</table>
 
 ---
 
@@ -228,7 +247,7 @@ Channel config is stored in `.data/channels.json` and is best managed from the W
 }
 ```
 
-When `weixin.botAgent` is left empty, it defaults to the current app version (for example, `AnyBot/1.0.0`).
+When `weixin.botAgent` is left empty, it defaults to the current app version (for example, `AnyBot/1.0.3`).
 
 ### Feishu
 
@@ -319,7 +338,10 @@ Common files:
 
 ---
 
-## How It Works
+<details>
+<summary><b>Developer documentation: how it works, project structure, and development commands</b></summary>
+
+### How It Works
 
 - `src/index.ts` starts the Provider, Web service, enabled channels, desktop update checks, and MCP Server startup verification.
 - `src/chat-runner.ts` is the shared orchestration layer for Web UI and channel messages. It handles Provider sessions, project working directories, prompts, message persistence, streamed events, and change review.
@@ -331,9 +353,7 @@ Common files:
 - Local image paths and `FILE: /path/to/file.ext` directives in Agent replies are uploaded only for channels that support attachment return.
 - Logs are single-line JSON files split by date and time under `.run/`, with a default retention of 3 days.
 
----
-
-## Project Structure
+### Project Structure
 
 ```text
 AnyBot/
@@ -364,9 +384,7 @@ AnyBot/
 └── package.json
 ```
 
----
-
-## Development
+### Development
 
 ```bash
 npm ci
@@ -380,9 +398,7 @@ npm run electron:build
 
 Run `npm run check` before submitting changes. For desktop shell, release asset, or installer changes, also run the relevant build/electron command.
 
----
-
-## Adding a Provider
+### Adding a Provider
 
 1. Implement `IProvider` under `src/providers/`.
 2. Register the Provider factory in `src/providers/index.ts`.
@@ -391,8 +407,18 @@ Run `npm run check` before submitting changes. For desktop shell, release asset,
 
 Use `src/providers/codex.ts` and `src/providers/claude-code.ts` as references.
 
+</details>
+
 ---
+
+## Release Notes
+
+See [release-notes.md](./release-notes.md) for the changelog of each release.
+
+## Contributing
+
+Issues and pull requests are welcome. Please run `npm run check` before submitting changes.
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).
