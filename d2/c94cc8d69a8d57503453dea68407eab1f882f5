@@ -1,0 +1,16 @@
+electron/main.cjs
+  h_7a561dec792e5b 965-967,969-970,981-988,994
+src/web/public/styles/main.css
+  h_7a561dec792e5b 136-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d2c94cc8d69a8d57503453dea68407eab1f882f5",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
