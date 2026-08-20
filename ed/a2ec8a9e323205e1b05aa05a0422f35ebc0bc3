@@ -1,0 +1,14 @@
+electron/main.cjs
+  h_7a561dec792e5b 965,967,971-976
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "eda2ec8a9e323205e1b05aa05a0422f35ebc0bc3",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
