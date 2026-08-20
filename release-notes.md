@@ -5,10 +5,10 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（1.0.2）
-- 推理强度选择支持 Codex，档位按提供商独立记忆
-- Codex 模型列表升级至 GPT-5.6 系列，SDK 升级至 0.148
-- macOS 界面优化：隐藏系统标题栏，原生红黄绿按钮融入应用顶部 UI
+### 本次更新（1.0.3）
+- 流式输出优化：长回复渲染更顺滑
+- Claude Code：SDK 升级至 0.3.x，适配新版待办任务事件，Agent 流式视图同步重构
+- Windows 界面优化
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
