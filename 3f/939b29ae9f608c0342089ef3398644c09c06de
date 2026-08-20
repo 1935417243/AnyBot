@@ -1,0 +1,18 @@
+electron/main.cjs
+  h_7a561dec792e5b 1,944-960,979,993
+electron/preload.cjs
+  h_7a561dec792e5b 1-7
+src/web/public/scripts/app/settings/settings-controller.js
+  h_7a561dec792e5b 171-175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "3f939b29ae9f608c0342089ef3398644c09c06de",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
