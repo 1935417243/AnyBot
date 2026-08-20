@@ -1,0 +1,67 @@
+src/providers/claude-code-agent-events.ts
+  s_8a7c0f616ab02c::t_b82bf8b334627d 360-378
+  s_8a7c0f616ab02c::t_8983fd63c3b387 349-352,356-359,379
+  s_8a7c0f616ab02c::t_713b2dd889843f 65
+  s_8a7c0f616ab02c::t_735f2b1a0aadde 234-290
+  s_8a7c0f616ab02c::t_a051a4ef139a4a 429,434,436-438
+  s_8a7c0f616ab02c::t_74baa5275a236b 17-23
+  s_8a7c0f616ab02c::t_842769800c5b38 128
+  s_8a7c0f616ab02c::t_d10edea7c88e94 380
+src/providers/claude-code.ts
+  s_8a7c0f616ab02c::t_8b7efe063710be 425-435
+  s_8a7c0f616ab02c::t_5bd78a9cc907be 31
+  s_8a7c0f616ab02c::t_9beb27968f2710 543-544
+  s_8a7c0f616ab02c::t_0a60fdaca6be81 668-688
+  s_8a7c0f616ab02c::t_f6e417b1e3d24c 647-654
+  s_8a7c0f616ab02c::t_4e521fc811a3be 716
+  s_8a7c0f616ab02c::t_35b59be1a68fa7 645-646
+  s_8a7c0f616ab02c::t_ec90af72205774 28
+  s_8a7c0f616ab02c::t_6e0477b2873eb5 541-542,555-578
+src/web/public/scripts/agent-loop.js
+  s_524bfa1ebd8b91::t_1dd14609c2d5d5 825,838
+  s_524bfa1ebd8b91::t_6dfafd7ba73da7 853
+  s_524bfa1ebd8b91::t_f00e04d286c629 774,781
+  s_524bfa1ebd8b91::t_58ae97434ffe44 752-753
+  s_524bfa1ebd8b91::t_1c736120780078 207
+  s_524bfa1ebd8b91::t_bb88f9ceb7f90a 252
+  s_524bfa1ebd8b91::t_22333520da7120 254
+  s_524bfa1ebd8b91::t_672eb9f0885a83 161
+  s_524bfa1ebd8b91::t_5323576217de7c 164
+  s_8a7c0f616ab02c::t_af5330749097d7 801-802
+src/web/public/styles/claude-agent-loop.css
+  s_524bfa1ebd8b91::t_4c896621bd2396 59
+  s_524bfa1ebd8b91::t_568d58b7a699d8 52-53,60-62
+  s_524bfa1ebd8b91::t_8329069adc572d 54-56
+src/web/agent-stream.ts
+  s_524bfa1ebd8b91::t_47be15052378ad 14
+package.json
+  s_8a7c0f616ab02c::t_cd8158437da2a7 24-25,27,36-37
+src/web/public/scripts/app/chat/task-dock.js
+  s_8a7c0f616ab02c::t_4643e70be3d53e 298
+package-lock.json
+  s_8a7c0f616ab02c::t_bd85f6f5617f29 11-12,14,23-24,39-41,47-54,57-58,63-65,76-78,89-91,102-104,115-117,128-130,141-143,154-156,167-169,172-173,188-190,1143-1145,1148,1261-1263,1266,1511-1516,3657-3659,3725-3727,3730,3813-3818,3820-3822,4328-4330,4497-4499,4577-4579,6112-6121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "4b24cb1520d500c3493052eccd6af56f83507de0",
+  "prompts": {},
+  "sessions": {
+    "s_524bfa1ebd8b91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aba22ce1-33e7-4d9e-b62e-5f382c7ec25b",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_8a7c0f616ab02c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cb71559d-0582-4365-93d3-813dae88849c",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
