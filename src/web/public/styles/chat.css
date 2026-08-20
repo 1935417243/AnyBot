@@ -435,7 +435,7 @@
             display: flex;
             align-items: center;
             padding: 0 24px;
-            border-bottom: 1px solid var(--conversation-divider);
+            border-bottom: 1px solid var(--border);
             background: var(--bg);
         }
 

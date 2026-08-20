@@ -987,6 +987,18 @@ function createWindow() {
     });
   }
 
+  // Windows：给页面 body 打上平台标记，用于隐藏侧边栏 Logo 行
+  if (process.platform === "win32") {
+    mainWindow.webContents.on("dom-ready", () => {
+      if (!mainWindow) {
+        return;
+      }
+      mainWindow.webContents
+        .executeJavaScript('document.body && document.body.classList.add("platform-windows-desktop")')
+        .catch(() => {});
+    });
+  }
+
   mainWindow.loadURL(appUrl);
   mainWindow.once("ready-to-show", () => mainWindow.show());
 

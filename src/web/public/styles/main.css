@@ -5,7 +5,6 @@
             --sidebar-hover: #1a1a1f;
             --sidebar-active: #1e1e26;
             --border: #222228;
-            --conversation-divider: rgba(255, 255, 255, 0.07);
             --border-hover: #30303a;
             --text: #e8e8f0;
             --text-muted: #9a9aaa;
@@ -44,7 +43,6 @@
             --sidebar-hover: #f5f5f5;
             --sidebar-active: #eeeeee;
             --border: #e6e6e6;
-            --conversation-divider: rgba(0, 0, 0, 0.06);
             --border-hover: #cfcfcf;
             --text: #000000;
             --text-muted: #4f4f4f;
@@ -103,6 +101,24 @@
         /* 隐藏 Logo 行内容，但保留占位高度，为红黄绿按钮腾出空间 */
         body.platform-macos-desktop .sidebar-top .logo {
             visibility: hidden;
+        }
+
+        /* Windows：隐藏侧边栏 Logo 行（logo-icon 和 logo-text），并移除占位高度 */
+        body.platform-windows-desktop .sidebar-top .logo {
+            display: none;
+        }
+
+        /* Windows：原生标题栏与页面内容之间画一条顶部分隔线 */
+        body.platform-windows-desktop::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--border);
+            z-index: 10000;
+            pointer-events: none;
         }
 
         /* 顶部区域可拖动窗口，交互元素保持可点击 */
