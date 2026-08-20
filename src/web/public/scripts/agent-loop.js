@@ -2,8 +2,11 @@
     var LARGE_MESSAGE_PREVIEW_CHARS = 40000;
     var STREAMING_ANSWER_PREVIEW_CHARS = 40000;
     var STREAMING_RENDER_INTERVAL_MS = 90;
-    var STREAMING_RENDER_SLOW_INTERVAL_MS = 400;
+    var STREAMING_RENDER_SLOW_INTERVAL_MS = 160;
     var ADAPTIVE_RENDER_CHARS = 4000;
+    // 打字机播放：接收缓冲与渲染解耦，按固定节奏匀速放字，把成块到达的 delta 抹平
+    var ANSWER_PLAYBACK_TICK_MS = 32;
+    var ANSWER_PLAYBACK_DRAIN_TICKS = 8;
     var NEAR_BOTTOM_PX = 120;
     var LONG_SHELL_COMMAND_CHARS = 300;
     var SHELL_COMMAND_SUMMARY_CHARS = 220;
@@ -140,10 +143,12 @@
             changeReview: opts.changeReview || null,
             answerIsTruncated: !!opts.contentTruncated,
             answerChars: opts.contentChars || 0,
+            answerDisplayChars: 0,
             fullAnswerLoader: opts.fullContentLoader || null,
         };
         var hasAttachedCompletionMeta = false;
         var scheduledAnswerRender = null;
+        var answerPlaybackTimer = null;
 
         var row = document.createElement('div');
         row.className = 'message-row ai';
@@ -334,6 +339,8 @@
         }
 
         function renderAnswer() {
+            // 完成/出错/中断都走这里：立即停掉打字机，全量渲染，不让用户等播放尾巴
+            stopAnswerPlayback();
             clearScheduledAnswerRender();
             finalEl.classList.remove('streaming');
             var answerText = String(state.answerText || '');
@@ -379,7 +386,9 @@
 
         function renderStreamingAnswer() {
             if (state.status !== 'running') return;
-            var answerText = String(state.answerText || '');
+            var fullText = String(state.answerText || '');
+            // 只渲染已播放出来的前缀，缓冲里未到播放进度的部分先不上屏
+            var answerText = isPersisted ? fullText : fullText.slice(0, state.answerDisplayChars);
             if (!answerText) return;
             var visibleText = previewStreamingText(answerText, STREAMING_ANSWER_PREVIEW_CHARS, '回复较长，完成后显示完整内容');
             finalEl.classList.add('streaming');
@@ -424,10 +433,34 @@
             }, streamRenderInterval(segment.text));
         }
 
+        function ensureAnswerPlayback() {
+            if (answerPlaybackTimer || isPersisted) return;
+            answerPlaybackTimer = setInterval(function () {
+                if (state.status !== 'running') {
+                    stopAnswerPlayback();
+                    return;
+                }
+                var backlog = state.answerText.length - state.answerDisplayChars;
+                if (backlog <= 0) return;
+                // 积压越多单次放得越多，保证能追上接收进度，不会越落越远
+                state.answerDisplayChars += Math.max(1, Math.ceil(backlog / ANSWER_PLAYBACK_DRAIN_TICKS));
+                if (state.answerDisplayChars > state.answerText.length) {
+                    state.answerDisplayChars = state.answerText.length;
+                }
+                scheduleStreamingAnswerRender();
+            }, ANSWER_PLAYBACK_TICK_MS);
+        }
+
+        function stopAnswerPlayback() {
+            if (!answerPlaybackTimer) return;
+            clearInterval(answerPlaybackTimer);
+            answerPlaybackTimer = null;
+        }
+
         function appendAnswerText(text) {
             if (!text || isPersisted) return;
             state.answerText += text;
-            scheduleStreamingAnswerRender();
+            ensureAnswerPlayback();
         }
 
         function renderChangeReview() {
