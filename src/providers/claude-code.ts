@@ -25,8 +25,10 @@ import {ProviderCancelledError} from "./types.js";
 import {ProviderEmptyOutputError, ProviderProcessError, ProviderTimeoutError, PROVIDER_HARD_ABORT_GRACE_MS,} from "./codex.js";
 import {
     type ClaudeAgentStreamEvent,
+    type ClaudeAgentTodoItem,
     createFileChangeEvent,
     createTaskEvent,
+    createTaskTodoEvent,
     createToolEndEvent,
     createToolProgressEvent,
     createToolStartEvent,
@@ -420,6 +422,17 @@ export class ClaudeCodeProvider implements IProvider {
         const sandbox = opts.sandbox ?? DEFAULT_SANDBOX;
         const startedAt = Date.now();
         const abortController = new AbortController();
+        // 包装 abort，任何触发点都记录来源调用栈，用于排查“完全访问下工具仍被取消”的根因
+        const rawAbort = abortController.abort.bind(abortController);
+        abortController.abort = (reason?: unknown) => {
+            logger.warn("provider.exec.abort.triggered", {
+                provider: this.type,
+                workdir,
+                reason: reason instanceof Error ? reason.message : reason ? String(reason) : null,
+                callerStack: new Error("abort caller").stack,
+            });
+            rawAbort(reason);
+        };
         const permissionMode = this.permissionMode ?? mapSandboxToPermissionMode(sandbox);
         const useAnthropicCompat = this.hasAnthropicCompatConfig();
         const claudeConfigDir = useAnthropicCompat ? getIsolatedClaudeConfigDir() : undefined;
@@ -525,6 +538,10 @@ export class ClaudeCodeProvider implements IProvider {
                 message: "Claude Code Agent 已启动",
             });
 
+            // 新版 SDK 用 TaskCreate/TaskUpdate 替代 TodoWrite，需跨 hook 维护待办任务表以合成全量 todo_update
+            const todoTasks = new Map<string, ClaudeAgentTodoItem>();
+            // 记录本轮内有工具被权限拒绝的子代理任务 id，用于结束时把 completed 降级为 failed
+            const deniedTaskIds = new Set<string>();
             const hooks: Options["hooks"] | undefined = onEvent
                 ? {
                     PreToolUse: [
@@ -535,6 +552,30 @@ export class ClaudeCodeProvider implements IProvider {
                                     if (event) await emitEvent?.(event);
                                     const todoEvent = createTodoUpdateEvent(input);
                                     if (todoEvent) await emitEvent?.(todoEvent);
+                                    const taskTodoEvent = createTaskTodoEvent(input, todoTasks);
+                                    if (taskTodoEvent) await emitEvent?.(taskTodoEvent);
+                                    return {};
+                                },
+                            ],
+                        },
+                    ],
+                    TaskCreated: [
+                        {
+                            hooks: [
+                                async (input) => {
+                                    const event = createTaskTodoEvent(input, todoTasks);
+                                    if (event) await emitEvent?.(event);
+                                    return {};
+                                },
+                            ],
+                        },
+                    ],
+                    TaskCompleted: [
+                        {
+                            hooks: [
+                                async (input) => {
+                                    const event = createTaskTodoEvent(input, todoTasks);
+                                    if (event) await emitEvent?.(event);
                                     return {};
                                 },
                             ],
@@ -601,6 +642,16 @@ export class ClaudeCodeProvider implements IProvider {
                     hooks,
                     env,
                     settings: flagSettings,
+                    // 临时开启 CLI debug 日志（经 stderr 回调落入 .run 日志），排查工具被 CLI 内部取消的根因，定位后移除
+                    debug: true,
+                    // 捕获 CLI 自身 stderr 诊断输出，用于排查 CLI 内部取消工具调用的原因
+                    stderr: (data) => {
+                        logger.warn("provider.exec.cli_stderr", {
+                            provider: this.type,
+                            workdir,
+                            data: data.slice(0, 500),
+                        });
+                    },
                 },
             });
 
@@ -614,6 +665,27 @@ export class ClaudeCodeProvider implements IProvider {
 
             const consuming = (async () => {
                 for await (const message of stream) {
+                    // permission_denied 是排查权限问题的关键线索，完整落日志（含 agent_id、拒绝原因类型）
+                    if (message.type === "system" && (message as {subtype?: string}).subtype === "permission_denied") {
+                        const denied = message as {
+                            tool_name?: string;
+                            tool_use_id?: string;
+                            agent_id?: string;
+                            decision_reason_type?: string;
+                            decision_reason?: string;
+                            message?: string;
+                        };
+                        logger.warn("provider.exec.permission_denied", {
+                            provider: this.type,
+                            workdir,
+                            toolName: denied.tool_name || null,
+                            toolUseId: denied.tool_use_id || null,
+                            agentId: denied.agent_id || null,
+                            decisionReasonType: denied.decision_reason_type || null,
+                            decisionReason: denied.decision_reason || null,
+                            message: denied.message || null,
+                        });
+                    }
                     if (isSdkAssistantMessage(message)) {
                         lastAssistantMessage = message;
                     }
@@ -641,7 +713,7 @@ export class ClaudeCodeProvider implements IProvider {
                             await emitEvent(progress);
                         }
 
-                        const task = createTaskEvent(message);
+                        const task = createTaskEvent(message, deniedTaskIds);
                         if (task) {
                             await emitEvent(task);
                         }

@@ -14,6 +14,13 @@ import type { ProviderContextUsage } from "./types.js";
 
 export type ClaudeAgentToolStatus = "running" | "success" | "failed";
 
+/** 待办事项条目，与前端 todo_update 事件的结构一致 */
+export type ClaudeAgentTodoItem = {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  activeForm?: string;
+};
+
 export type ClaudeAgentDiff = {
   path: string;
   diff: string;
@@ -55,7 +62,7 @@ export type ClaudeAgentStreamEvent =
       description?: string;
       summary?: string;
       lastToolName?: string;
-      status?: "pending" | "running" | "completed" | "failed" | "killed";
+      status?: "pending" | "running" | "completed" | "failed" | "killed" | "paused";
       isBackgrounded?: boolean;
       error?: string;
       durationMs?: number;
@@ -118,11 +125,7 @@ export type ClaudeAgentStreamEvent =
     }
   | {
       type: "todo_update";
-      todos: Array<{
-        content: string;
-        status: "pending" | "in_progress" | "completed";
-        activeForm?: string;
-      }>;
+      todos: ClaudeAgentTodoItem[];
     }
   | { type: "context_usage"; usage: ProviderContextUsage };
 
@@ -228,6 +231,63 @@ export function createTodoUpdateEvent(
   return { type: "todo_update", todos: items };
 }
 
+/**
+ * 新版 SDK（0.3.x）用 TaskCreate/TaskUpdate 工具替代 TodoWrite 管理待办，
+ * 单次调用只携带增量（创建一项 / 更新某 id 的状态），因此需要调用方跨 hook
+ * 维护一份任务表（tasks），这里负责应用增量并输出全量 todo_update 事件。
+ * 处理三种输入：TaskCreated hook、TaskCompleted hook、TaskUpdate 的 PreToolUse hook。
+ */
+export function createTaskTodoEvent(
+  input: HookInput,
+  tasks: Map<string, ClaudeAgentTodoItem>,
+): ClaudeAgentStreamEvent | null {
+  if (input.hook_event_name === "TaskCreated") {
+    tasks.set(input.task_id, {
+      content: sanitizeAgentText(input.task_subject),
+      status: "pending",
+    });
+    return buildTaskTodoUpdateEvent(tasks);
+  }
+
+  if (input.hook_event_name === "TaskCompleted") {
+    const task = tasks.get(input.task_id);
+    if (task) task.status = "completed";
+    else tasks.set(input.task_id, { content: sanitizeAgentText(input.task_subject), status: "completed" });
+    return buildTaskTodoUpdateEvent(tasks);
+  }
+
+  if (input.hook_event_name !== "PreToolUse" || input.tool_name !== "TaskUpdate") return null;
+  const toolInput = isRecord(input.tool_input) ? input.tool_input : {};
+  const taskId = getString(toolInput, "taskId") || getString(toolInput, "task_id");
+  if (!taskId) return null;
+
+  const rawStatus = (getString(toolInput, "status") || "").toLowerCase();
+  if (rawStatus === "deleted") {
+    tasks.delete(taskId);
+    return buildTaskTodoUpdateEvent(tasks);
+  }
+
+  // resume 的会话可能更新历史任务，本地表里没有时按 subject 补建
+  const task = tasks.get(taskId) ?? { content: "", status: "pending" as const };
+  const subject = getString(toolInput, "subject");
+  if (subject) task.content = sanitizeAgentText(subject);
+  if (!task.content) task.content = `任务 ${taskId}`;
+  if (rawStatus === "in_progress" || rawStatus === "completed" || rawStatus === "pending") {
+    task.status = rawStatus;
+  }
+  const activeForm = getString(toolInput, "activeForm");
+  if (activeForm) task.activeForm = sanitizeAgentText(activeForm);
+  tasks.set(taskId, task);
+  return buildTaskTodoUpdateEvent(tasks);
+}
+
+/** 把任务表序列化为全量 todo_update 事件（保持插入顺序） */
+function buildTaskTodoUpdateEvent(
+  tasks: Map<string, ClaudeAgentTodoItem>,
+): ClaudeAgentStreamEvent {
+  return { type: "todo_update", todos: [...tasks.values()].map((todo) => ({ ...todo })) };
+}
+
 export async function createToolEndEvent(
   input: HookInput,
   workdir: string,
@@ -286,9 +346,37 @@ export function createToolProgressEvent(message: SDKMessage): ClaudeAgentStreamE
   };
 }
 
-export function createTaskEvent(message: SDKMessage): ClaudeAgentStreamEvent | null {
+export function createTaskEvent(
+  message: SDKMessage,
+  deniedTaskIds?: Set<string>,
+): ClaudeAgentStreamEvent | null {
   if (message.type !== "system") return null;
   const subtype = (message as { subtype?: string }).subtype;
+
+  // 子代理内工具被权限拒绝时记录任务 id（agent_id 与 task_id 一致），
+  // 用于 task_notification 时把 completed 降级为 failed —— 子代理被拒绝了工具
+  // 仍会正常跑完并上报 completed，但其目标未必达成（实测有的模型还会在 summary 里谎称成功）
+  if (subtype === "permission_denied") {
+    const denied = message as {
+      agent_id?: string;
+      tool_use_id: string;
+      decision_reason?: string;
+    };
+    if (denied.agent_id) {
+      deniedTaskIds?.add(denied.agent_id);
+      return null;
+    }
+    // 主线程工具被拒绝时不会触发 PostToolUse 钩子，这里补发 tool_end，
+    // 否则活动流里该工具行会一直停在运行中
+    return {
+      type: "tool_end",
+      toolId: denied.tool_use_id,
+      status: "failed",
+      error: denied.decision_reason
+        ? sanitizeAgentText(denied.decision_reason)
+        : "工具调用被权限拒绝",
+    };
+  }
 
   if (subtype === "task_started") {
     const task = message as SDKTaskStartedMessage;
@@ -338,13 +426,16 @@ export function createTaskEvent(message: SDKMessage): ClaudeAgentStreamEvent | n
   if (subtype === "task_notification") {
     const task = message as SDKTaskNotificationMessage;
     if (task.skip_transcript) return null;
+    const denied = task.status === "completed" && deniedTaskIds?.has(task.task_id);
     return {
       type: "task_end",
       taskId: task.task_id,
       toolUseId: task.tool_use_id,
-      status: task.status,
+      status: denied ? "failed" : task.status,
       outputFile: task.output_file,
-      summary: sanitizeAgentText(task.summary),
+      summary: denied
+        ? `任务内有工具调用被权限拒绝，结果可能未完成。原始汇报：${sanitizeAgentText(task.summary)}`
+        : sanitizeAgentText(task.summary),
       durationMs: task.usage?.duration_ms,
       totalTokens: task.usage?.total_tokens,
       toolUses: task.usage?.tool_uses,

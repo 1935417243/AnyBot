@@ -295,7 +295,7 @@ export function createTaskDock(options) {
 
             var name = document.createElement('span');
             name.className = 'td-name';
-            name.textContent = task.summary || task.description || task.prompt || task.id;
+            name.textContent = task.description || task.prompt || task.summary || task.id;
             name.title = name.textContent;
             row.appendChild(name);
 

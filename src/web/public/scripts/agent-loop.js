@@ -129,8 +129,6 @@
             activeThinkingSegment: null,
             activeActivitySegment: null,
             tools: new Map(),
-            tasks: new Map(),
-            taskAliases: new Map(),
             readFiles: new Set(),
             searchCount: 0,
             listCount: 0,
@@ -160,13 +158,13 @@
         var content = document.createElement('div');
         content.className = 'message-content claude-agent-message';
 
+        // 过程面板运行中默认展开平铺，完成后自动收起，可随时手动展开
         var process = document.createElement('details');
         process.className = 'claude-process not-expandable';
-        process.open = false;
+        process.open = true;
 
         var processSummary = document.createElement('summary');
         processSummary.className = 'claude-process-summary';
-        processSummary.setAttribute('aria-disabled', 'true');
         processSummary.innerHTML =
             '<span class="claude-process-title" data-role="title">处理中 ' + formatDuration(state.durationMs) + '</span>' +
             '<span class="claude-process-chevron">›</span>';
@@ -174,23 +172,9 @@
         var processBody = document.createElement('div');
         processBody.className = 'claude-process-body';
 
-        var taskSection = document.createElement('div');
-        taskSection.className = 'claude-task-section';
-        taskSection.style.display = 'none';
-        taskSection.innerHTML =
-            '<div class="claude-task-section-header">' +
-            '<span class="claude-task-section-title">并行任务</span>' +
-            '<span class="claude-task-section-meta" data-role="task-section-meta"></span>' +
-            '</div>';
-
-        var taskList = document.createElement('div');
-        taskList.className = 'claude-task-list';
-        taskSection.appendChild(taskList);
-
         var activityList = document.createElement('div');
         activityList.className = 'claude-activity-list';
 
-        processBody.appendChild(taskSection);
         processBody.appendChild(activityList);
         process.appendChild(processSummary);
         process.appendChild(processBody);
@@ -220,6 +204,7 @@
             updateProcessTitle();
         }, 1000);
 
+        // 没有任何过程内容时不允许展开（body 也是隐藏的）
         processSummary.addEventListener('click', function (event) {
             if (!hasProcessDetails()) event.preventDefault();
         });
@@ -228,10 +213,6 @@
             if (!hasProcessDetails() && (event.key === 'Enter' || event.key === ' ')) {
                 event.preventDefault();
             }
-        });
-
-        process.addEventListener('toggle', function () {
-            if (process.open && !hasProcessDetails()) process.open = false;
         });
 
         function attachCompletionMeta() {
@@ -260,7 +241,6 @@
             return hasProcessText ||
                 hasThinkingText ||
                 state.tools.size > 0 ||
-                state.tasks.size > 0 ||
                 state.readFiles.size > 0 ||
                 state.searchCount > 0 ||
                 state.listCount > 0 ||
@@ -269,16 +249,9 @@
                 state.editCount > 0;
         }
 
+        // 没有任何过程内容时隐藏空白 body 并禁止展开
         function updateProcessAvailability() {
-            var canExpand = hasProcessDetails();
-            process.classList.toggle('not-expandable', !canExpand);
-            processSummary.setAttribute('aria-disabled', canExpand ? 'false' : 'true');
-            if (!canExpand && process.open) process.open = false;
-        }
-
-        function openProcessIfAvailable() {
-            updateProcessAvailability();
-            if (state.status === 'running' && hasProcessDetails()) process.open = true;
+            process.classList.toggle('not-expandable', !hasProcessDetails());
         }
 
         function createActivityStats() {
@@ -289,7 +262,6 @@
                 bashCount: 0,
                 editCount: 0,
                 webCount: 0,
-                taskIds: new Set(),
             };
         }
 
@@ -324,11 +296,6 @@
             if (stats) stats[key] += 1;
         }
 
-        function recordTaskActivity(taskId, segment) {
-            var stats = getActivityStats(segment || state.activeActivitySegment);
-            if (stats && taskId) stats.taskIds.add(taskId);
-        }
-
         function appendSegmentActivityElement(el) {
             var segment = state.activeActivitySegment;
             if (!segment || !segment.activityItemsEl) return null;
@@ -349,7 +316,6 @@
             if (stats.searchCount > 0) exploredParts.push(stats.searchCount + ' 次搜索');
             if (stats.listCount > 0) exploredParts.push(stats.listCount + ' 个列表');
             if (stats.webCount > 0) actionParts.push('已搜索网页 ' + stats.webCount + ' 次');
-            if (stats.taskIds.size > 0) actionParts.push('已启动 ' + stats.taskIds.size + ' 个并行任务');
             if (stats.bashCount > 0) actionParts.push('已运行 ' + stats.bashCount + ' 条命令');
             if (stats.editCount > 0) actionParts.push('已修改 ' + stats.editCount + ' 个文件');
 
@@ -645,257 +611,9 @@
             return name + (summary ? ' ' + summary : '');
         }
 
-        function formatTaskMetric(task) {
-            var parts = [];
-            if (task.durationMs || task.durationMs === 0) parts.push(formatDuration(task.durationMs));
-            if (task.totalTokens) parts.push(compactTokenCount(task.totalTokens));
-            if (task.toolUses) parts.push(task.toolUses + ' tools');
-            if (task.lastToolName) parts.push(task.lastToolName);
-            return parts.join(' · ');
-        }
-
-        function taskStatusText(status) {
-            if (status === 'completed') return '已完成';
-            if (status === 'failed') return '失败';
-            if (status === 'stopped' || status === 'killed') return '已停止';
-            if (status === 'pending') return '等待中';
-            return '运行中';
-        }
-
-        function compactTokenCount(value) {
-            var n = Number(value || 0);
-            if (!n) return '';
-            return n >= 1000 ? (Math.round(n / 100) / 10) + 'k tokens' : n + ' tokens';
-        }
-
-        function cleanTaskTitle(value) {
-            var text = String(value || '').trim();
-            var match = text.match(/^Agent "([^"]+)" completed$/);
-            if (match) return match[1];
-            return text;
-        }
-
-        function updateTaskSection() {
-            var tasks = Array.from(state.tasks.values()).filter(function (item) {
-                return !item.activitySegment;
-            }).map(function (item) { return item.data; });
-            if (tasks.length === 0) {
-                taskSection.style.display = 'none';
-                return;
-            }
-
-            var completed = tasks.filter(function (task) { return task.status === 'completed'; }).length;
-            var failed = tasks.filter(function (task) { return task.status === 'failed' || task.status === 'killed' || task.status === 'stopped'; }).length;
-            var running = Math.max(0, tasks.length - completed - failed);
-            var meta = completed + '/' + tasks.length + ' 已完成';
-            if (running > 0) meta += ' · ' + running + ' 运行中';
-            if (failed > 0) meta += ' · ' + failed + ' 失败';
-            taskSection.querySelector('[data-role="task-section-meta"]').textContent = meta;
-            taskSection.style.display = 'block';
-        }
-
-        function shouldKeepProcessOpenAfterCompletion() {
-            return false;
-        }
-
-        function appendTaskStep(taskState, text) {
-            var value = String(text || '').trim();
-            if (!value) return;
-            var task = taskState.data;
-            var last = task.steps.length > 0 ? task.steps[task.steps.length - 1] : '';
-            if (last === value) return;
-            task.steps.push(value);
-            if (task.steps.length > 40) task.steps.shift();
-
-            var item = document.createElement('div');
-            item.className = 'claude-task-step';
-            item.textContent = value;
-            taskState.body.appendChild(item);
-            while (taskState.body.children.length > 40) {
-                taskState.body.removeChild(taskState.body.firstChild);
-            }
-        }
-
-        function updateTaskElement(taskState) {
-            var task = taskState.data;
-            var status = task.status || 'running';
-            taskState.el.classList.remove('running', 'completed', 'failed', 'stopped', 'killed', 'pending');
-            taskState.el.classList.add(status);
-            var text = cleanTaskTitle(task.summary || task.title || task.description || task.prompt || task.id);
-            var metric = formatTaskMetric(task);
-            taskState.titleEl.textContent = text || task.id;
-            taskState.metaEl.textContent = [taskStatusText(status), metric].filter(Boolean).join(' · ');
-            updateTaskSection();
-            scrollBottom();
-        }
-
-        function resolveTaskId(id) {
-            return state.taskAliases.get(id) || id;
-        }
-
-        function ensureTask(task) {
-            var requestedId = task.id || task.taskId;
-            var id = resolveTaskId(requestedId);
-            if (!id) return null;
-            var existing = state.tasks.get(id);
-            if (existing) {
-                if (task.toolUseId && !existing.data.toolUseId) existing.data.toolUseId = task.toolUseId;
-                return existing;
-            }
-
-            if (task.toolUseId) {
-                var aliasedId = resolveTaskId(task.toolUseId);
-                var aliased = state.tasks.get(aliasedId);
-                if (aliased) {
-                    if (requestedId && requestedId !== aliasedId) {
-                        state.tasks.delete(aliasedId);
-                        state.tasks.set(requestedId, aliased);
-                        state.taskAliases.set(aliasedId, requestedId);
-                        state.taskAliases.set(task.toolUseId, requestedId);
-                        aliased.data.id = requestedId;
-                        id = requestedId;
-                    }
-                    aliased.data.toolUseId = task.toolUseId;
-                    if (task.title) aliased.data.title = task.title;
-                    if (task.description) aliased.data.description = task.description;
-                    if (task.prompt) aliased.data.prompt = task.prompt;
-                    if (task.status) aliased.data.status = task.status;
-                    updateTaskElement(aliased);
-                    updateActivitySummary(aliased.activitySegment);
-                    updateProcessAvailability();
-                    return aliased;
-                }
-            }
-
-            state.activeProcessTextSegment = null;
-            state.activeThinkingSegment = null;
-            var el = document.createElement('details');
-            el.className = 'claude-activity-item claude-task-item running';
-            el.open = !isPersisted;
-            var summary = document.createElement('summary');
-            summary.className = 'claude-task-summary';
-            var statusDot = document.createElement('span');
-            statusDot.className = 'claude-task-status-dot';
-            var summaryMain = document.createElement('span');
-            summaryMain.className = 'claude-task-summary-main';
-            var titleEl = document.createElement('span');
-            titleEl.className = 'claude-task-title';
-            var metaEl = document.createElement('span');
-            metaEl.className = 'claude-task-meta';
-            var chevron = document.createElement('span');
-            chevron.className = 'claude-task-chevron';
-            chevron.textContent = '›';
-            var body = document.createElement('div');
-            body.className = 'claude-task-steps';
-            summaryMain.appendChild(titleEl);
-            summaryMain.appendChild(metaEl);
-            summary.appendChild(statusDot);
-            summary.appendChild(summaryMain);
-            summary.appendChild(chevron);
-            el.appendChild(summary);
-            el.appendChild(body);
-            var taskState = {
-                data: {
-                    id: id,
-                    toolUseId: task.toolUseId,
-                    title: task.title || task.description || '',
-                    description: task.description || '',
-                    prompt: task.prompt || '',
-                    status: task.status || 'running',
-                    startedAt: task.startedAt || Date.now(),
-                    steps: [],
-                },
-                el: el,
-                titleEl: titleEl,
-                metaEl: metaEl,
-                body: body,
-            };
-            state.tasks.set(id, taskState);
-            if (task.toolUseId) state.taskAliases.set(task.toolUseId, id);
-            var activitySegment = appendSegmentActivityElement(el);
-            recordTaskActivity(id, activitySegment);
-            if (!activitySegment) taskList.appendChild(el);
-            appendTaskStep(taskState, task.description || task.prompt || '');
-            taskState.activitySegment = activitySegment;
-            updateTaskElement(taskState);
-            updateActivitySummary(activitySegment);
-            updateProcessAvailability();
-            return taskState;
-        }
-
-        function updateTask(event) {
-            var taskState = ensureTask({
-                id: event.taskId,
-                toolUseId: event.toolUseId,
-                description: event.description || '',
-                status: event.status || 'running',
-            });
-            if (!taskState) return;
-            var task = taskState.data;
-            if (event.description) task.description = event.description;
-            if (event.summary) {
-                task.latestSummary = event.summary;
-                if (event.status || /^Agent /.test(event.summary)) task.summary = event.summary;
-            }
-            if (event.lastToolName) task.lastToolName = event.lastToolName;
-            if (event.status) task.status = event.status;
-            if (event.isBackgrounded || event.isBackgrounded === false) task.isBackgrounded = event.isBackgrounded;
-            if (event.error) task.summary = event.error;
-            if (event.durationMs || event.durationMs === 0) task.durationMs = event.durationMs;
-            if (event.totalTokens) task.totalTokens = event.totalTokens;
-            if (event.toolUses) task.toolUses = event.toolUses;
-            appendTaskStep(taskState, event.summary || event.description || event.lastToolName || event.error || '');
-            updateTaskElement(taskState);
-            updateActivitySummary(taskState.activitySegment);
-            updateProcessAvailability();
-        }
-
-        function finishTask(event) {
-            var taskState = ensureTask({
-                id: event.taskId,
-                toolUseId: event.toolUseId,
-                description: event.summary || '',
-                status: event.status,
-            });
-            if (!taskState) return;
-            var task = taskState.data;
-            task.status = event.status || 'completed';
-            if (event.summary) task.summary = event.summary;
-            if (event.outputFile) task.outputFile = event.outputFile;
-            if (event.durationMs || event.durationMs === 0) task.durationMs = event.durationMs;
-            if (event.totalTokens) task.totalTokens = event.totalTokens;
-            if (event.toolUses) task.toolUses = event.toolUses;
-            appendTaskStep(taskState, event.summary || event.outputFile || task.status);
-            updateTaskElement(taskState);
-            updateActivitySummary(taskState.activitySegment);
-            updateProcessAvailability();
-        }
-
         function ensureTool(tool) {
             var existing = state.tools.get(tool.id);
             if (existing) return existing;
-
-            if (tool.name === 'Agent' || tool.name === 'Task') {
-                var taskState = ensureTask({
-                    id: tool.id,
-                    toolUseId: tool.id,
-                    title: tool.summary || tool.title || '子任务',
-                    description: tool.summary || tool.title || '',
-                    prompt: tool.input || '',
-                    status: 'running',
-                    startedAt: tool.startedAt,
-                });
-                existing = {
-                    data: tool,
-                    el: taskState ? taskState.el : document.createElement('div'),
-                    text: tool.summary || tool.title || '',
-                    isTaskTool: true,
-                    activitySegment: taskState ? taskState.activitySegment : null,
-                };
-                state.tools.set(tool.id, existing);
-                updateActivitySummary(existing.activitySegment);
-                return existing;
-            }
 
             var activitySegment = state.activeActivitySegment;
             var lineText = classifyTool(tool, activitySegment);
@@ -1002,16 +720,6 @@
                     summary: '',
                 });
             }
-            if (toolState.isTaskTool || toolState.data.name === 'Agent' || toolState.data.name === 'Task') {
-                finishTask({
-                    taskId: event.toolId,
-                    toolUseId: event.toolId,
-                    status: event.status === 'success' ? 'completed' : 'failed',
-                    summary: event.error || toolState.data.summary || toolState.data.title || '',
-                    durationMs: event.durationMs,
-                });
-                return;
-            }
             toolState.el.classList.remove('running');
             toolState.el.classList.toggle('failed', event.status !== 'success');
             if (toolState.data.name === 'Bash') renderShell(toolState, event);
@@ -1041,7 +749,8 @@
             updateProcessTitle();
             if (ticker) clearInterval(ticker);
             updateProcessAvailability();
-            if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
+            // 完成后自动收起过程面板，保持对话整洁（性能上可有可无，纯体验取舍）
+            process.open = false;
         }
 
         function handleEvent(event) {
@@ -1062,14 +771,14 @@
                     finalizeSegmentRenders();
                     updateProcessTitle();
                     if (ticker) clearInterval(ticker);
-                    if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
+                    process.open = false;
                 } else if (event.status === 'failed') {
                     state.status = 'completed';
                     state.durationMs = event.durationMs || (Date.now() - startedAt);
                     finalizeSegmentRenders();
                     updateProcessTitle();
                     if (ticker) clearInterval(ticker);
-                    if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
+                    process.open = false;
                 }
                 return;
             }
@@ -1081,31 +790,16 @@
 
             if (event.type === 'process_delta') {
                 appendProcessText(event.text || '');
-                openProcessIfAvailable();
                 return;
             }
 
             if (event.type === 'thinking_delta') {
                 appendThinkingText(event.text || '');
-                openProcessIfAvailable();
                 return;
             }
 
-            if (event.type === 'task_start') {
-                ensureTask(event.task || {});
-                openProcessIfAvailable();
-                return;
-            }
-
-            if (event.type === 'task_progress') {
-                updateTask(event);
-                openProcessIfAvailable();
-                return;
-            }
-
-            if (event.type === 'task_end') {
-                finishTask(event);
-                openProcessIfAvailable();
+            if (event.type === 'task_start' || event.type === 'task_progress' || event.type === 'task_end') {
+                // 并行任务由底部任务面板（task-dock）统一展示，思考过程里不再渲染任务卡片
                 return;
             }
 
@@ -1128,7 +822,7 @@
                 updateProcessTitle();
                 if (ticker) clearInterval(ticker);
                 updateProcessAvailability();
-                if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
+                process.open = false;
                 return;
             }
 
@@ -1141,7 +835,7 @@
                 updateProcessTitle();
                 if (ticker) clearInterval(ticker);
                 updateProcessAvailability();
-                if (!shouldKeepProcessOpenAfterCompletion()) process.open = false;
+                process.open = false;
                 return;
             }
 
@@ -1156,7 +850,7 @@
                 state.activeProcessTextSegment = null;
                 state.activeThinkingSegment = null;
                 ensureTool(event.tool);
-                openProcessIfAvailable();
+                updateProcessAvailability();
                 return;
             }
 

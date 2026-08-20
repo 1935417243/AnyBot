@@ -21,8 +21,10 @@
     "bot:status": "node ./scripts/bot.mjs status"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.139",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.237",
+    "@anthropic-ai/sdk": "^0.120.0",
     "@larksuiteoapi/node-sdk": "^1.59.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/codex-sdk": "^0.148.0",
     "better-sqlite3": "^12.6.2",
     "dingtalk-stream": "^2.1.6-beta.1",
@@ -31,7 +33,8 @@
     "multer": "^2.1.1",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
-    "undici": "^7.24.1"
+    "undici": "^7.24.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

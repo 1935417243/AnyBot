@@ -49,8 +49,17 @@
     transform: rotate(90deg) translateY(1px);
 }
 
+/* 无过程内容时隐藏空白 body */
+.claude-process.not-expandable .claude-process-body {
+    display: none;
+}
+
 .claude-process-body {
     padding: 12px 0 16px;
+    /* 过程内容默认平铺展示后，长对话中跳过视口外内容的排版绘制；
+       auto 让浏览器记住已渲染高度，减少滚动条跳动 */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 300px;
 }
 
 .claude-process-text {
