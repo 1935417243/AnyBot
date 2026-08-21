@@ -178,17 +178,20 @@
 - **位置**:`src/web/public/scripts/agent-loop.js:204-211` + `app/chat/session-controller.js:79-89` + `message-list-controller.js:241`
 - **问题**:ticker 只在收到终态事件后清除;切换会话只 abort fetch,`state.status` 永远停在 `'running'`,`setInterval` 闭包永久存活。每次中途切换泄漏一个永久定时器。
 - **修复建议**:消息视图增加 `dispose()`,渲染清空前统一调用。
+- **状态**:✅ 已修复(2026-08-16)
 
 #### 22. 图片弹窗 keydown 监听不移除
 
 - **位置**:`src/web/public/scripts/app/ui/image-modal.js:22-35`
 - **问题**:只有按 Escape 才 `removeEventListener`,点 overlay 关闭不移除,每次开关残留一个闭包。
+- **状态**:✅ 已修复(2026-08-21)。`handleKeydown` 提为具名函数,`closeImageModal` 统一负责移除监听,Escape 与点 overlay 关闭均会清理。
 
 #### 23. `loadSession` 无并发守卫,快速切换会话可错序渲染
 
 - **位置**:`src/web/public/scripts/app/chat/session-controller.js:291-339`
 - **问题**:`await fetch` 后直接赋值渲染,无请求序号/取消机制;侧边栏点击与轮询静默刷新可并发触发,慢响应后到达者覆盖快响应,出现标题与消息不匹配的错乱。
 - **修复建议**:加单调递增 requestId,响应落地前校验是否最新。
+- **状态**:✅ 已修复(2026-08-21)。`loadSession` 新增单调递增 `loadSessionRequestId`,在 `fetch` 响应到达、`res.json()` 解析完成、`fetchModelConfig` 返回(恢复流/压缩订阅前)三处落地前校验 requestId 是否仍为最新,过期请求直接丢弃不再触碰状态。
 
 #### 24. 多处 fetch 不检查响应状态,失败时 UI 静默劣化
 

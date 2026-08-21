@@ -11,6 +11,7 @@ export function createSessionController(config) {
     var activeCompactPollTimer = null;
     var currentSessionUpdatedAt = 0;
     var currentNewestMessageId = 0;
+    var loadSessionRequestId = 0;
 
     var ensureSessionPromise = null;
 
@@ -48,6 +49,9 @@ export function createSessionController(config) {
             config.inputEl.focus();
             return;
         }
+        // 离开正在进行流式/压缩的会话：解除本地订阅并复位输入状态，
+        // 服务端继续运行，回到该会话时 loadSession 会按 activeStream/activeRun 恢复
+        stopActiveStreamSubscription();
         // 丢弃未发送的空会话，避免侧边栏残留「新对话」
         var abandonedEmptySessionId = null;
         if (isViewingEmptySession && currentSessionId) {
@@ -337,15 +341,18 @@ export function createSessionController(config) {
             return;
         }
 
+        var requestId = ++loadSessionRequestId;
         try {
             stopActiveStreamSubscription();
             var isSameSession = id === currentSessionId;
             var res = await fetch('/api/sessions/' + id + '?limit=' + config.sessionMessagePageSize);
+            if (requestId !== loadSessionRequestId) return;
             if (!res.ok) {
                 if (!options.silent) config.showError('加载会话失败');
                 return;
             }
             var data = await res.json();
+            if (requestId !== loadSessionRequestId) return;
             var wasChatView = config.getCurrentView() === 'chat';
             currentSessionId = id;
             currentSessionProjectId = data.projectId || null;
@@ -365,6 +372,7 @@ export function createSessionController(config) {
             if (config.refreshBranchSwitcher) config.refreshBranchSwitcher();
             currentNewestMessageId = config.renderSessionMessages(data.messages || [], !!data.hasMoreMessages);
             await config.fetchModelConfig(currentSessionProvider);
+            if (requestId !== loadSessionRequestId) return;
             if (data.activeRun && data.activeRun.kind === 'compact') {
                 resumeActiveCompact(id, data.activeRun);
             } else if (data.activeStream) {
