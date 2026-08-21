@@ -78,6 +78,48 @@ class ChannelManager {
     );
   }
 
+  async startChannelLogin(type: string): Promise<boolean> {
+    if (!this.callbacks) {
+      logger.warn("channel.login_skipped", { type, reason: "no callbacks registered" });
+      return false;
+    }
+
+    const existing = this.runningChannels.get(type);
+    if (existing) {
+      try {
+        await existing.stop();
+        logger.info("channel.stopped", { type });
+      } catch (error) {
+        logger.error("channel.stop_failed", { type, error });
+      }
+      this.runningChannels.delete(type);
+    }
+
+    const factory = channelFactories[type];
+    if (!factory) {
+      logger.warn("channel.login.unknown_type", { type });
+      return false;
+    }
+
+    const channel = factory();
+    if (typeof channel.startLogin !== "function") {
+      logger.warn("channel.login.unsupported", { type });
+      return false;
+    }
+
+    try {
+      const started = await channel.startLogin(this.callbacks);
+      if (started) {
+        this.runningChannels.set(type, channel);
+        logger.info("channel.login_started", { type });
+      }
+      return started;
+    } catch (error) {
+      logger.error("channel.login_failed", { type, error });
+      return false;
+    }
+  }
+
   async restartChannel(type: string): Promise<void> {
     if (!this.callbacks) {
       logger.warn("channel.restart_skipped", { type, reason: "no callbacks registered" });

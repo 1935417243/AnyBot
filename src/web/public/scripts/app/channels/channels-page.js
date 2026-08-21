@@ -183,7 +183,9 @@ export function createChannelsPageController(options) {
                         message: '正在生成微信登录二维码…'
                     });
                     startWeixinLoginPolling(true);
-                    saveChannel(type);
+                    fetch('/api/channels/weixin/login', {method: 'POST'}).catch(function (e) {
+                        console.error('Failed to start weixin login:', e);
+                    });
                 }
             }
         });

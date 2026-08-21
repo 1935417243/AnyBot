@@ -52,5 +52,15 @@ export function createChannelsRouter(): Router {
     res.json(getWeixinLoginStatus());
   });
 
+  router.post("/channels/weixin/login", async (_req: Request, res: Response) => {
+    try {
+      const ok = await channelManager.startChannelLogin("weixin");
+      res.json({ ok });
+    } catch (error) {
+      logger.error("weixin.login_start_failed", { error });
+      res.status(500).json({ error: "启动微信扫码登录失败" });
+    }
+  });
+
   return router;
 }

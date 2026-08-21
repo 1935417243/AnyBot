@@ -208,24 +208,8 @@ export class WeixinChannel implements IChannel {
       logger.warn("weixin.login_required", {
         message: "微信频道未绑定，正在输出二维码，请用个人微信扫码确认",
       });
-      const login = await this.loginWithQr();
-      this.config = {
-        ...this.config,
-        accountId: login.accountId,
-        token: login.token,
-        baseUrl: login.baseUrl || this.config.baseUrl || DEFAULT_BASE_URL,
-        ownerChatId: this.config.ownerChatId || login.ownerChatId || "",
-      };
-      updateChannelConfig("weixin", {
-        accountId: this.config.accountId,
-        token: this.config.token,
-        baseUrl: this.config.baseUrl,
-        ownerChatId: this.config.ownerChatId,
-      });
-      logger.info("weixin.login_saved", {
-        accountId: this.config.accountId,
-        ownerChatId: this.config.ownerChatId,
-      });
+      void this.loginInBackground();
+      return true;
     }
 
     await this.notifyStart();
@@ -245,6 +229,25 @@ export class WeixinChannel implements IChannel {
     logger.info("weixin.stopped");
   }
 
+  async startLogin(callbacks: ChannelCallbacks): Promise<boolean> {
+    const config = readChannelConfig<WeixinChannelConfig>("weixin");
+    this.callbacks = callbacks;
+    this.config = normalizeConfig(config ?? {});
+    this.stopped = false;
+    this.getUpdatesBuf = loadSyncBuf();
+
+    if (this.config.token?.trim() && this.config.accountId?.trim()) {
+      logger.info("weixin.login_skipped", { reason: "already bound" });
+      return false;
+    }
+
+    logger.warn("weixin.login_required", {
+      message: "微信频道未绑定，正在输出二维码，请用个人微信扫码确认",
+    });
+    void this.loginInBackground();
+    return true;
+  }
+
   async sendToOwner(text: string): Promise<void> {
     if (!this.config?.token) {
       throw new Error("Weixin channel is not started");
@@ -254,6 +257,42 @@ export class WeixinChannel implements IChannel {
       throw new Error("微信 ownerChatId 未设置，请先给 AnyBot 发一条微信消息");
     }
     await this.sendReply(ownerChatId, text, this.contextTokens.get(ownerChatId));
+  }
+
+  private async loginInBackground(): Promise<void> {
+    try {
+      const login = await this.loginWithQr();
+      if (this.stopped || !this.config) return;
+      this.config = {
+        ...this.config,
+        accountId: login.accountId,
+        token: login.token,
+        baseUrl: login.baseUrl || this.config.baseUrl || DEFAULT_BASE_URL,
+        ownerChatId: this.config.ownerChatId || login.ownerChatId || "",
+      };
+      updateChannelConfig("weixin", {
+        enabled: true,
+        accountId: this.config.accountId,
+        token: this.config.token,
+        baseUrl: this.config.baseUrl,
+        ownerChatId: this.config.ownerChatId,
+      });
+      logger.info("weixin.login_saved", {
+        accountId: this.config.accountId,
+        ownerChatId: this.config.ownerChatId,
+      });
+      await this.notifyStart();
+      if (this.stopped) return;
+      void this.pollLoop();
+      logger.info("weixin.started", {
+        accountId: this.config.accountId,
+        ownerChatId: this.config.ownerChatId,
+      });
+    } catch (error) {
+      if (!this.stopped) {
+        logger.error("weixin.login_failed", { error });
+      }
+    }
   }
 
   private async loginWithQr(): Promise<LoginResult> {
@@ -307,9 +346,15 @@ export class WeixinChannel implements IChannel {
             state: "waiting_code",
             message: "手机微信要求输入数字验证码，请在终端输入",
           });
-          verifyCode = await readVerifyCodeFromStdin(
-            verifyCode ? "验证码不匹配，请重新输入手机微信显示的数字：" : "请输入手机微信显示的数字：",
-          );
+          try {
+            verifyCode = await readVerifyCodeFromStdin(
+              verifyCode ? "验证码不匹配，请重新输入手机微信显示的数字：" : "请输入手机微信显示的数字：",
+            );
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            setWeixinLoginStatus({ state: "failed", message });
+            throw error;
+          }
           break;
         case "scaned_but_redirect":
           if (status.redirect_host) {
@@ -1053,9 +1098,10 @@ function isRetryableWeixinError(error: unknown): boolean {
   return true;
 }
 
-function normalizeConfig(config: WeixinChannelConfig): WeixinChannelConfig {
+function normalizeConfig(config: Partial<WeixinChannelConfig>): WeixinChannelConfig {
   return {
     ...config,
+    enabled: !!config.enabled,
     baseUrl: config.baseUrl?.trim() || DEFAULT_BASE_URL,
     botType: config.botType?.trim() || DEFAULT_BOT_TYPE,
     botAgent: config.botAgent?.trim() || DEFAULT_BOT_AGENT,
@@ -1212,15 +1258,28 @@ function setWeixinLoginStatus(next: Partial<WeixinLoginStatus>): void {
   };
 }
 
+const VERIFY_CODE_INPUT_TIMEOUT_MS = 120_000;
+
 async function readVerifyCodeFromStdin(prompt: string): Promise<string> {
+  if (!process.stdin.isTTY) {
+    throw new Error("当前运行环境无法从终端输入验证码，请重新扫码并在手机微信上直接确认");
+  }
   process.stdout.write(prompt);
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let input = "";
+    const cleanup = () => {
+      clearTimeout(timer);
+      process.stdin.removeListener("data", onData);
+      process.stdin.pause();
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("验证码输入超时，请重新扫码登录"));
+    }, VERIFY_CODE_INPUT_TIMEOUT_MS);
     const onData = (chunk: Buffer | string) => {
       input += chunk.toString();
       if (input.includes("\n")) {
-        process.stdin.removeListener("data", onData);
-        process.stdin.pause();
+        cleanup();
         resolve(input.trim());
       }
     };
