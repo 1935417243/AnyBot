@@ -201,7 +201,8 @@
         scrollBottom(true);
 
         var ticker = isPersisted ? null : setInterval(function () {
-            if (state.status !== 'running') {
+            // 行被移出文档（如中途切换会话）说明视图已废弃，自杀释放闭包
+            if (state.status !== 'running' || !row.isConnected) {
                 clearInterval(ticker);
                 return;
             }
@@ -436,7 +437,7 @@
         function ensureAnswerPlayback() {
             if (answerPlaybackTimer || isPersisted) return;
             answerPlaybackTimer = setInterval(function () {
-                if (state.status !== 'running') {
+                if (state.status !== 'running' || !row.isConnected) {
                     stopAnswerPlayback();
                     return;
                 }
