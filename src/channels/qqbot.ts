@@ -54,6 +54,10 @@ export class QQBotChannel implements IChannel {
   private ws: WebSocket | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private lastSeq: number | null = null;
+  private sessionId: string | null = null;
+  private reconnectAttempts = 0;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private stopped = false;
   private accessToken: string | null = null;
   private tokenExpiresAt: number = 0;
   private queueByChat = new Map<string, Promise<void>>();
@@ -71,7 +75,9 @@ export class QQBotChannel implements IChannel {
 
     this.config = config;
     this.callbacks = callbacks;
-    
+    this.stopped = false;
+    this.reconnectAttempts = 0;
+
     try {
       await this.connect();
       return true;
@@ -82,6 +88,11 @@ export class QQBotChannel implements IChannel {
   }
 
   async stop(): Promise<void> {
+    this.stopped = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
@@ -177,15 +188,27 @@ export class QQBotChannel implements IChannel {
           }
           logger.info("qqbot.ws_hello", { heartbeatInterval: interval });
 
-          // 发送 Identify, 请求公域与频道的普通消息以及私信
-          this.ws!.send(JSON.stringify({
-            op: 2,
-            d: {
-              token: `QQBot ${this.accessToken}`,
-              intents: (1 << 30) | (1 << 12) | (1 << 25), // PUBLIC_GUILD_MESSAGES, DIRECT_MESSAGE, GROUP_AND_C2C
-              shard: [0, 1]
-            }
-          }));
+          if (this.sessionId && this.lastSeq !== null) {
+            // 已有会话，尝试 Resume (op 6) 恢复事件流
+            this.ws!.send(JSON.stringify({
+              op: 6,
+              d: {
+                token: `QQBot ${this.accessToken}`,
+                session_id: this.sessionId,
+                seq: this.lastSeq,
+              }
+            }));
+          } else {
+            // 发送 Identify, 请求公域与频道的普通消息以及私信
+            this.ws!.send(JSON.stringify({
+              op: 2,
+              d: {
+                token: `QQBot ${this.accessToken}`,
+                intents: (1 << 30) | (1 << 12) | (1 << 25), // PUBLIC_GUILD_MESSAGES, DIRECT_MESSAGE, GROUP_AND_C2C
+                shard: [0, 1]
+              }
+            }));
+          }
 
           this.heartbeatInterval = setInterval(() => {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -193,14 +216,33 @@ export class QQBotChannel implements IChannel {
             }
           }, interval);
         } else if (op === 0 && t === "READY") {
+          this.sessionId = payload.d?.session_id ?? this.sessionId;
+          this.reconnectAttempts = 0;
           logger.info("qqbot.started", { user: payload.d?.user });
+        } else if (op === 0 && t === "RESUMED") {
+          this.reconnectAttempts = 0;
+          logger.info("qqbot.resumed");
         } else if (op === 0 && (t === "DIRECT_MESSAGE_CREATE" || t === "AT_MESSAGE_CREATE" || t === "GROUP_AT_MESSAGE_CREATE" || t === "C2C_MESSAGE_CREATE")) {
           // 处理消息事件
           this.handleMessage(payload.d, t).catch((error) => {
             logger.error("qqbot.handle_message_failed", { error, eventType: t });
           });
+        } else if (op === 7) {
+          // 服务端要求重连
+          logger.info("qqbot.ws_reconnect_requested");
+          try {
+            this.ws?.close();
+          } catch { /* close 事件会触发重连 */ }
         } else if (op === 9) {
-          logger.error("qqbot.ws_invalid_session");
+          // Invalid Session: d 为 true 时仍可 resume,否则清空会话重新 Identify
+          logger.error("qqbot.ws_invalid_session", { canResume: payload.d === true });
+          if (payload.d !== true) {
+            this.sessionId = null;
+            this.lastSeq = null;
+          }
+          try {
+            this.ws?.close();
+          } catch { /* close 事件会触发重连 */ }
         }
       } catch (error) {
         logger.error("qqbot.ws_message_error", { error });
@@ -213,12 +255,36 @@ export class QQBotChannel implements IChannel {
         clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = null;
       }
-      // TODO: 添加断线重连逻辑
+      this.ws = null;
+      this.scheduleReconnect();
     });
     
     this.ws.on("error", (error: Error) => {
       logger.error("qqbot.ws_error", { error });
     });
+  }
+
+  private scheduleReconnect(): void {
+    if (this.stopped || !this.config || !this.callbacks) {
+      return;
+    }
+    if (this.reconnectTimer) {
+      return;
+    }
+    // 指数退避: 1s, 2s, 4s, ... 上限 60s; READY/RESUMED 后重置
+    const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 60_000);
+    this.reconnectAttempts += 1;
+    logger.info("qqbot.reconnect_scheduled", { delayMs: delay, attempt: this.reconnectAttempts });
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.stopped) {
+        return;
+      }
+      this.connect().catch((error) => {
+        logger.error("qqbot.reconnect_failed", { error });
+        this.scheduleReconnect();
+      });
+    }, delay);
   }
 
   async sendToOwner(text: string): Promise<void> {

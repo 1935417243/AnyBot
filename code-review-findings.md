@@ -110,12 +110,14 @@
 - **位置**:`src/channels/qqbot.ts:200-207`(代码里自认 `TODO: 添加断线重连逻辑`)
 - **问题**:close 后实例仍挂在 `channelManager.runningChannels` 里,`/api/send` 和 automation 投递认为频道"运行中",实际消息全部发不出去。网络抖动一次就永久失效,只能人工重启频道。
 - **修复建议**:参照 telegram/weixin 的 poll 循环,加带退避和 session resume(op 6)的重连。
+- **状态**:✅ 已修复(2026-08-21)。`qqbot.ts` 新增断线重连:close 后按指数退避(1s→60s 上限,READY/RESUMED 后重置)自动重连;持有 `session_id`+`lastSeq` 时发送 op 6 Resume 恢复事件流,否则重新 Identify;同时处理 op 7(服务端要求重连)与 op 9(invalid session,不可恢复时清空会话)。注:原描述"消息全部发不出去"不准确——发送走 REST API 不受 WS 影响,实际死的是入站事件流。
 
 #### 12. 微信扫码登录阻塞频道启动,stdin 验证码路径可永久挂起
 
 - **位置**:`src/channels/weixin.ts:211`(`await this.loginWithQr()`)、`1215-1231`、`src/channels/index.ts:42`
 - **问题**:未绑定时 `start()` 内同步等待扫码最长 8 分钟,期间 `startAllChannels` 卡住,`automationScheduler.start()`(`index.ts:254`)和后续频道跟着等;`readVerifyCodeFromStdin` 无超时,Electron 以 `stdio: ["ignore", ...]`(`main.cjs:740`)启动时 stdin 永远无输入 → 登录流程永久挂起。
 - **修复建议**:登录流程异步化(start 先返回,登录后台进行,UI 已有轮询机制);stdin 读取加超时。
+- - **状态**:✅ 已修复(2026-08-21)
 
 #### 13. Provider 超时无硬性兜底
 
