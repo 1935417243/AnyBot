@@ -13,21 +13,23 @@ export function openImageModal(src) {
         overlay.classList.add('active');
     });
 
+    function handleKeydown(event) {
+        if (event.key === 'Escape') {
+            closeImageModal(overlay, handleKeydown);
+        }
+    }
+
+    document.addEventListener('keydown', handleKeydown);
+
     overlay.addEventListener('click', function (event) {
         if (event.target === overlay) {
-            closeImageModal(overlay);
-        }
-    });
-
-    document.addEventListener('keydown', function handleKeydown(event) {
-        if (event.key === 'Escape') {
-            closeImageModal(overlay);
-            document.removeEventListener('keydown', handleKeydown);
+            closeImageModal(overlay, handleKeydown);
         }
     });
 }
 
-function closeImageModal(overlay) {
+function closeImageModal(overlay, handleKeydown) {
+    document.removeEventListener('keydown', handleKeydown);
     overlay.classList.remove('active');
     setTimeout(function () {
         overlay.remove();
