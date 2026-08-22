@@ -1,0 +1,115 @@
+src/web/public/scripts/app/app/create-app.js
+  s_96a13bace673d1::t_203b7bc40a120b 693-694
+  s_96a13bace673d1::t_23fdb589060191 33
+  s_96a13bace673d1::t_6ba66fda06e3ab 199,201-206
+  s_96a13bace673d1::t_fbb5f3048ded2a 391-392
+  s_96a13bace673d1::t_6bd60fa25595c9 774-777
+  s_96a13bace673d1::t_47b2b56f7a1183 4
+  s_96a13bace673d1::t_e888ba18444c6d 439-448
+  s_96a13bace673d1::t_bb2dda92ab48b6 1129,1133-1134
+  s_96a13bace673d1::t_929030d199fa89 126
+src/providers/index.ts
+  s_96a13bace673d1::t_a42f6cb5e576e4 205,207
+  s_96a13bace673d1::t_04bad0f8681cac 2,7,10
+  s_96a13bace673d1::t_e42faf5c85e23b 227-236,238
+  s_96a13bace673d1::t_d67c146addaff0 60-79
+  s_96a13bace673d1::t_23a4998acb7dde 11
+src/web/model-config.ts
+  s_96a13bace673d1::t_28b020206070ca 10,12
+  s_96a13bace673d1::t_298474d283b058 316-317,322,331-334
+src/web/routes/cli-runtime.ts
+  s_96a13bace673d1::t_7b375311ee0e35 1-69
+src/providers/codex.ts
+  s_96a13bace673d1::t_add2bd3c9cc4ad 336-346
+  s_96a13bace673d1::t_06cd2e421d6288 92
+  s_96a13bace673d1::t_7c06f3184163ed 167-168
+  s_96a13bace673d1::t_f037d9926e261b 42
+src/web/public/index.html
+  s_96a13bace673d1::t_e2698a749514fb 410
+src/cli-runtime/installer.ts
+  s_96a13bace673d1::t_96902974c97a46 186-187
+  s_96a13bace673d1::t_8740340983a080 1-185,188-233,236-359
+  s_96a13bace673d1::t_1b14fd41921002 234-235
+src/web/public/scripts/app/chat/send-message.js
+  s_96a13bace673d1::t_2ad81b81f3bdce 12-16,18-20
+  s_96a13bace673d1::t_f6b7d903701bdc 17
+src/cli-runtime/registry.ts
+  s_96a13bace673d1::t_d09db4a8a5c5d7 1-158
+package.json
+  s_96a13bace673d1::t_497e22cc0666db 36
+  s_96a13bace673d1::t_c1ade4f88b322f 78-84
+src/index.ts
+  s_96a13bace673d1::t_82b6a164e2351f 55,58-59
+src/web/public/scripts/app/app/cli-runtime-store.js
+  s_fcecb9a3bbfedc::t_0af3a46bf68b6d 1-4,9,11,13,17,19,21,26-27,29,35,38,50,73,77,101,105,110-111,115,131
+  s_96a13bace673d1::t_f16611dee6207f 5-8,10,12,14-16,18,20,22-25,28,30-34,36-37,39-49,51-72,74-76,78-100,102-104,106-109,112-114,116-130,132-137
+src/web/public/scripts/app/chat/cli-runtime-bar.js
+  s_fcecb9a3bbfedc::t_3d93bfbfa6e545 57
+  s_96a13bace673d1::t_bccb7e164b5926 1-56,58-89
+src/app-settings.ts
+  s_96a13bace673d1::t_5603037fc259a3 399-403
+  s_96a13bace673d1::t_d7ce2defe9e1b4 146-148
+  s_96a13bace673d1::t_1642b46a2683f0 213-216
+  s_96a13bace673d1::t_0a5a04adacb62d 83-87
+  s_96a13bace673d1::t_384c0c012a6f8f 370
+  s_96a13bace673d1::t_79a75c06d5b536 473
+src/web/events.ts
+  s_96a13bace673d1::t_92cf3f3fdfdb8f 21-25
+  s_96a13bace673d1::t_24bea32ec1da56 91-98
+  s_96a13bace673d1::t_c017fe8aed9315 20
+src/web/public/styles/chat.css
+  s_96a13bace673d1::t_842e154b4f0b27 1473-1511
+scripts/package-portable.mjs
+  s_96a13bace673d1::t_9eb70b88dda631 306
+  s_96a13bace673d1::t_577f1b1ab09ba8 26-37
+src/web/public/scripts/app/settings/settings-controller.js
+  s_96a13bace673d1::t_f35ede728bb02c 580-583,596
+  s_96a13bace673d1::t_c76009783d8714 47
+  s_96a13bace673d1::t_56b1bd20fac9a2 665-666
+src/web/public/styles/settings.css
+  s_96a13bace673d1::t_79635cbaadbd88 1114-1130
+src/web/public/scripts/app/settings/settings-provider-controller.js
+  s_96a13bace673d1::t_174e7e0d3198f6 814-891,893-894,896-901,904-919,922-928,930-943
+  s_96a13bace673d1::t_d8b3525e5f00bc 920-921,929
+  s_96a13bace673d1::t_72911880cb3d5c 1397,1400-1401
+  s_96a13bace673d1::t_e2b9fb05ffc9be 1546-1550
+  s_96a13bace673d1::t_a4afe5637a4629 1341-1342,1345-1346,1354-1360,1364,1366-1370
+  s_96a13bace673d1::t_7eb75e3043c04c 801
+  s_96a13bace673d1::t_b2adf28b4d96dc 32-35
+  s_96a13bace673d1::t_e035e5e7a04e68 1455,1460-1462,1471
+  s_fcecb9a3bbfedc::t_9de24495da603b 892,895,902-903
+  s_96a13bace673d1::t_3ae34e2a87fc2c 10
+src/web/api.ts
+  s_96a13bace673d1::t_9a3b5bd45f6e86 35
+  s_96a13bace673d1::t_c84a0cb626c6c4 5
+src/web/public/scripts/app/app/dom.js
+  s_96a13bace673d1::t_08a46e34221607 85
+src/cli-runtime/manifest.ts
+  s_96a13bace673d1::t_1162fefc014e28 1-166
+package-lock.json
+  s_96a13bace673d1::t_6e256a9e594277 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "a2d0f937d58e8c4416540a8134fa12e10b82aac5",
+  "prompts": {},
+  "sessions": {
+    "s_96a13bace673d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "200a65ea-956d-4d98-8def-2e93eddf079a",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_fcecb9a3bbfedc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5ac6616-64f5-4896-85ab-9ef82e3c0289",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
