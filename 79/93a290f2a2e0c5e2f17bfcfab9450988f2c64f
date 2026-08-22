@@ -1,0 +1,14 @@
+src/channels/dingtalk.ts
+  h_7a561dec792e5b 243-255,266,419
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "7993a290f2a2e0c5e2f17bfcfab9450988f2c64f",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
