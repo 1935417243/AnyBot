@@ -44,6 +44,7 @@ export function createSettingsController(options) {
     const settingsProviderCurrent = options.settingsProviderCurrent;
     const settingsProviderExtraFields = options.settingsProviderExtraFields;
     const settingsProviderBinFields = options.settingsProviderBinFields;
+    const settingsProviderRuntimeFields = options.settingsProviderRuntimeFields;
     const settingsProviderMenu = options.settingsProviderMenu;
     const settingsProviderModelCombobox = options.settingsProviderModelCombobox;
     const settingsProviderModelCurrent = options.settingsProviderModelCurrent;
@@ -576,6 +577,10 @@ export function createSettingsController(options) {
                 logIncludePrompt: false,
                 logRetentionDays: 3,
             },
+            // 内置 CLI 组件按需下载配置
+            cliRuntime: {
+                downloadSource: 'auto',
+            },
         };
     }
 
@@ -588,6 +593,7 @@ export function createSettingsController(options) {
             workspace: Object.assign({}, base.workspace, raw.workspace || {}),
             permissions: Object.assign({}, base.permissions, raw.permissions || {}),
             privacy: Object.assign({}, base.privacy, raw.privacy || {}),
+            cliRuntime: Object.assign({}, base.cliRuntime, raw.cliRuntime || {}),
         };
     }
 
@@ -656,6 +662,8 @@ export function createSettingsController(options) {
         settingsProviderCurrent: settingsProviderCurrent,
         settingsProviderExtraFields: settingsProviderExtraFields,
         settingsProviderBinFields: settingsProviderBinFields,
+        settingsProviderRuntimeFields: settingsProviderRuntimeFields,
+        cliRuntimeStore: options.cliRuntimeStore || null,
         settingsProviderMenu: settingsProviderMenu,
         settingsProviderModelCombobox: settingsProviderModelCombobox,
         settingsProviderModelCurrent: settingsProviderModelCurrent,

@@ -7,7 +7,9 @@ import {
   switchProvider,
   createProvider,
   getProviderInstallationStatus,
+  normalizeProviderType,
 } from "../providers/index.js";
+import { getCliRuntimeStatus, type CliRuntimeStatus } from "../cli-runtime/installer.js";
 import { EFFORT_LEVELS, CODEX_EFFORT_LEVELS, type EffortLevel } from "../providers/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -311,10 +313,13 @@ export function getProviderTypes(): Array<{
   bin: string;
   executablePath: string | null;
   installHint: string;
+  /** 内置 CLI 组件的下载状态；仅 codex / claude-code 有值，其他 provider 为 null */
+  cliRuntime: CliRuntimeStatus | null;
 }> {
   return getRegisteredProviderTypes().map((type) => {
     const p = createProvider(type);
     const installation = getProviderInstallationStatus(type);
+    const normalized = normalizeProviderType(type);
     return {
       type: p.type,
       displayName: p.displayName,
@@ -323,6 +328,10 @@ export function getProviderTypes(): Array<{
       bin: installation.bin,
       executablePath: installation.executablePath,
       installHint: installation.installHint,
+      cliRuntime:
+        normalized === "codex" || normalized === "claude-code"
+          ? getCliRuntimeStatus(normalized)
+          : null,
     };
   });
 }

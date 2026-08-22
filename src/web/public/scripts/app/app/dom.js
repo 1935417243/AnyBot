@@ -82,6 +82,7 @@ export function getAppDom(documentRef) {
         settingsProviderTimeoutFields: byId(documentRef, 'settings-provider-timeout-fields'),
         settingsProviderCompatToggleFields: byId(documentRef, 'settings-provider-compat-toggle-fields'),
         settingsProviderBinFields: byId(documentRef, 'settings-provider-bin-fields'),
+        settingsProviderRuntimeFields: byId(documentRef, 'settings-provider-runtime-fields'),
         settingsProviderExtraFields: byId(documentRef, 'settings-provider-extra-fields'),
         settingsDefaultWorkdir: byId(documentRef, 'settings-default-workdir'),
         settingsWorkdirOpenBtn: byId(documentRef, 'settings-workdir-open-btn'),

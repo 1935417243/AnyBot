@@ -18,6 +18,12 @@ type WebUiEvent =
       updatedAt: number;
     }
   | {
+      /** 内置 CLI 组件下载到达终态（ready/error）时推送，前端据此刷新安装状态 */
+      type: "cli_runtime_changed";
+      provider: string;
+      updatedAt: number;
+    }
+  | {
       type: "ready" | "ping";
       updatedAt: number;
     };
@@ -79,6 +85,14 @@ export function emitProjectsChanged(projectId?: string, reason?: string): void {
 export function emitHistoryCleared(): void {
   broadcast({
     type: "history_cleared",
+    updatedAt: Date.now(),
+  });
+}
+
+export function emitCliRuntimeChanged(provider: string): void {
+  broadcast({
+    type: "cli_runtime_changed",
+    provider,
     updatedAt: Date.now(),
   });
 }

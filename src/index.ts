@@ -52,8 +52,11 @@ import {
 } from "./chat-runner.js";
 import { abortAllActiveRuns, clearActiveRun, createActiveRun } from "./web/active-runs.js";
 import * as db from "./web/db.js";
+import { cleanupStaleStaging } from "./cli-runtime/installer.js";
 
 ensureExecutablePathEnv();
+// 清理上次中断的 CLI 组件下载残留
+cleanupStaleStaging();
 
 function resolveInitialProviderType(): string {
   const persisted = readPersistedProviderType();

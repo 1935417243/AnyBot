@@ -1111,6 +1111,23 @@
             white-space: nowrap;
         }
 
+        /* 内置 CLI 组件下载状态条（设置-提供商页），复用 settings-update-* 进度样式 */
+        .settings-cli-runtime {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--subtle-hover);
+        }
+
+        .settings-cli-runtime-actions {
+            margin: 0;
+            padding: 0;
+        }
+
         .settings-danger-btn {
             min-height: 36px;
             border: 1px solid rgba(244, 63, 94, 0.35);

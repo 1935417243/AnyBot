@@ -1,6 +1,7 @@
 import { createAttachmentController } from '../chat/attachments.js';
 import { createBranchSwitcher } from '../chat/branch-switcher.js';
 import { createAutomationsPageController } from '../automations/automations-page.js';
+import { createCliRuntimeBar } from '../chat/cli-runtime-bar.js';
 import { createContextUsageController, formatTokenCount } from '../chat/context-usage.js';
 import { createFileReferencePickerController } from '../chat/file-reference-picker.js';
 import { bindChatInputEvents } from '../chat/input-events.js';
@@ -29,6 +30,7 @@ import { createPluginsPageController } from '../plugins/plugins-page.js';
 import { copyCode } from '../ui/code-copy.js';
 import { openImageModal } from '../ui/image-modal.js';
 import { createToastController } from '../ui/toast.js';
+import { createCliRuntimeStore } from './cli-runtime-store.js';
 import { createViewRouter } from './view-router.js';
 
 const SESSION_MESSAGE_PAGE_SIZE = 40;
@@ -121,6 +123,7 @@ export function createAnyBotApp(dom, deps) {
         settingsProviderTimeoutFields,
         settingsProviderCompatToggleFields,
         settingsProviderBinFields,
+        settingsProviderRuntimeFields,
         settingsProviderExtraFields,
         settingsDefaultWorkdir,
         settingsWorkdirOpenBtn,
@@ -193,7 +196,14 @@ export function createAnyBotApp(dom, deps) {
     let homeHeroController = null;
     let appEventsBound = false;
     let pendingAttachments = [];
+    let cliRuntimeBar = null;
     const toastController = createToastController({ documentRef: documentRef });
+    // 内置 CLI 组件下载状态共享 store（设置页状态条 / 聊天页提示条 / 发送拦截共用）
+    const cliRuntimeStore = createCliRuntimeStore({
+        showError: function (msg) {
+            toastController.showError(msg);
+        },
+    });
 
     function requireAttachmentController() {
         return requireAppController(attachmentController, 'attachmentController');
@@ -378,6 +388,8 @@ export function createAnyBotApp(dom, deps) {
         settingsProviderCurrent: settingsProviderCurrent,
         settingsProviderExtraFields: settingsProviderExtraFields,
         settingsProviderBinFields: settingsProviderBinFields,
+        settingsProviderRuntimeFields: settingsProviderRuntimeFields,
+        cliRuntimeStore: cliRuntimeStore,
         settingsProviderMenu: settingsProviderMenu,
         settingsProviderModelCombobox: settingsProviderModelCombobox,
         settingsProviderModelCurrent: settingsProviderModelCurrent,
@@ -422,6 +434,16 @@ export function createAnyBotApp(dom, deps) {
         showError: showError,
         showSettingsView: showSettingsView,
         updateContextUsage: updateContextUsage,
+    });
+
+    // 聊天页内置组件下载提示条：当前 provider 组件未就绪时显示在输入框上方
+    cliRuntimeBar = createCliRuntimeBar({
+        inputArea: documentRef.getElementById('input-area'),
+        cliRuntimeStore: cliRuntimeStore,
+        getCurrentProvider: function () {
+            var config = settingsController ? settingsController.getModelConfig() : null;
+            return config ? config.provider : null;
+        },
     });
 
     function updateSendBtnState() {
@@ -668,6 +690,8 @@ export function createAnyBotApp(dom, deps) {
                 if (effortModeController) {
                     effortModeController.applyModelConfig(requireSettingsController().getModelConfig());
                 }
+                // provider 切换后同步组件下载提示条
+                if (cliRuntimeBar) cliRuntimeBar.render();
             });
         },
         fetchSessions: function () {
@@ -746,6 +770,10 @@ export function createAnyBotApp(dom, deps) {
         messagesEl: messagesEl,
         ensureSession: function () {
             return requireSessionController().ensureSession();
+        },
+        // 发送前校验内置组件是否就绪（未就绪时拦截并提示去下载）
+        isCliRuntimeReady: function (provider) {
+            return cliRuntimeStore.isReady(provider);
         },
         getState: function () {
             var promptSelection = requireSlashPickerController().getSelection();
@@ -1098,9 +1126,12 @@ export function createAnyBotApp(dom, deps) {
             settings.fetchProviders(),
             settings.fetchAppSettings(),
             settings.fetchProxyConfig(),
+            cliRuntimeStore.refresh(),
             permissionModeController ? permissionModeController.refresh() : Promise.resolve(),
             effortModeController ? effortModeController.refresh() : Promise.resolve(),
         ]);
+        cliRuntimeStore.bindEvents();
+        if (cliRuntimeBar) cliRuntimeBar.render();
         settings.startDesktopUpdateStatusRefresh();
         var initialSessions = sidebar.getSessions();
         if (initialSessions.length > 0) {

@@ -33,6 +33,7 @@
     "multer": "^2.1.1",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
+    "tar": "^7.5.15",
     "undici": "^7.24.1",
     "zod": "^4.4.3"
   },
@@ -74,7 +75,13 @@
       "!release-assets/**",
       "!.packaging/**",
       "!.run/**",
-      "!.data/**"
+      "!.data/**",
+      "!node_modules/@openai/codex-darwin-*/**",
+      "!node_modules/@openai/codex-linux-*/**",
+      "!node_modules/@openai/codex-win32-*/**",
+      "!node_modules/@anthropic-ai/claude-agent-sdk-darwin-*/**",
+      "!node_modules/@anthropic-ai/claude-agent-sdk-linux-*/**",
+      "!node_modules/@anthropic-ai/claude-agent-sdk-win32-*/**"
     ],
     "asar": false,
     "afterPack": "./electron/afterPack.cjs",

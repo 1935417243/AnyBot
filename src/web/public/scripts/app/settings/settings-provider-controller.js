@@ -7,6 +7,7 @@ export function createSettingsProviderController(options) {
     const settingsProviderCurrent = options.settingsProviderCurrent;
     const settingsProviderExtraFields = options.settingsProviderExtraFields;
     const settingsProviderBinFields = options.settingsProviderBinFields;
+    const settingsProviderRuntimeFields = options.settingsProviderRuntimeFields;
     const settingsProviderMenu = options.settingsProviderMenu;
     const settingsProviderModelCombobox = options.settingsProviderModelCombobox;
     const settingsProviderModelCurrent = options.settingsProviderModelCurrent;
@@ -28,6 +29,10 @@ export function createSettingsProviderController(options) {
     let settingsProviderEffortComboboxController = null;
     // codex「上游格式」combobox 控制器；字段区每次渲染重建 DOM，控制器随之重建
     let codexFormatComboboxController = null;
+    // 内置 CLI 组件状态共享 store（由 create-app 注入；可能为空，需防御）
+    const cliRuntimeStore = options.cliRuntimeStore || null;
+    // 各 provider 上次已知的组件阶段，用于检测 ready 跃迁后自动切换
+    let lastRuntimePhases = {};
     let remoteProviderModelSuggestions = [];
     let remoteProviderModelFetchTimer = null;
     let remoteProviderModelFetchSeq = 0;
@@ -793,6 +798,7 @@ export function createSettingsProviderController(options) {
             settingsProviderBinFields.style.display = 'none';
             settingsProviderBinFields.innerHTML = '';
         }
+        renderCliRuntimeFields(provider);
         if (settingsProviderExtraFields) {
             settingsProviderExtraFields.style.display = showProviderFields ? '' : 'none';
             settingsProviderExtraFields.innerHTML = showProviderFields ? definition.buildFields(cfg) : '';
@@ -803,6 +809,136 @@ export function createSettingsProviderController(options) {
             }
         }
         if (showModelSelect) fetchSettingsModelConfig(provider.type);
+    }
+
+    // ---------- 内置 CLI 组件（按需下载）状态条与下载源 ----------
+
+    // 需要内置 CLI 组件的 provider；与后端 cli-runtime manifest 的 provider 集合一致
+    const CLI_RUNTIME_PROVIDER_LABELS = {
+        'codex': 'Codex',
+        'claude-code': 'Claude Code',
+    };
+
+    function isCliRuntimeProvider(providerType) {
+        return !!CLI_RUNTIME_PROVIDER_LABELS[providerType];
+    }
+
+    /** provider 未安装但可通过内置组件下载补齐 */
+    function isProviderDownloadable(provider) {
+        return !!provider && !isProviderInstalled(provider) && !!provider.cliRuntime;
+    }
+
+    function formatRuntimeSize(bytes) {
+        var value = Number(bytes || 0);
+        if (!Number.isFinite(value) || value <= 0) return '';
+        var mb = value / (1024 * 1024);
+        return (mb >= 100 ? String(Math.round(mb)) : mb.toFixed(1)) + ' MB';
+    }
+
+    /** 状态条色调复用 settings-update-status 的 ready/warn/error */
+    function getCliRuntimeTone(status) {
+        if (!status) return 'warn';
+        if (status.phase === 'ready') return 'ready';
+        if (status.phase === 'error') return 'error';
+        return 'warn';
+    }
+
+    function buildCliRuntimeStatusText(provider, status) {
+        var label = CLI_RUNTIME_PROVIDER_LABELS[provider.type] || provider.displayName || provider.type;
+        var sizeText = status ? formatRuntimeSize(status.sizeBytes) : '';
+        if (!status) return label + ' 内置组件状态加载中…';
+        if (!status.supported) return label + ' 内置组件暂不支持当前平台自动下载，请配置外部 CLI';
+        if (status.phase === 'ready') return label + ' 内置组件已就绪（' + status.version + '）';
+        if (status.phase === 'downloading') return label + ' 内置组件下载中…';
+        if (status.phase === 'verifying') return label + ' 内置组件校验中…';
+        if (status.phase === 'error') {
+            return label + ' 内置组件下载失败' + (status.message ? '：' + status.message : '');
+        }
+        return label + ' 内置组件未下载' + (sizeText ? '（约 ' + sizeText + '）' : '');
+    }
+
+    /** 未下载/下载中/失败时展示的状态条；结构复用桌面更新的 settings-update-* 三件套 */
+    function buildCliRuntimeStatusHtml(provider, status) {
+        var html = '<div class="settings-cli-runtime-status settings-update-status ' +
+            getCliRuntimeTone(status) + '" id="settings-cli-runtime-status">' +
+            escapeHtml(buildCliRuntimeStatusText(provider, status)) + '</div>';
+        var showProgress = status && (status.phase === 'downloading' || status.phase === 'verifying');
+        if (showProgress) {
+            var percent = status.phase === 'verifying'
+                ? 100
+                : Math.max(0, Math.min(100, Number(status.percent || 0)));
+            var detail = status.phase === 'verifying'
+                ? '正在校验文件完整性…'
+                : percent.toFixed(1) + '%' +
+                    (status.percent != null && status.sizeBytes
+                        ? ' · ' + formatRuntimeSize(status.sizeBytes * percent / 100) + ' / ' + formatRuntimeSize(status.sizeBytes)
+                        : '') +
+                    (status.source ? ' · ' + status.source : '');
+            html += '<div class="settings-update-progress">' +
+                '<div class="settings-update-progress-bar"><span style="width:' + percent.toFixed(1) + '%"></span></div>' +
+                '<div class="settings-update-progress-text">' + escapeHtml(detail) + '</div>' +
+                '</div>';
+        }
+        var canDownload = status && status.supported && status.phase !== 'downloading' && status.phase !== 'verifying';
+        if (canDownload) {
+            html += '<div class="settings-button-row settings-cli-runtime-actions">' +
+                '<button class="settings-primary-btn compact" id="settings-cli-runtime-download-btn" type="button">' +
+                (status.phase === 'error' ? '重试下载' : '立即下载') + '</button>' +
+                '</div>';
+        }
+        return html;
+    }
+
+    /** 渲染组件状态条（未就绪时）；已就绪或非内置组件 provider 时隐藏 */
+    function renderCliRuntimeFields(provider) {
+        if (!settingsProviderRuntimeFields) return;
+        var showFields = !!provider && isCliRuntimeProvider(provider.type) && !!cliRuntimeStore && !isProviderInstalled(provider);
+        if (!showFields) {
+            settingsProviderRuntimeFields.style.display = 'none';
+            settingsProviderRuntimeFields.innerHTML = '';
+            return;
+        }
+        var status = cliRuntimeStore.get(provider.type);
+        settingsProviderRuntimeFields.innerHTML =
+            '<div class="settings-cli-runtime">' + buildCliRuntimeStatusHtml(provider, status) + '</div>';
+        settingsProviderRuntimeFields.style.display = '';
+        bindCliRuntimeFields(provider);
+    }
+
+    function bindCliRuntimeFields(provider) {
+        var downloadBtn = document.getElementById('settings-cli-runtime-download-btn');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', function () {
+                if (cliRuntimeStore) cliRuntimeStore.startDownload(provider.type);
+            });
+        }
+    }
+
+    /** 组件状态变更订阅回调：就地刷新状态条；就绪跃迁时刷新列表并自动切换过去 */
+    function handleCliRuntimeChange() {
+        if (!cliRuntimeStore) return;
+        // fetchProviders 会把下拉重置回当前 provider，先记住用户正在查看的 provider
+        var viewingBeforeRefresh = getSelectedSettingsProvider();
+        Object.keys(CLI_RUNTIME_PROVIDER_LABELS).forEach(function (providerType) {
+            var status = cliRuntimeStore.get(providerType);
+            var phase = status ? status.phase : null;
+            var prevPhase = lastRuntimePhases[providerType] || null;
+            if (prevPhase !== 'ready' && phase === 'ready') {
+                fetchProviders().then(function () {
+                    // 用户正在查看该 provider 时，下载完成后直接切换为当前 provider
+                    if (viewingBeforeRefresh && viewingBeforeRefresh.type === providerType) {
+                        persistSettingsProviderSelection(providerType);
+                    }
+                });
+            }
+            if (phase) lastRuntimePhases[providerType] = phase;
+        });
+        var provider = getSelectedSettingsProvider();
+        if (provider) renderCliRuntimeFields(provider);
+    }
+
+    if (cliRuntimeStore) {
+        cliRuntimeStore.subscribe(handleCliRuntimeChange);
     }
 
     function getProviderTimeoutMinutes(cfg) {
@@ -1202,10 +1338,12 @@ export function createSettingsProviderController(options) {
         if (settingsProviderMenu) settingsProviderMenu.innerHTML = '';
         providerData.providers.forEach(function (p) {
             var isInstalled = isProviderInstalled(p);
+            // 内置组件可下载的 provider 允许选中查看状态条，但不切换当前 provider
+            var isDownloadable = isProviderDownloadable(p);
             var opt = document.createElement('option');
             opt.value = p.type;
-            opt.textContent = p.displayName + (isInstalled ? '' : '（未安装）');
-            opt.disabled = !isInstalled;
+            opt.textContent = p.displayName + (isInstalled ? '' : (isDownloadable ? '（需下载）' : '（未安装）'));
+            opt.disabled = !isInstalled && !isDownloadable;
             settingsProviderSelect.appendChild(opt);
 
             if (settingsProviderMenu) {
@@ -1213,14 +1351,23 @@ export function createSettingsProviderController(options) {
                 item.className = 'settings-combobox-option';
                 item.type = 'button';
                 item.setAttribute('role', 'option');
-                item.disabled = !isInstalled;
-                item.setAttribute('aria-disabled', isInstalled ? 'false' : 'true');
-                if (!isInstalled) item.title = (p.bin || p.displayName) + ' 未安装';
+                item.disabled = !isInstalled && !isDownloadable;
+                item.setAttribute('aria-disabled', item.disabled ? 'true' : 'false');
+                if (!isInstalled) {
+                    item.title = isDownloadable
+                        ? '内置组件未下载，选中后可就地下载'
+                        : (p.bin || p.displayName) + ' 未安装';
+                }
                 item.dataset.providerType = p.type;
                 item.dataset.providerDisplayName = p.displayName;
                 item.dataset.providerInstalled = isInstalled ? 'true' : 'false';
+                item.dataset.providerDownloadable = isDownloadable ? 'true' : 'false';
                 item.dataset.providerBin = p.bin || '';
-                item.innerHTML = buildSettingsProviderOptionHtml(false, p.displayName, !isInstalled);
+                item.innerHTML = buildSettingsProviderOptionHtml(
+                    false,
+                    p.displayName,
+                    isInstalled ? '' : (isDownloadable ? '需下载' : '未安装'),
+                );
                 item.addEventListener('click', async function (e) {
                     e.stopPropagation();
                     if (setSettingsProviderValue(p.type)) {
@@ -1247,11 +1394,11 @@ export function createSettingsProviderController(options) {
         var provider = providerData.providers.find(function (p) {
             return p.type === providerType;
         });
-        return !!provider && isProviderInstalled(provider);
+        return !!provider && (isProviderInstalled(provider) || isProviderDownloadable(provider));
     }
 
-    function buildSettingsProviderOptionHtml(isActive, displayName, isDisabled) {
-        return buildSettingsComboboxOptionHtml(isActive, displayName, isDisabled ? '未安装' : '');
+    function buildSettingsProviderOptionHtml(isActive, displayName, statusText) {
+        return buildSettingsComboboxOptionHtml(isActive, displayName, statusText || '');
     }
 
     settingsProviderModelComboboxController = createSettingsSingleSelectCombobox({
@@ -1305,12 +1452,14 @@ export function createSettingsProviderController(options) {
         });
         if (settingsProviderCurrent) {
             settingsProviderCurrent.textContent = selected
-                ? selected.displayName + (isProviderInstalled(selected) ? '' : '（未安装）')
+                ? selected.displayName + (isProviderInstalled(selected) ? '' : (isProviderDownloadable(selected) ? '（需下载）' : '（未安装）'))
                 : '请选择提供商';
         }
         getSettingsProviderOptions(true).forEach(function (item) {
             var isActive = item.dataset.providerType === settingsProviderSelect.value;
-            var isDisabled = item.dataset.providerInstalled === 'false';
+            var isInstalled = item.dataset.providerInstalled !== 'false';
+            var isDownloadable = item.dataset.providerDownloadable === 'true';
+            var isDisabled = !isInstalled && !isDownloadable;
             item.classList.toggle('active', isActive);
             item.classList.toggle('disabled', isDisabled);
             item.disabled = isDisabled;
@@ -1319,7 +1468,7 @@ export function createSettingsProviderController(options) {
             item.innerHTML = buildSettingsProviderOptionHtml(
                 isActive,
                 item.dataset.providerDisplayName || '',
-                isDisabled,
+                isInstalled ? '' : (isDownloadable ? '需下载' : '未安装'),
             );
         });
     }
@@ -1394,6 +1543,11 @@ export function createSettingsProviderController(options) {
 
     async function persistSettingsProviderSelection(providerType) {
         if (!providerType || !isSettingsProviderSelectable(providerType)) return false;
+        // 需下载的 provider 允许选中查看状态条，但在组件就绪前不切换当前 provider
+        var provider = providerData.providers.find(function (p) {
+            return p.type === providerType;
+        });
+        if (!provider || !isProviderInstalled(provider)) return false;
         var saved = await switchProviderTo(providerType, { closeOnSuccess: false });
         if (saved) showSettingsStatus('已保存');
         return saved;

@@ -9,6 +9,15 @@ export function createSendMessageController(config) {
         var outgoing = collectOutgoingMessage();
         if (!outgoing) return;
 
+        // 内置组件（Claude Code / Codex CLI）未下载时拦截发送，引导去设置页下载
+        var sendState = config.getState();
+        var provider = sendState.modelConfig && sendState.modelConfig.provider;
+        if (config.isCliRuntimeReady && provider && !config.isCliRuntimeReady(provider)) {
+            var providerLabel = provider === 'codex' ? 'Codex' : (provider === 'claude-code' ? 'Claude Code' : provider);
+            config.showError(providerLabel + ' 内置组件尚未下载，请下载后再发送');
+            return;
+        }
+
         if (isCompactCommand(outgoing.text)) {
             await compactContext(outgoing);
             return;

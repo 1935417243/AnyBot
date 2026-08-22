@@ -23,6 +23,18 @@ function copy(source, target) {
   fs.cpSync(source, target, { recursive: true });
 }
 
+// 内置 CLI 的平台二进制包改为按需下载，打包时一律剔除（与 package.json build.files 黑名单保持一致）
+const EXCLUDED_PLATFORM_PACKAGE_PATTERN =
+  /^node_modules[/\\]@(openai[/\\]codex-(darwin|linux|win32)-|anthropic-ai[/\\]claude-agent-sdk-(darwin|linux|win32)-)/;
+
+function copyNodeModules(source, target) {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.cpSync(source, target, {
+    recursive: true,
+    filter: (src) => !EXCLUDED_PLATFORM_PACKAGE_PATTERN.test(path.relative(root, src)),
+  });
+}
+
 function copyFileIfExists(source, target) {
   if (fs.existsSync(source)) copy(source, target);
 }
@@ -291,7 +303,7 @@ fs.rmSync(releaseDir, { recursive: true, force: true });
 fs.mkdirSync(releaseDir, { recursive: true });
 
 copy(path.join(root, "dist"), path.join(releaseDir, "dist"));
-copy(path.join(root, "node_modules"), path.join(releaseDir, "node_modules"));
+copyNodeModules(path.join(root, "node_modules"), path.join(releaseDir, "node_modules"));
 copy(path.join(root, "package.json"), path.join(releaseDir, "package.json"));
 copy(path.join(root, "package-lock.json"), path.join(releaseDir, "package-lock.json"));
 copyFileIfExists(path.join(root, "README.md"), path.join(releaseDir, "README.md"));

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createAutomationsRouter } from "./routes/automations.js";
 import { createChangeReviewsRouter } from "./routes/change-reviews.js";
 import { createChannelsRouter } from "./routes/channels.js";
+import { createCliRuntimeRouter } from "./routes/cli-runtime.js";
 import { createCodexOpenAIRouter } from "./routes/codex-openai.js";
 import { createDataRouter } from "./routes/data.js";
 import { createDesktopUpdateRouter } from "./routes/desktop-update.js";
@@ -31,6 +32,7 @@ export function createApiRouter(): Router {
   router.use(createMcpRouter());
   router.use(createCodexOpenAIRouter());
   router.use(createChannelsRouter());
+  router.use(createCliRuntimeRouter());
   router.use(createSkillsRouter());
   router.use(createProxyRouter());
   router.use(createDataRouter());

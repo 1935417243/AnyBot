@@ -39,6 +39,7 @@ import { logger } from "../logger.js";
 import { DEFAULT_SANDBOX } from "../sandbox-config.js";
 import { DEFAULT_PROVIDER_TIMEOUT_MS, type CodexUpstreamFormat } from "../app-settings.js";
 import { registerCodexAdapterStream } from "../codex-adapter-stream.js";
+import { getCliExecutablePath } from "../cli-runtime/installer.js";
 import { resolveExecutable } from "../utils/process.js";
 import { getCodexHome, getCodexSkillsDir, getIsolatedCodexHome } from "../codex-config.js";
 import { getCodexMcpServersConfig } from "../mcp-config.js";
@@ -88,6 +89,7 @@ const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
 const DEFAULT_CODEX_CONTEXT_WINDOW = 200000;
 const CODEX_NPM_NAME = "@openai/codex";
 const CODEX_BUNDLED_BIN_LABEL = "bundled Codex CLI";
+const CODEX_DOWNLOADED_BIN_LABEL = "已下载的 Codex CLI";
 const moduleRequire = createRequire(import.meta.url);
 
 const CODEX_MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -162,7 +164,8 @@ type CodexSkillsMapping = {
 };
 
 export type CodexExecutableResolution = {
-  source: "bundled" | "configured";
+  /** downloaded = userData 下按需下载的二进制；bundled = 随包 node_modules；configured = 用户指定或 PATH */
+  source: "bundled" | "configured" | "downloaded";
   bin: string;
   executablePath: string | null;
   codexPathOverride?: string;
@@ -330,6 +333,17 @@ export function resolveCodexExecutable(bin?: string): CodexExecutableResolution 
   const bundledExecutable = resolveBundledCodexExecutable();
 
   if (!configuredBin || configuredBin === "codex") {
+    // 优先级：按需下载到 userData 的二进制 > 随包 node_modules（dev 场景）> PATH
+    const downloadedExecutable = getCliExecutablePath("codex");
+    if (downloadedExecutable) {
+      return {
+        source: "downloaded",
+        bin: CODEX_DOWNLOADED_BIN_LABEL,
+        executablePath: downloadedExecutable,
+        codexPathOverride: downloadedExecutable,
+      };
+    }
+
     if (bundledExecutable) {
       return {
         source: "bundled",

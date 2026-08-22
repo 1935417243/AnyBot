@@ -80,6 +80,11 @@ export interface AppSettings {
     webPort: number;
   };
   providers: Record<string, ProviderRuntimeSettings>;
+  /** 内置 CLI 组件（Claude Code / Codex）的按需下载配置 */
+  cliRuntime: {
+    /** 下载源：auto = 国内镜像优先失败回退官方；mirror = 仅国内镜像；official = 仅官方源 */
+    downloadSource: "auto" | "mirror" | "official";
+  };
   mcp: {
     servers: Record<string, McpServerSettings>;
   };
@@ -138,6 +143,9 @@ function createDefaultSettings(): AppSettings {
       webPort: 19981,
     },
     providers: {},
+    cliRuntime: {
+      downloadSource: "auto",
+    },
     mcp: {
       servers: {},
     },
@@ -200,6 +208,10 @@ function isLogLevel(value: unknown): value is AppLogLevel {
 
 function isTheme(value: unknown): value is AppTheme {
   return value === "light" || value === "dark" || value === "system";
+}
+
+function isCliDownloadSource(value: unknown): value is AppSettings["cliRuntime"]["downloadSource"] {
+  return value === "auto" || value === "mirror" || value === "official";
 }
 
 const MIN_FONT_SIZE = 12;
@@ -355,6 +367,7 @@ function normalizeMcpSettings(value: unknown): AppSettings["mcp"] {
 function mergeSettings(value: unknown): AppSettings {
   const raw = (value && typeof value === "object" ? value : {}) as Partial<AppSettings>;
   const general = (raw.general || {}) as Partial<AppSettings["general"]>;
+  const cliRuntime = (raw.cliRuntime || {}) as Partial<AppSettings["cliRuntime"]>;
   const workspace = (raw.workspace || {}) as Partial<AppSettings["workspace"]>;
   const permissions = (raw.permissions || {}) as Partial<AppSettings["permissions"]>;
   const privacy = (raw.privacy || {}) as Partial<AppSettings["privacy"]>;
@@ -383,6 +396,11 @@ function mergeSettings(value: unknown): AppSettings {
     providers: Object.fromEntries(
       Object.entries(providers).map(([provider, config]) => [provider, normalizeProviderSettings(config)]),
     ),
+    cliRuntime: {
+      downloadSource: isCliDownloadSource(cliRuntime.downloadSource)
+        ? cliRuntime.downloadSource
+        : DEFAULT_SETTINGS.cliRuntime.downloadSource,
+    },
     mcp,
     workspace: {
       defaultWorkdir: requestedWorkdir,
@@ -452,6 +470,7 @@ export function updateAppSettings(partial: Partial<AppSettings>): AppSettings {
     ...partial,
     general: { ...current.general, ...(partial.general || {}) },
     providers: { ...current.providers, ...(partial.providers || {}) },
+    cliRuntime: { ...current.cliRuntime, ...(partial.cliRuntime || {}) },
     mcp: { ...current.mcp, ...(partial.mcp || {}) },
     workspace: { ...current.workspace, ...(partial.workspace || {}) },
     permissions: { ...current.permissions, ...(partial.permissions || {}) },

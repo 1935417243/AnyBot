@@ -1,9 +1,13 @@
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
+import { createRequire } from "module";
 import type { IProvider } from "./types.js";
 import { CodexProvider, resolveCodexExecutable } from "./codex.js";
 import { ClaudeCodeProvider } from "./claude-code.js";
 import { resolveExecutable } from "../utils/process.js";
+import { getCliExecutablePath } from "../cli-runtime/installer.js";
 import { getConfiguredWebPort, getCodexUpstreamFormat, getProviderRuntimeSettings } from "../app-settings.js";
+
+const moduleRequire = createRequire(import.meta.url);
 
 type ProviderFactory = (config?: Record<string, unknown>) => IProvider;
 
@@ -53,7 +57,26 @@ function getClaudeCodeExecutable(
   if (useAnthropicCompat) {
     return configured;
   }
-  return getClaudeCodeBin() || configured;
+  // 未显式指定时优先用按需下载到 userData 的 CLI；
+  // 返回 undefined 则由 SDK 自行解析随包平台包（dev 环境下 node_modules 里有）
+  return getClaudeCodeBin() || configured || getCliExecutablePath("claude-code") || undefined;
+}
+
+/** 随包的 Claude Code 平台包是否可用（生产包已裁剪平台包，仅 dev 环境为 true） */
+function isBundledClaudeAvailable(): boolean {
+  const names = [`@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`];
+  if (process.platform === "linux") {
+    names.push(`@anthropic-ai/claude-agent-sdk-linux-${process.arch}-musl`);
+  }
+  for (const name of names) {
+    try {
+      moduleRequire.resolve(`${name}/package.json`);
+      return true;
+    } catch {
+      // 平台包不存在，尝试下一个候选
+    }
+  }
+  return false;
 }
 
 export function getProviderConfig(type: string): Record<string, unknown> {
@@ -179,9 +202,9 @@ function getProviderBin(type: string, config: Record<string, unknown>): string {
 function getProviderInstallHint(type: string): string {
   switch (normalizeProviderType(type)) {
     case "codex":
-      return "重新安装 AnyBot 或运行 npm install；如需使用外部 CLI，可设置 CODEX_BIN 为可执行文件路径";
+      return "请在设置页下载内置组件；如需使用外部 CLI，可设置 CODEX_BIN 为可执行文件路径";
     case "claude-code":
-      return "使用随 @anthropic-ai/claude-agent-sdk 安装的 Claude Code native binary；如需指定外部 CLI，可设置 CLAUDE_CODE_BIN";
+      return "请在设置页下载内置组件；如需指定外部 CLI，可设置 CLAUDE_CODE_BIN";
     default:
       return "";
   }
@@ -201,8 +224,18 @@ export function getProviderInstallationStatus(type: string): ProviderInstallatio
   }
   const bin = getProviderBin(normalizedType, config);
   if (normalizedType === "claude-code" && !config.pathToClaudeCodeExecutable) {
+    // 真实探测：已下载 > 随包平台包（dev）> 未安装
+    const downloadedExecutable = getCliExecutablePath("claude-code");
+    if (downloadedExecutable) {
+      return {
+        installed: true,
+        bin: "已下载的 Claude Code",
+        executablePath: downloadedExecutable,
+        installHint: getProviderInstallHint(normalizedType),
+      };
+    }
     return {
-      installed: true,
+      installed: isBundledClaudeAvailable(),
       bin,
       executablePath: null,
       installHint: getProviderInstallHint(normalizedType),
