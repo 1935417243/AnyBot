@@ -1384,7 +1384,11 @@ export function createSidebarController(options) {
     async function fetchProjects() {
         try {
             var res = await fetch("/api/projects");
-            projects = await res.json();
+            // 校验响应状态与数据结构，失败时保留旧数据，避免 renderProjects 遍历非数组导致侧边栏瘫痪
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            if (!Array.isArray(data)) throw new Error('invalid projects data');
+            projects = data;
             options.invalidateSlashItemsData();
             renderProjects();
         } catch (e) {

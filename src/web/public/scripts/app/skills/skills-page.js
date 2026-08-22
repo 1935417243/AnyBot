@@ -33,7 +33,11 @@ export function createSkillsPageController(options) {
         var providerType = getActiveSlashProviderType();
         try {
             var res = await fetch('/api/skills' + getProviderQuery(providerType));
-            skillsData = await res.json();
+            // 校验响应状态与数据结构，失败走 catch 兜底为空列表
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            if (!data || !Array.isArray(data.skills)) throw new Error('invalid skills data');
+            skillsData = data;
             skillsDataProvider = providerType;
             invalidateSlashItemsData(providerType);
         } catch (e) {

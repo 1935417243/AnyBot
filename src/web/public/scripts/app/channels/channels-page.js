@@ -19,6 +19,8 @@ export function createChannelsPageController(options) {
     async function fetchChannels() {
         try {
             var res = await fetch('/api/channels');
+            // 校验响应状态，失败时保留旧数据
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             channelsData = await res.json();
         } catch (e) {
             console.error('Failed to fetch channels:', e);

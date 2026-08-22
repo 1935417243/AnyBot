@@ -55,7 +55,11 @@ export function createSlashItemsStore(options) {
         }
         try {
             var res = await fetch('/api/slash/items' + getProviderQuery(providerType));
-            slashItemsData = await res.json();
+            // 校验响应状态与数据结构，失败走 catch 兜底为空分组
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            if (!data || !Array.isArray(data.groups)) throw new Error('invalid slash items data');
+            slashItemsData = data;
             slashItemsDataProvider = providerType;
             var fetchedAt = Date.now();
             slashItemsDataCache[cacheKey] = {
