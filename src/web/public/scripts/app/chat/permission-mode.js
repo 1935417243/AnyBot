@@ -1,7 +1,7 @@
 var PERMISSION_MODES = [
     { id: 'read-only', name: '只读', description: '只能读取文件，适合查看和问答' },
-    { id: 'workspace-write', name: '工作区可写', description: '允许修改当前工作区文件，推荐日常开发使用' },
-    { id: 'danger-full-access', name: '完全访问', description: '允许访问和修改更多本机文件，仅在信任任务时使用', danger: true },
+    { id: 'workspace-write', name: '工作区可写', description: '可修改当前工作区文件，推荐日常开发使用' },
+    { id: 'danger-full-access', name: '完全访问', description: '可访问并修改更多本机文件，请谨慎使用', danger: true },
 ];
 
 var DEFAULT_MODE = 'workspace-write';
@@ -27,6 +27,8 @@ export function createPermissionMode(options) {
         var mode = findMode(currentMode) || findMode(DEFAULT_MODE);
         if (nameEl) nameEl.textContent = mode.name;
         if (badge) badge.title = '权限模式：' + mode.name;
+        // 在切换器上标记当前模式，供 CSS 按模式着色（只读-蓝、可写-橙、完全访问-红）
+        if (switcher) switcher.dataset.mode = mode.id;
         renderDropdown();
     }
 

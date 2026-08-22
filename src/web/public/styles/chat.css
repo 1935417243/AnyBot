@@ -1623,6 +1623,37 @@
             background: var(--accent-dim);
         }
 
+        /* 权限模式配色：只读-蓝色、工作区可写-橙色、完全访问-红色 */
+        .permission-switcher[data-mode='read-only'] .permission-badge {
+            color: #3b82f6;
+        }
+
+        .permission-switcher[data-mode='workspace-write'] .permission-badge {
+            color: #f59e0b;
+        }
+
+        .permission-switcher[data-mode='danger-full-access'] .permission-badge {
+            color: #ef4444;
+        }
+
+        .permission-switcher[data-mode='read-only'] .permission-badge:hover,
+        .permission-switcher[data-mode='read-only'] .permission-badge:focus-visible,
+        .permission-switcher[data-mode='read-only'].open .permission-badge {
+            background: rgba(59, 130, 246, 0.12);
+        }
+
+        .permission-switcher[data-mode='workspace-write'] .permission-badge:hover,
+        .permission-switcher[data-mode='workspace-write'] .permission-badge:focus-visible,
+        .permission-switcher[data-mode='workspace-write'].open .permission-badge {
+            background: rgba(245, 158, 11, 0.12);
+        }
+
+        .permission-switcher[data-mode='danger-full-access'] .permission-badge:hover,
+        .permission-switcher[data-mode='danger-full-access'] .permission-badge:focus-visible,
+        .permission-switcher[data-mode='danger-full-access'].open .permission-badge {
+            background: rgba(239, 68, 68, 0.12);
+        }
+
         .permission-name {
             font-size: 13px;
             font-weight: 600;
