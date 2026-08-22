@@ -1,0 +1,24 @@
+src/channels/dingtalk.ts
+  s_5871057aec09bf::t_41851c4f0f3661 378
+  s_5871057aec09bf::t_565e9dac16271b 740
+  s_5871057aec09bf::t_93fc98c2287274 134-135
+  s_5871057aec09bf::t_8c6dbe471bc810 382-412,452
+  s_5871057aec09bf::t_471783cd67e9b6 413
+  s_5871057aec09bf::t_166b24406ec78f 741
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "99be642a474ae9c96acbdf86b9b59edc4df0da0b",
+  "prompts": {},
+  "sessions": {
+    "s_5871057aec09bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "438f0b03-1eb8-4210-88f2-91f9cb296ec4",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
