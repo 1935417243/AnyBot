@@ -240,6 +240,19 @@ export class DingtalkChannel implements IChannel {
     this.queueByChat.set(chatId, next);
   }
 
+  /**
+   * 解析会话 key：私聊按 conversationId；群聊按 conversationId:senderStaffId，
+   * 保证群内每个成员的会话上下文互相独立（senderStaffId 缺失时退化为群级共享）
+   */
+  private resolveChatId(message: DingtalkRobotMessage): string {
+    const conversationId = message.conversationId?.trim() || "";
+    if (message.conversationType === "2") {
+      const senderId = message.senderStaffId?.trim();
+      if (senderId) return `${conversationId}:${senderId}`;
+    }
+    return conversationId;
+  }
+
   private async handleRobotMessage(event: DWClientDownStream): Promise<void> {
     if (!this.config || !this.callbacks) return;
 
@@ -250,7 +263,7 @@ export class DingtalkChannel implements IChannel {
     if (this.handledMessageIds.has(messageId)) return;
     this.handledMessageIds.add(messageId);
 
-    const chatId = message.conversationId?.trim();
+    const chatId = this.resolveChatId(message);
     if (!chatId) {
       logger.warn("dingtalk.message.no_conversation_id", { messageId });
       return;
@@ -403,7 +416,7 @@ export class DingtalkChannel implements IChannel {
       summary = `${summary.slice(0, 100)}…`;
     }
 
-    const chatId = message.conversationId?.trim();
+    const chatId = this.resolveChatId(message);
     const workspaceName = chatId && this.callbacks
       ? this.callbacks.listWorkspaces(chatId, "dingtalk").find((w) => w.isCurrent)?.name
       : undefined;
