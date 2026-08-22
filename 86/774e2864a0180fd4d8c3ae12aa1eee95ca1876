@@ -1,0 +1,65 @@
+src/app-settings.ts
+  s_2a95131ceb8636::t_4373715867e617 14-15
+  s_2a95131ceb8636::t_565151740bb2c8 54-55
+  s_2a95131ceb8636::t_93ef759b0092b0 466-474
+  s_2a95131ceb8636::t_8c11306f7708c4 294-296
+src/providers/index.ts
+  s_2a95131ceb8636::t_5d7340f6a0f493 134,137
+  s_2a95131ceb8636::t_b95694f733766b 6
+  s_2a95131ceb8636::t_0eae7f210a62e6 68-70,75-79,81,86
+src/web/public/styles/settings.css
+  s_2a95131ceb8636::t_f83771a5927ce2 721-722
+  s_2a95131ceb8636::t_2e3a0973d0f569 723-725
+src/providers/codex.ts
+  s_fcf44cce513499::t_5071e7f29653ad 1187-1192
+  s_fcf44cce513499::t_cbf0f5aaca279f 1169-1170
+  s_2a95131ceb8636::t_33bc0f55a38f55 1144-1145,1147-1151,1156-1161
+  s_2a95131ceb8636::t_7c9e8e54235fc0 734-758
+  s_2a95131ceb8636::t_708d80620f24ae 939,942
+  s_fcf44cce513499::t_84a2efeb662560 824-825
+  s_2a95131ceb8636::t_d9e02c2e92503d 687-688,691-692,701,704,714,717,721-722,724,726
+  s_2a95131ceb8636::t_871bee9093bbe4 40
+  s_fcf44cce513499::t_5376cd80a25f08 980
+  s_2a95131ceb8636::t_3cd6e9e213dc22 788-795
+  s_fcf44cce513499::t_d91bef26da765a 1130-1133
+  s_2a95131ceb8636::t_94d93c75892034 835-836
+src/web/public/scripts/app/settings/settings-provider-controller.js
+  s_2a95131ceb8636::t_62070770b33046 1163-1164,1167
+  s_2a95131ceb8636::t_66b14dc8569da0 755
+  s_2a95131ceb8636::t_0eae3ae9e048a4 904-905,908-916
+  s_2a95131ceb8636::t_1d114d04f7f21e 847-848
+  s_2a95131ceb8636::t_d4b69c061afc14 286-309,312
+  s_2a95131ceb8636::t_53dfa3122918e6 623
+  s_2a95131ceb8636::t_2fdcca0d9a4452 94-101
+  s_2a95131ceb8636::t_1f0f34a327054d 1095,1104-1106
+  s_2a95131ceb8636::t_e2c9cdbde04e00 1562,1575-1577,1594-1596,1598
+  s_2a95131ceb8636::t_c213d00ac797d1 906-907,917-928,930-940,969-970,972-974
+  s_2a95131ceb8636::t_59e99b339a9d87 929,941-968
+  s_2a95131ceb8636::t_b8808133a9ae33 29-30
+  s_2a95131ceb8636::t_878f797a051947 754
+  s_2a95131ceb8636::t_a8a9c1410c8d2e 1597
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "86774e2864a0180fd4d8c3ae12aa1eee95ca1876",
+  "prompts": {},
+  "sessions": {
+    "s_2a95131ceb8636": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c518182-aa83-4c32-a924-0547df91df28",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_fcf44cce513499": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c026e288-4cda-410a-b28b-c88dfdd31c2a",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
