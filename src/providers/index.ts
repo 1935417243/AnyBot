@@ -3,7 +3,7 @@ import type { IProvider } from "./types.js";
 import { CodexProvider, resolveCodexExecutable } from "./codex.js";
 import { ClaudeCodeProvider } from "./claude-code.js";
 import { resolveExecutable } from "../utils/process.js";
-import { getConfiguredWebPort, getProviderRuntimeSettings } from "../app-settings.js";
+import { getConfiguredWebPort, getCodexUpstreamFormat, getProviderRuntimeSettings } from "../app-settings.js";
 
 type ProviderFactory = (config?: Record<string, unknown>) => IProvider;
 
@@ -65,17 +65,25 @@ export function getProviderConfig(type: string): Record<string, unknown> {
     process.env.ANTHROPIC_MODEL,
   );
   switch (normalizeProviderType(type)) {
-    case "codex":
+    case "codex": {
+      // anthropic 格式才需要本地适配层地址；responses 格式由 Codex 直连上游
+      const codexUpstreamFormat = getCodexUpstreamFormat(settings);
       return dropUndefined({
         bin: process.env.CODEX_BIN || settings.bin,
         timeoutMs: settings.timeoutMs,
         codexCompatEnabled: settings.codexCompatEnabled,
-        codexAdapterBaseUrl: settings.codexCompatEnabled ? getLocalCodexAdapterBaseUrl() : undefined,
+        codexUpstreamFormat,
+        codexAdapterBaseUrl:
+          settings.codexCompatEnabled && codexUpstreamFormat === "anthropic"
+            ? getLocalCodexAdapterBaseUrl()
+            : undefined,
         codexAnthropicBaseUrl: settings.codexAnthropicBaseUrl,
+        codexApiKey: settings.codexApiKey,
         codexDefaultModel: settings.codexDefaultModel,
         codexFastModel: settings.codexFastModel,
         codexCodeModel: settings.codexCodeModel,
       });
+    }
     case "claude-code":
       return dropUndefined({
         pathToClaudeCodeExecutable: getClaudeCodeExecutable(settings, useAnthropicCompat),
@@ -123,8 +131,10 @@ const providerFactories: Record<string, ProviderFactory> = {
       bin: config?.bin as string | undefined,
       timeoutMs: config?.timeoutMs as number | undefined,
       codexCompatEnabled: config?.codexCompatEnabled as boolean | undefined,
+      codexUpstreamFormat: config?.codexUpstreamFormat as "responses" | "anthropic" | undefined,
       codexAdapterBaseUrl: config?.codexAdapterBaseUrl as string | undefined,
       codexAnthropicBaseUrl: config?.codexAnthropicBaseUrl as string | undefined,
+      codexApiKey: config?.codexApiKey as string | undefined,
       codexDefaultModel: config?.codexDefaultModel as string | undefined,
       codexFastModel: config?.codexFastModel as string | undefined,
       codexCodeModel: config?.codexCodeModel as string | undefined,

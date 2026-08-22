@@ -26,6 +26,8 @@ export function createSettingsProviderController(options) {
     let settingsModelConfig = null;
     let settingsProviderModelComboboxController = null;
     let settingsProviderEffortComboboxController = null;
+    // codex「上游格式」combobox 控制器；字段区每次渲染重建 DOM，控制器随之重建
+    let codexFormatComboboxController = null;
     let remoteProviderModelSuggestions = [];
     let remoteProviderModelFetchTimer = null;
     let remoteProviderModelFetchSeq = 0;
@@ -87,6 +89,14 @@ export function createSettingsProviderController(options) {
             id: 'vibeapi',
             label: 'VibeAPI',
             value: 'https://vibeapi.cc',
+        },
+    ];
+    // codex「上游格式 = Responses」时的 Base URL 建议（id 与 Anthropic 模式的 deepseek 条目区分，避免预设串扰）
+    const CODEX_RESPONSES_BASE_URL_SUGGESTIONS = [
+        {
+            id: 'deepseek-responses',
+            label: 'DeepSeek',
+            value: 'https://api.deepseek.com',
         },
     ];
     const PROVIDER_MODEL_SUGGESTION_STRATEGIES = [
@@ -273,9 +283,33 @@ export function createSettingsProviderController(options) {
         return String(baseUrl || '').trim().replace(/\/+$/, '').toLowerCase();
     }
 
+    // 与后端 getCodexUpstreamFormat 的迁移默认值一致：老配置（已存 Base URL、无新字段）默认 anthropic
+    function getCodexUpstreamFormat(cfg) {
+        if (cfg && (cfg.codexUpstreamFormat === 'responses' || cfg.codexUpstreamFormat === 'anthropic')) {
+            return cfg.codexUpstreamFormat;
+        }
+        return cfg && cfg.codexAnthropicBaseUrl ? 'anthropic' : 'responses';
+    }
+
+    // 面板打开时以下拉框当前值为准（用户可能刚切换还没保存）
+    function getCurrentCodexUpstreamFormat() {
+        var select = document.getElementById('settings-provider-codex-upstream-format');
+        if (select) return select.value === 'anthropic' ? 'anthropic' : 'responses';
+        return getCodexUpstreamFormat(getProviderSettings('codex'));
+    }
+
+    // codex + Responses 格式时只展示原生 Responses 服务（当前仅 DeepSeek），其余情况用全局列表
+    function getActiveBaseUrlSuggestions() {
+        var provider = getSelectedSettingsProvider();
+        if (provider && provider.type === 'codex' && getCurrentCodexUpstreamFormat() === 'responses') {
+            return CODEX_RESPONSES_BASE_URL_SUGGESTIONS;
+        }
+        return PROVIDER_BASE_URL_SUGGESTIONS;
+    }
+
     function getProviderBaseUrlSuggestion(baseUrl) {
         var normalized = normalizeProviderBaseUrl(baseUrl);
-        return PROVIDER_BASE_URL_SUGGESTIONS.find(function (suggestion) {
+        return getActiveBaseUrlSuggestions().find(function (suggestion) {
             return normalizeProviderBaseUrl(suggestion.value) === normalized;
         }) || null;
     }
@@ -586,7 +620,7 @@ export function createSettingsProviderController(options) {
 
         closeProviderModelSuggestionMenus();
         menu.innerHTML = '';
-        PROVIDER_BASE_URL_SUGGESTIONS.forEach(function (suggestion) {
+        getActiveBaseUrlSuggestions().forEach(function (suggestion) {
             var option = document.createElement('button');
             option.className = 'provider-model-suggest-option provider-base-url-suggest-option';
             option.type = 'button';
@@ -717,6 +751,8 @@ export function createSettingsProviderController(options) {
             });
             input.addEventListener('keydown', handleProviderModelSuggestionInputKeydown);
         });
+        var codexFormatSelect = document.getElementById('settings-provider-codex-upstream-format');
+        if (codexFormatSelect) bindCodexUpstreamFormatCombobox();
         scheduleRemoteProviderModelFetch();
     }
 
@@ -808,8 +844,8 @@ export function createSettingsProviderController(options) {
 
     function buildCodexCompatToggle(cfg) {
         var checked = cfg.codexCompatEnabled === true;
-        return '<div class="settings-row compat-toggle-row"><span><strong>Responses 适配层</strong><small>开启后 Codex 仅在 AnyBot 内映射到兼容服务</small></span>' +
-            '<label class="settings-switch" aria-label="Responses 适配层">' +
+        return '<div class="settings-row compat-toggle-row"><span><strong>自定义上游</strong><small>开启后 Codex 使用自定义上游服务（Responses 直连或 Anthropic 适配）</small></span>' +
+            '<label class="settings-switch" aria-label="自定义上游">' +
             '<input id="settings-provider-codex-compat-enabled" type="checkbox"' + (checked ? ' checked' : '') + '>' +
             '<span class="settings-switch-slider"></span>' +
             '</label></div>';
@@ -865,9 +901,77 @@ export function createSettingsProviderController(options) {
         });
     }
 
+    // codex 上游格式下拉：Responses = Codex 直连上游；Anthropic = 经 AnyBot 本地适配层翻译。
+    // 用项目统一的 settings-combobox 样式；隐藏 input 承载当前值，供收集/校验逻辑读取
+    function buildCodexUpstreamFormatRow(format) {
+        return '<div class="settings-row"><span><strong>上游格式</strong><small>上游服务支持的 API 协议</small></span>' +
+            '<input type="hidden" id="settings-provider-codex-upstream-format" value="' + escapeAttr(format) + '">' +
+            '<div class="settings-combobox" id="settings-provider-codex-format-combobox">' +
+            '<button class="settings-combobox-trigger" id="settings-provider-codex-format-trigger" type="button"' +
+            ' aria-haspopup="listbox" aria-expanded="false" aria-label="上游格式">' +
+            '<span class="settings-combobox-value" id="settings-provider-codex-format-current"></span>' +
+            '<svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '</button>' +
+            '<div class="settings-combobox-menu" id="settings-provider-codex-format-menu" role="listbox" aria-label="上游格式"></div>' +
+            '</div></div>';
+    }
+
+    // Base URL 行的标签与说明随上游格式变化；id 供切换格式时就地更新文案（避免重渲染丢失未保存输入）
+    function buildCodexBaseUrlRow(format, value) {
+        var isResponses = format === 'responses';
+        var label = isResponses ? 'Responses Base URL' : 'Anthropic Base URL';
+        var hint = isResponses ? '兼容 OpenAI Responses API 的服务地址' : '兼容 Anthropic API 的服务地址';
+        return '<div class="settings-row" id="settings-provider-codex-base-url-row"><span><strong>' + label + '</strong><small>' + hint + '</small></span>' +
+            buildProviderBaseUrlInput(value || '', label) + '</div>';
+    }
+
+    // 切换上游格式：更新内存配置并就地刷新 Base URL 行文案，持久化随保存进行
+    function applyCodexUpstreamFormat(format) {
+        var cfg = getProviderSettings('codex');
+        cfg.codexUpstreamFormat = format;
+        var row = document.getElementById('settings-provider-codex-base-url-row');
+        if (row) {
+            var isResponses = format === 'responses';
+            var labelEl = row.querySelector('strong');
+            var hintEl = row.querySelector('small');
+            if (labelEl) labelEl.textContent = isResponses ? 'Responses Base URL' : 'Anthropic Base URL';
+            if (hintEl) hintEl.textContent = isResponses ? '兼容 OpenAI Responses API 的服务地址' : '兼容 Anthropic API 的服务地址';
+        }
+        closeProviderModelSuggestionMenus();
+    }
+
+    // 绑定上游格式 combobox；字段区每次渲染都会重建 DOM，因此控制器也随渲染重建
+    function bindCodexUpstreamFormatCombobox() {
+        var combobox = document.getElementById('settings-provider-codex-format-combobox');
+        if (!combobox) {
+            codexFormatComboboxController = null;
+            return;
+        }
+        var hiddenInput = document.getElementById('settings-provider-codex-upstream-format');
+        codexFormatComboboxController = createSettingsSingleSelectCombobox({
+            combobox: combobox,
+            trigger: document.getElementById('settings-provider-codex-format-trigger'),
+            current: document.getElementById('settings-provider-codex-format-current'),
+            menu: document.getElementById('settings-provider-codex-format-menu'),
+            closeOthers: function () {
+                closeOtherSettingsMenus();
+                closeProviderModelSuggestionMenus();
+            },
+            onChange: function (format) {
+                if (hiddenInput) hiddenInput.value = format;
+                applyCodexUpstreamFormat(format);
+            },
+        });
+        codexFormatComboboxController.render([
+            { value: 'responses', label: 'Responses' },
+            { value: 'anthropic', label: 'Anthropic' },
+        ], hiddenInput && hiddenInput.value === 'anthropic' ? 'anthropic' : 'responses');
+    }
+
     function buildCodexCompatFields(cfg) {
-        return '<div class="settings-row"><span><strong>Anthropic Base URL</strong><small>兼容 Anthropic API 的服务地址</small></span>' +
-            buildProviderBaseUrlInput(cfg.codexAnthropicBaseUrl || '', 'Anthropic Base URL') + '</div>' +
+        var format = getCodexUpstreamFormat(cfg);
+        return buildCodexUpstreamFormatRow(format) +
+            buildCodexBaseUrlRow(format, cfg.codexAnthropicBaseUrl || '') +
             buildProviderApiKeyRow(cfg.codexApiKey || '') +
             '<div class="settings-row"><span><strong>gpt-5.6-sol</strong><small>映射到默认通用模型</small></span>' +
             buildProviderModelInput('settings-provider-codex-default-model', cfg.codexDefaultModel || '', 'gpt-5.6-sol') + '</div>' +
@@ -988,6 +1092,7 @@ export function createSettingsProviderController(options) {
 
     function collectCodexCompatSettings(current) {
         var next = Object.assign({}, current, { codexCompatEnabled: true });
+        var formatSelect = document.getElementById('settings-provider-codex-upstream-format');
         var apiKeyInput = document.getElementById('settings-provider-api-key');
         var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
         var defaultModelInput = document.getElementById('settings-provider-codex-default-model');
@@ -996,6 +1101,9 @@ export function createSettingsProviderController(options) {
         var baseUrl = baseUrlInput ? baseUrlInput.value.trim() : '';
         var fixedModel = getFixedProviderModel(baseUrl);
         var presetKey = getProviderBaseUrlPresetKey(baseUrl);
+        if (formatSelect) {
+            next.codexUpstreamFormat = formatSelect.value === 'anthropic' ? 'anthropic' : 'responses';
+        }
         if (apiKeyInput) {
             next.codexApiKey = apiKeyInput.value;
             if (!next.codexApiKey.trim() && isOllamaBaseUrl(baseUrl)) {
@@ -1052,9 +1160,11 @@ export function createSettingsProviderController(options) {
 
     function validateCodexSettings() {
         var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
+        var formatSelect = document.getElementById('settings-provider-codex-upstream-format');
+        var baseUrlLabel = formatSelect && formatSelect.value === 'anthropic' ? 'Anthropic Base URL' : 'Responses Base URL';
         var ollamaLocal = isOllamaBaseUrl(baseUrlInput ? baseUrlInput.value : '');
         var fields = [
-            ['Anthropic Base URL', baseUrlInput],
+            [baseUrlLabel, baseUrlInput],
             ['API Key', document.getElementById('settings-provider-api-key')],
             ['gpt-5.6-sol', document.getElementById('settings-provider-codex-default-model')],
             ['gpt-mini', document.getElementById('settings-provider-codex-fast-model')],
@@ -1449,6 +1559,7 @@ export function createSettingsProviderController(options) {
         closeProviderModelSuggestionMenus();
         if (settingsProviderModelComboboxController) settingsProviderModelComboboxController.setOpen(false);
         if (settingsProviderEffortComboboxController) settingsProviderEffortComboboxController.setOpen(false);
+        if (codexFormatComboboxController) codexFormatComboboxController.setOpen(false);
     }
 
     function handleDocumentClick(e) {
@@ -1460,6 +1571,9 @@ export function createSettingsProviderController(options) {
         }
         if (settingsProviderEffortComboboxController && !settingsProviderEffortComboboxController.contains(e.target)) {
             settingsProviderEffortComboboxController.setOpen(false);
+        }
+        if (codexFormatComboboxController && !codexFormatComboboxController.contains(e.target)) {
+            codexFormatComboboxController.setOpen(false);
         }
         if (!e.target.closest || !e.target.closest('.provider-model-input-control')) {
             closeProviderModelSuggestionMenus();
@@ -1475,6 +1589,11 @@ export function createSettingsProviderController(options) {
         if (settingsProviderEffortComboboxController && settingsProviderEffortComboboxController.isOpen()) {
             settingsProviderEffortComboboxController.setOpen(false);
             settingsProviderEffortComboboxController.focusTrigger();
+            return true;
+        }
+        if (codexFormatComboboxController && codexFormatComboboxController.isOpen()) {
+            codexFormatComboboxController.setOpen(false);
+            codexFormatComboboxController.focusTrigger();
             return true;
         }
         if (document.querySelector('.provider-model-input-control.open')) {

@@ -37,7 +37,7 @@ import type {
 import { sanitizeAgentText } from "./claude-code-agent-events.js";
 import { logger } from "../logger.js";
 import { DEFAULT_SANDBOX } from "../sandbox-config.js";
-import { DEFAULT_PROVIDER_TIMEOUT_MS } from "../app-settings.js";
+import { DEFAULT_PROVIDER_TIMEOUT_MS, type CodexUpstreamFormat } from "../app-settings.js";
 import { registerCodexAdapterStream } from "../codex-adapter-stream.js";
 import { resolveExecutable } from "../utils/process.js";
 import { getCodexHome, getCodexSkillsDir, getIsolatedCodexHome } from "../codex-config.js";
@@ -684,8 +684,12 @@ export class CodexProvider implements IProvider {
   private readonly codex: Codex;
   private readonly codexHome: string | undefined;
   private readonly codexCompatEnabled: boolean;
+  /** 上游协议格式：responses 由 Codex 直连上游；anthropic 经本地适配层翻译 */
+  private readonly codexUpstreamFormat: CodexUpstreamFormat;
   private readonly codexAdapterBaseUrl: string | undefined;
   private readonly codexAnthropicBaseUrl: string | undefined;
+  /** responses 直连模式下上游服务的真实 API Key */
+  private readonly codexApiKey: string | undefined;
   private readonly codexDefaultModel: string | undefined;
   private readonly codexFastModel: string | undefined;
   private readonly codexCodeModel: string | undefined;
@@ -694,8 +698,10 @@ export class CodexProvider implements IProvider {
     bin?: string;
     timeoutMs?: number;
     codexCompatEnabled?: boolean;
+    codexUpstreamFormat?: CodexUpstreamFormat;
     codexAdapterBaseUrl?: string;
     codexAnthropicBaseUrl?: string;
+    codexApiKey?: string;
     codexDefaultModel?: string;
     codexFastModel?: string;
     codexCodeModel?: string;
@@ -705,24 +711,49 @@ export class CodexProvider implements IProvider {
       ? { codexPathOverride: executable.codexPathOverride }
       : {};
     this.codexCompatEnabled = opts?.codexCompatEnabled === true;
+    this.codexUpstreamFormat = opts?.codexUpstreamFormat === "anthropic" ? "anthropic" : "responses";
     this.codexAdapterBaseUrl = cleanString(opts?.codexAdapterBaseUrl);
     this.codexAnthropicBaseUrl = cleanString(opts?.codexAnthropicBaseUrl);
+    this.codexApiKey = cleanString(opts?.codexApiKey);
     this.codexDefaultModel = cleanString(opts?.codexDefaultModel);
     this.codexFastModel = cleanString(opts?.codexFastModel);
     this.codexCodeModel = cleanString(opts?.codexCodeModel);
-    if (this.codexCompatEnabled && this.codexAdapterBaseUrl) {
+    const activeBaseUrl = this.getActiveUpstreamBaseUrl();
+    if (this.codexCompatEnabled && activeBaseUrl) {
       this.codexHome = getIsolatedCodexHome();
-      const env = this.buildIsolatedCodexEnv();
-      codexOptions.env = env;
-      codexOptions.apiKey = "anybot-local-codex-adapter";
-      codexOptions.baseUrl = this.codexAdapterBaseUrl;
+      Object.assign(codexOptions, this.buildCompatCodexOptions());
     }
-    codexOptions.config = this.buildCodexConfig(this.codexAdapterBaseUrl, false);
+    codexOptions.config = this.buildCodexConfig(activeBaseUrl, false);
     this.bin = executable.bin;
     this.executablePath = executable.executablePath;
     this.codexPathOverride = executable.codexPathOverride;
     this.timeoutMs = opts?.timeoutMs || DEFAULT_TIMEOUT_MS;
     this.codex = new Codex(codexOptions);
+  }
+
+  /** compat 模式下 Codex 实际请求的上游地址：responses 直连上游；anthropic 指向本地适配层 */
+  private getActiveUpstreamBaseUrl(): string | undefined {
+    if (!this.codexCompatEnabled) return undefined;
+    return this.codexUpstreamFormat === "responses"
+      ? this.codexAnthropicBaseUrl
+      : this.codexAdapterBaseUrl;
+  }
+
+  /** compat 模式下 Codex SDK 的基础选项（隔离 env + 上游地址与密钥），构造函数与 per-run 实例共用 */
+  private buildCompatCodexOptions(): Pick<CodexOptions, "env" | "apiKey" | "baseUrl"> {
+    const env = this.buildIsolatedCodexEnv();
+    if (this.codexUpstreamFormat === "responses") {
+      return {
+        env,
+        apiKey: this.codexApiKey || "anybot-codex-responses",
+        baseUrl: this.codexAnthropicBaseUrl,
+      };
+    }
+    return {
+      env,
+      apiKey: "anybot-local-codex-adapter",
+      baseUrl: this.codexAdapterBaseUrl,
+    };
   }
 
   listModels(): ProviderModel[] {
@@ -754,6 +785,14 @@ export class CodexProvider implements IProvider {
     return this.codexDefaultModel || requested;
   }
 
+  /** 传给 Codex 的模型：responses 直连需映射为上游真实模型名；anthropic 模式传虚拟 id，由适配层映射 */
+  private resolveThreadModel(model: string | undefined): string | undefined {
+    if (this.codexCompatEnabled && this.codexUpstreamFormat === "responses") {
+      return this.resolveContextModel(model);
+    }
+    return cleanString(model);
+  }
+
   async run(opts: RunOptions): Promise<RunResult> {
     return this.execute(opts);
   }
@@ -782,6 +821,8 @@ export class CodexProvider implements IProvider {
     const abortController = new AbortController();
     const toolStateById = new Map<string, ToolState>();
     const textByAgentMessageId = new Map<string, string>();
+    /** reasoning item 已推送文本，用于 item.updated 增量切片，避免重复输出 */
+    const textByReasoningId = new Map<string, string>();
     const codexSkillsMapping = this.codexHome
       ? ensureCodexSkillsAvailableInHome(this.codexHome)
       : null;
@@ -791,7 +832,8 @@ export class CodexProvider implements IProvider {
     const emitEvent: typeof onEvent = onEvent
       ? (event) => (hardExpired ? undefined : onEvent(event))
       : undefined;
-    const adapterRunId = onEvent && this.codexCompatEnabled && this.codexAdapterBaseUrl
+    // 适配层旁路推流只在 anthropic 格式下存在；responses 直连由 Codex SDK 原生 item 事件流式输出
+    const adapterRunId = onEvent && this.codexCompatEnabled && this.codexUpstreamFormat === "anthropic" && this.codexAdapterBaseUrl
       ? randomUUID()
       : undefined;
     let adapterAnswerStreamed = false;
@@ -894,10 +936,10 @@ export class CodexProvider implements IProvider {
         workingDirectory: workdir,
         skipGitRepoCheck: true,
         sandboxMode: sandbox as ThreadOptions["sandboxMode"],
-        model: model || undefined,
+        model: this.resolveThreadModel(model),
         modelReasoningEffort: codexEffort as ThreadOptions["modelReasoningEffort"],
       };
-      const codex = this.createCodexForAdapterRun(adapterRunId);
+      const codex = this.createCodexForRun(adapterRunId);
       const thread = sessionId
         ? codex.resumeThread(sessionId, threadOptions)
         : codex.startThread(threadOptions);
@@ -935,6 +977,7 @@ export class CodexProvider implements IProvider {
               event,
               toolStateById,
               textByAgentMessageId,
+              textByReasoningId,
               emitEvent,
               adapterAnswerStreamed,
             );
@@ -1084,6 +1127,10 @@ export class CodexProvider implements IProvider {
           wire_api: "responses",
         },
       };
+      // responses 直连时请求上游返回推理摘要，否则 reasoning item 的 text 为空、前端看不到思考过程
+      if (this.codexUpstreamFormat === "responses") {
+        config.model_reasoning_summary = "detailed";
+      }
     }
 
     if (includeMcpServers) {
@@ -1094,32 +1141,24 @@ export class CodexProvider implements IProvider {
     return Object.keys(config).length > 0 ? config as CodexOptions["config"] : undefined;
   }
 
-  private createCodexForAdapterRun(runId: string | undefined): Codex {
+  /** 构造本次运行的 Codex 实例：仅 anthropic 格式有 per-run 适配层地址；无 per-run 地址且无 MCP 配置时复用共享实例 */
+  private createCodexForRun(runId: string | undefined): Codex {
     const mcpServers = getCodexMcpServersConfig();
-    if (!runId || !this.codexCompatEnabled || !this.codexAdapterBaseUrl) {
-      if (mcpServers) {
-        const codexOptions: CodexOptions = this.codexPathOverride
-          ? { codexPathOverride: this.codexPathOverride }
-          : {};
-        if (this.codexCompatEnabled && this.codexAdapterBaseUrl) {
-          codexOptions.env = this.buildIsolatedCodexEnv();
-          codexOptions.apiKey = "anybot-local-codex-adapter";
-          codexOptions.baseUrl = this.codexAdapterBaseUrl;
-        }
-        codexOptions.config = this.buildCodexConfig(this.codexAdapterBaseUrl, true);
-        return new Codex(codexOptions);
-      }
-      return this.codex;
-    }
+    const runBaseUrl =
+      runId && this.codexCompatEnabled && this.codexUpstreamFormat === "anthropic" && this.codexAdapterBaseUrl
+        ? buildCodexAdapterRunBaseUrl(this.codexAdapterBaseUrl, runId)
+        : undefined;
+    if (!runBaseUrl && !mcpServers) return this.codex;
 
-    const baseUrl = buildCodexAdapterRunBaseUrl(this.codexAdapterBaseUrl, runId);
     const codexOptions: CodexOptions = this.codexPathOverride
       ? { codexPathOverride: this.codexPathOverride }
       : {};
-    codexOptions.env = this.buildIsolatedCodexEnv();
-    codexOptions.apiKey = "anybot-local-codex-adapter";
-    codexOptions.baseUrl = baseUrl;
-    codexOptions.config = this.buildCodexConfig(baseUrl, true);
+    const activeBaseUrl = this.getActiveUpstreamBaseUrl();
+    if (this.codexCompatEnabled && activeBaseUrl) {
+      Object.assign(codexOptions, this.buildCompatCodexOptions());
+      if (runBaseUrl) codexOptions.baseUrl = runBaseUrl;
+    }
+    codexOptions.config = this.buildCodexConfig(runBaseUrl || activeBaseUrl, true);
     return new Codex(codexOptions);
   }
 
@@ -1127,6 +1166,8 @@ export class CodexProvider implements IProvider {
     event: Extract<ThreadEvent, { item: ThreadItem }>,
     toolStateById: Map<string, ToolState>,
     textByAgentMessageId: Map<string, string>,
+    /** reasoning item 已推送文本，item.updated 时只补增量 */
+    textByReasoningId: Map<string, string>,
     onEvent?: StreamHandler,
     suppressAgentMessageDelta?: boolean,
   ): Promise<string | null> {
@@ -1143,7 +1184,12 @@ export class CodexProvider implements IProvider {
     }
 
     if (item.type === "reasoning" && item.text) {
-      await onEvent?.({ type: "process_delta", text: sanitizeAgentText(item.text) });
+      const previous = textByReasoningId.get(item.id) || "";
+      const next = sanitizeAgentText(item.text);
+      if (next.length > previous.length) {
+        await onEvent?.({ type: "process_delta", text: next.slice(previous.length) });
+        textByReasoningId.set(item.id, next);
+      }
       return null;
     }
 

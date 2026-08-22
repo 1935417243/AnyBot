@@ -718,6 +718,11 @@
             background: rgba(148, 163, 184, 0.08);
         }
 
+        /* 行内下拉（settings-combobox）与输入框容器（.provider-model-input-control）保持同宽，左右边缘对齐 */
+        .settings-row .settings-combobox {
+            flex: 0 1 320px;
+        }
+
         .settings-inline-value {
             max-width: 260px;
             min-height: 30px;

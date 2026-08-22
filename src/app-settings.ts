@@ -11,6 +11,8 @@ let cachedSettings: AppSettings | null = null;
 export type AppLanguage = "auto" | "zh" | "en";
 export type AppLogLevel = "debug" | "info" | "warn" | "error";
 export type AppTheme = "light" | "dark" | "system";
+/** Codex 上游协议格式：responses = OpenAI Responses API 直连；anthropic = 经本地适配层翻译成 Anthropic Messages API */
+export type CodexUpstreamFormat = "responses" | "anthropic";
 
 export interface AnthropicBaseUrlPreset {
   apiKey?: string;
@@ -49,6 +51,8 @@ export interface ProviderRuntimeSettings {
   claudeCodeSubagentModel?: string;
   anthropicBaseUrlPresets?: Record<string, AnthropicBaseUrlPreset>;
   codexCompatEnabled?: boolean;
+  /** Codex 上游服务的 API 协议格式：responses 直连，anthropic 走本地适配层 */
+  codexUpstreamFormat?: CodexUpstreamFormat;
   codexAnthropicBaseUrl?: string;
   codexApiKey?: string;
   codexDefaultModel?: string;
@@ -287,6 +291,9 @@ function normalizeProviderSettings(value: unknown): ProviderRuntimeSettings {
   if (typeof raw.codexCompatEnabled === "boolean") {
     settings.codexCompatEnabled = raw.codexCompatEnabled;
   }
+  if (raw.codexUpstreamFormat === "responses" || raw.codexUpstreamFormat === "anthropic") {
+    settings.codexUpstreamFormat = raw.codexUpstreamFormat;
+  }
   if (typeof raw.codexAnthropicBaseUrl === "string") settings.codexAnthropicBaseUrl = raw.codexAnthropicBaseUrl;
   if (typeof raw.codexApiKey === "string") settings.codexApiKey = raw.codexApiKey;
   if (typeof raw.codexDefaultModel === "string") settings.codexDefaultModel = raw.codexDefaultModel;
@@ -454,6 +461,15 @@ export function updateAppSettings(partial: Partial<AppSettings>): AppSettings {
 
 export function getProviderRuntimeSettings(providerType: string): ProviderRuntimeSettings {
   return readAppSettings().providers[providerType] || {};
+}
+
+/**
+ * 取 Codex 上游协议格式，带迁移默认值：
+ * 老配置（已存 codexAnthropicBaseUrl 但没有新字段）默认 anthropic，全新配置默认 responses。
+ */
+export function getCodexUpstreamFormat(settings: ProviderRuntimeSettings): CodexUpstreamFormat {
+  if (settings.codexUpstreamFormat) return settings.codexUpstreamFormat;
+  return settings.codexAnthropicBaseUrl?.trim() ? "anthropic" : "responses";
 }
 
 export function getConfiguredWebPort(): number {
