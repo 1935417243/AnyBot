@@ -1,0 +1,23 @@
+package.json
+  s_ab90036626b42e::t_6c7d71cc386842 3
+release-notes.md
+  s_ab90036626b42e::t_6c7d71cc386842 8-13
+package-lock.json
+  s_ab90036626b42e::t_96a921270f5b92 3,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "fa3b0d08c8722239fafda8bc6c20ec9ffce85b99",
+  "prompts": {},
+  "sessions": {
+    "s_ab90036626b42e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02a2a-d502-7c22-a057-0ab1b76f28b0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
