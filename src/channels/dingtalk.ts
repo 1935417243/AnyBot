@@ -131,6 +131,8 @@ interface DingtalkSendTarget {
   userId?: string;
   robotCode?: string;
   atUserId?: string;
+  /** 群聊回复时拼在正文前的引用行（> @发送者 [项目名] 消息摘要），@ 后跟 senderStaffId 以形成真实 @ 提及 */
+  quoteLine?: string;
 }
 
 export class DingtalkChannel implements IChannel {
@@ -373,7 +375,40 @@ export class DingtalkChannel implements IChannel {
       userId: message.senderStaffId,
       robotCode: message.robotCode || this.config?.robotCode,
       atUserId: message.conversationType === "2" ? message.senderStaffId : undefined,
+      quoteLine: message.conversationType === "2" ? this.buildQuoteLine(message) : undefined,
     }, text);
+  }
+
+  /**
+   * 构造群聊回复的引用行：> @发送者 [项目名] 原消息摘要（最多 100 字符）
+   * 钉钉机器人不支持真正的引用回复，用 markdown 引用格式模拟
+   * 注意：@ 后必须跟 senderStaffId 并与 at.atUserIds 一致，钉钉才会渲染为真正的 @ 提及（写昵称只是普通文本）
+   */
+  private buildQuoteLine(message: DingtalkRobotMessage): string | undefined {
+    const atUserId = message.senderStaffId?.trim();
+    if (!atUserId) return undefined;
+
+    let summary = this.extractUserText(message).replace(/\s+/g, " ").trim();
+    if (!summary) {
+      const content = parseDingtalkContent(message.content);
+      if (message.msgtype === "file") {
+        summary = `[文件] ${content.fileName || ""}`.trim();
+      } else if (message.msgtype === "picture" || message.msgtype === "richText") {
+        summary = "[图片]";
+      } else if (message.msgtype === "audio") {
+        summary = "[语音]";
+      }
+    }
+    if (summary.length > 100) {
+      summary = `${summary.slice(0, 100)}…`;
+    }
+
+    const chatId = message.conversationId?.trim();
+    const workspaceName = chatId && this.callbacks
+      ? this.callbacks.listWorkspaces(chatId, "dingtalk").find((w) => w.isCurrent)?.name
+      : undefined;
+
+    return `> @${atUserId}${workspaceName ? ` [${workspaceName}]` : ""}${summary ? ` ${summary}` : ""}`;
   }
 
   private async sendReplyToTarget(target: DingtalkSendTarget, reply: string): Promise<void> {
@@ -414,7 +449,7 @@ export class DingtalkChannel implements IChannel {
   private async sendMarkdownToTarget(target: DingtalkSendTarget, text: string): Promise<void> {
     if (target.sessionWebhook) {
       for (const chunk of this.splitMessage(text)) {
-        await this.sendWebhookMarkdown(target.sessionWebhook, chunk, target.atUserId);
+        await this.sendWebhookMarkdown(target.sessionWebhook, chunk, target.atUserId, target.quoteLine);
       }
       return;
     }
@@ -699,8 +734,11 @@ export class DingtalkChannel implements IChannel {
     sessionWebhook: string,
     text: string,
     atUserId?: string,
+    quoteLine?: string,
   ): Promise<void> {
     const token = await this.getAccessToken();
+    // 钉钉 markdown 消息只有在文本中出现 @昵称 时，atUserIds 才会真正渲染为可点击的 @ 提及
+    const markdownText = quoteLine ? `${quoteLine}\n\n${text}` : text;
     const res = await fetch(sessionWebhook, {
       method: "POST",
       headers: {
@@ -711,7 +749,7 @@ export class DingtalkChannel implements IChannel {
         msgtype: "markdown",
         markdown: {
           title: "AnyBot 回复",
-          text,
+          text: markdownText,
         },
         ...(atUserId ? { at: { atUserIds: [atUserId], isAtAll: false } } : {}),
       }),
