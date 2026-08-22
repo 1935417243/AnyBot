@@ -13,3 +13,4 @@ build/icons/*.tiff
 .data/
 .playwright-mcp/
 .playwright-cli/
+/cli-runtime
