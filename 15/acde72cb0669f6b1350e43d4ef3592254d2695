@@ -1,0 +1,16 @@
+src/web/public/scripts/app/chat/permission-mode.js
+  h_7a561dec792e5b 3-4,30-31
+src/web/public/styles/chat.css
+  h_7a561dec792e5b 1626-1656
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "15acde72cb0669f6b1350e43d4ef3592254d2695",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
