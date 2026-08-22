@@ -1,0 +1,25 @@
+src/web/public/scripts/app/sidebar/sidebar-controller.js
+  s_11c5b936986a4c::t_236e7f66d6eb52 1387-1391
+src/web/public/scripts/app/skills/skills-page.js
+  s_11c5b936986a4c::t_31f8fb0948bcff 36-40
+src/web/public/scripts/app/chat/slash-items-store.js
+  s_11c5b936986a4c::t_b2ed9586dd24f1 58-62
+src/web/public/scripts/app/channels/channels-page.js
+  s_11c5b936986a4c::t_f6471cf1096025 22-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "1940575583c9d1b9fee66c95cb22cadbc0b02a04",
+  "prompts": {},
+  "sessions": {
+    "s_11c5b936986a4c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0297bb46-77e4-4f1b-8af7-f866bf69bddd",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
