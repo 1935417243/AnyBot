@@ -5,10 +5,12 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（1.0.3）
-- 流式输出优化：长回复渲染更顺滑
-- Claude Code：SDK 升级至 0.3.x，适配新版待办任务事件，Agent 流式视图同步重构
-- Windows 界面优化
+### 本次更新（1.0.4）
+- Agent CLI 改为按需下载，安装包体积减少约 55%
+- Codex 自定义上游新增 OpenAI Responses 直连格式支持
+- 优化微信、QQ 和钉钉频道，完善钉钉机器人群聊回复
+- 修复多会话切换异常和流式渲染计时器残留问题
+- 优化图片预览弹窗、权限模式展示及部分页面请求失败提示
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
