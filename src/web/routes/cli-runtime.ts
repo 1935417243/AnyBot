@@ -9,6 +9,12 @@ import {
   type CliRuntimeEvent,
 } from "../../cli-runtime/installer.js";
 import type { CliRuntimeProvider } from "../../cli-runtime/manifest.js";
+import {
+  getProvider,
+  getProviderConfig,
+  normalizeProviderType,
+  switchProvider,
+} from "../../providers/index.js";
 
 /** 归一化 provider 参数，仅支持两个内置 CLI 组件 */
 function parseProvider(value: unknown): CliRuntimeProvider | null {
@@ -18,6 +24,18 @@ function parseProvider(value: unknown): CliRuntimeProvider | null {
 
 function writeDownloadEvent(res: Response, event: CliRuntimeEvent): void {
   if (!res.writableEnded) res.write(`${JSON.stringify(event)}\n`);
+}
+
+/**
+ * 组件安装成功后，若它正是当前活跃的 provider，则重建该 provider 实例。
+ * provider 的 CLI 路径在创建时一次性解析并缓存，不重建的话新下载的组件
+ * 要重启 App 或改动设置才会生效（表现为发消息持续报 CLI 找不到）。
+ */
+function refreshActiveProviderAfterInstall(installed: CliRuntimeProvider): void {
+  const activeType = normalizeProviderType(getProvider().type);
+  if (activeType !== installed) return;
+  switchProvider(activeType, getProviderConfig(activeType));
+  logger.info("provider.switched", { provider: activeType, reason: "cli_runtime.installed" });
 }
 
 export function createCliRuntimeRouter(): Router {
@@ -56,6 +74,7 @@ export function createCliRuntimeRouter(): Router {
     try {
       await ensureCliRuntime(provider, source, (event) => writeDownloadEvent(res, event));
       logger.info("cli_runtime.installed", { provider });
+      refreshActiveProviderAfterInstall(provider);
     } catch (error) {
       // 错误事件已由 ensureCliRuntime 广播给所有订阅者，这里只记录日志
       const message = error instanceof Error ? error.message : "下载失败";
