@@ -3,6 +3,7 @@ import { createAutomationsRouter } from "./routes/automations.js";
 import { createChangeReviewsRouter } from "./routes/change-reviews.js";
 import { createChannelsRouter } from "./routes/channels.js";
 import { createCliRuntimeRouter } from "./routes/cli-runtime.js";
+import { createClaudeLocalAdapterRouter } from "./routes/claude-local-adapter.js";
 import { createCodexOpenAIRouter } from "./routes/codex-openai.js";
 import { createDataRouter } from "./routes/data.js";
 import { createDesktopUpdateRouter } from "./routes/desktop-update.js";
@@ -31,6 +32,7 @@ export function createApiRouter(): Router {
   router.use(createProvidersRouter());
   router.use(createMcpRouter());
   router.use(createCodexOpenAIRouter());
+  router.use(createClaudeLocalAdapterRouter());
   router.use(createChannelsRouter());
   router.use(createCliRuntimeRouter());
   router.use(createSkillsRouter());

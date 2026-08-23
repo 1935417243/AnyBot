@@ -4,6 +4,7 @@ import type { IProvider } from "./types.js";
 import { CodexProvider, resolveCodexExecutable } from "./codex.js";
 import { ClaudeCodeProvider } from "./claude-code.js";
 import { resolveExecutable } from "../utils/process.js";
+import { getLocalProviderBaseUrlType, stripProviderBaseUrlType } from "../utils/provider-base-url.js";
 import { getCliExecutablePath } from "../cli-runtime/installer.js";
 import { getConfiguredWebPort, getCodexUpstreamFormat, getProviderRuntimeSettings } from "../app-settings.js";
 
@@ -41,6 +42,10 @@ function preferSettingWhenEnabled(
 
 function getLocalCodexAdapterBaseUrl(): string {
   return `http://127.0.0.1:${getConfiguredWebPort()}/api/codex-openai/v1`;
+}
+
+function getLocalClaudeAdapterBaseUrl(): string {
+  return `http://127.0.0.1:${getConfiguredWebPort()}/api/claude-local`;
 }
 
 function getClaudeCodeBin(): string | undefined {
@@ -101,14 +106,15 @@ export function getProviderConfig(type: string): Record<string, unknown> {
           settings.codexCompatEnabled && codexUpstreamFormat === "anthropic"
             ? getLocalCodexAdapterBaseUrl()
             : undefined,
-        codexAnthropicBaseUrl: settings.codexAnthropicBaseUrl,
+        codexAnthropicBaseUrl: stripProviderBaseUrlType(settings.codexAnthropicBaseUrl),
         codexApiKey: settings.codexApiKey,
         codexDefaultModel: settings.codexDefaultModel,
         codexFastModel: settings.codexFastModel,
         codexCodeModel: settings.codexCodeModel,
       });
     }
-    case "claude-code":
+    case "claude-code": {
+      const anthropicBaseUrl = preferSettingWhenEnabled(useAnthropicCompat, settings.anthropicBaseUrl, process.env.ANTHROPIC_BASE_URL);
       return dropUndefined({
         pathToClaudeCodeExecutable: getClaudeCodeExecutable(settings, useAnthropicCompat),
         timeoutMs: settings.timeoutMs,
@@ -117,7 +123,10 @@ export function getProviderConfig(type: string): Record<string, unknown> {
           : cleanString(process.env.CLAUDE_AGENT_MODEL),
         apiKey: preferSettingWhenEnabled(useAnthropicCompat, settings.apiKey, process.env.ANTHROPIC_API_KEY),
         apiKeyHelper: preferSettingWhenEnabled(useAnthropicCompat, settings.apiKeyHelper, process.env.CLAUDE_CODE_API_KEY_HELPER),
-        anthropicBaseUrl: preferSettingWhenEnabled(useAnthropicCompat, settings.anthropicBaseUrl, process.env.ANTHROPIC_BASE_URL),
+        // 本地后端（llama/Ollama）改指本地适配层，清洗 mid-conversation system 消息；远程地址直连
+        anthropicBaseUrl: getLocalProviderBaseUrlType(anthropicBaseUrl)
+          ? getLocalClaudeAdapterBaseUrl()
+          : stripProviderBaseUrlType(anthropicBaseUrl),
         anthropicAutoModel,
         anthropicOpusModel: preferSettingWhenEnabled(
           useAnthropicCompat,
@@ -144,6 +153,7 @@ export function getProviderConfig(type: string): Record<string, unknown> {
           : settings.maxTurns,
         permissionMode: process.env.CLAUDE_AGENT_PERMISSION_MODE || settings.permissionMode,
       });
+    }
     default:
       return {};
   }

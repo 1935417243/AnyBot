@@ -50,10 +50,15 @@ export function hostGuard(req: Request, res: Response, next: NextFunction): void
   next();
 }
 
-// `/api/codex-openai/*` 供本机 Codex SDK/CLI 调用,SDK 端使用硬编码占位 key,
-// 无法携带动态 token,故豁免 token 校验(Origin/Sec-Fetch-Site 校验仍然生效)。
-function isCodexOpenAIPath(req: Request): boolean {
-  return req.path === "/codex-openai" || req.path.startsWith("/codex-openai/");
+// `/api/codex-openai/*` 与 `/api/claude-local/*` 供本机 Codex / Claude SDK/CLI 调用,
+// SDK 端使用硬编码占位 key,无法携带动态 token,故豁免 token 校验(Origin/Sec-Fetch-Site 校验仍然生效)。
+function isLocalCliAdapterPath(req: Request): boolean {
+  return (
+    req.path === "/codex-openai" ||
+    req.path.startsWith("/codex-openai/") ||
+    req.path === "/claude-local" ||
+    req.path.startsWith("/claude-local/")
+  );
 }
 
 function tokenMatches(candidate: string | undefined): boolean {
@@ -78,7 +83,7 @@ export const apiGuard: RequestHandler = (req, res, next) => {
     return;
   }
 
-  if (isCodexOpenAIPath(req)) {
+  if (isLocalCliAdapterPath(req)) {
     next();
     return;
   }

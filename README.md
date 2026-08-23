@@ -19,7 +19,7 @@ AnyBot is a local AI Coding Agent console and remote entry point that lets you c
 
 AnyBot uses the platform native binaries provided by `@openai/codex-sdk` and `@anthropic-ai/claude-agent-sdk` by default, so users do not need to install `codex` or Claude Code globally. If needed, you can still configure an external CLI from settings. Provider settings, model mappings, environment variables, and MCP configuration are stored inside AnyBot.
 
-If you do not want to use the machine's global model configuration, you can configure separate compatibility endpoints and model mappings inside AnyBot for Codex / Claude Code, connecting Aliyun Token Plan, DeepSeek, Kimi, MiniMax, Ollama (local), VibeAPI, or other Anthropic API-compatible services. AnyBot's settings only take effect inside AnyBot and do not affect the machine's global configuration.
+If you do not want to use the machine's global model configuration, you can configure separate compatibility endpoints and model mappings inside AnyBot for Codex / Claude Code, connecting DeepSeek, Kimi, MiniMax, Aliyun Token Plan, VibeAPI, Ollama (local), llama (local), or other Anthropic API-compatible services. AnyBot's settings only take effect inside AnyBot and do not affect the machine's global configuration.
 
 The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
 
@@ -154,7 +154,7 @@ Provider and model choices are saved from the Web UI. Each Provider remembers it
 
 ## Compatible Model Support
 
-AnyBot can configure Anthropic API-compatible services separately for Codex and Claude Code from settings. Built-in Base URL suggestions currently include Aliyun Token Plan, DeepSeek, Kimi, MiniMax, Ollama (local), and VibeAPI; you can also manually enter another compatible service URL.
+AnyBot can configure Anthropic API-compatible services separately for Codex and Claude Code from settings. Built-in Base URL suggestions currently include DeepSeek, Kimi, MiniMax, Aliyun Token Plan, VibeAPI, Ollama (local), and llama (local); you can also manually enter another compatible service URL.
 
 Codex connects to compatible services through the **Responses compatibility layer**. When enabled, the Codex Provider uses AnyBot's local compatibility service configuration and model mapping with an isolated `CODEX_HOME`, so it does not affect the user's global `~/.codex` configuration.
 

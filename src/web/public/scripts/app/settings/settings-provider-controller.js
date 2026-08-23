@@ -60,16 +60,13 @@ export function createSettingsProviderController(options) {
     const ALIYUN_TOKEN_PLAN_BASE_URL = 'https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic';
     const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
     const KIMI_CODING_MODELS = ['kimi-for-coding', 'k3', 'k3-256k', 'kimi-for-coding-highspeed'];
-    const OLLAMA_BASE_URL = 'http://localhost:11434';
+    const OLLAMA_BASE_URL = 'http://localhost:11434?anybot=ollama';
     const OLLAMA_PLACEHOLDER_API_KEY = 'ollama';
+    const LLAMA_BASE_URL = 'http://localhost:8080?anybot=llama';
+    const LLAMA_PLACEHOLDER_API_KEY = 'llama';
     // 与后端 src/web/services/secrets.ts 的 SECRET_MASK 保持一致。
     const SECRET_MASK = '__anybot_secret_unchanged__';
     const PROVIDER_BASE_URL_SUGGESTIONS = [
-        {
-            id: 'aliyun-token-plan',
-            label: '阿里Token Plan',
-            value: ALIYUN_TOKEN_PLAN_BASE_URL,
-        },
         {
             id: 'deepseek',
             label: 'DeepSeek',
@@ -86,14 +83,24 @@ export function createSettingsProviderController(options) {
             value: 'https://api.minimaxi.com/anthropic',
         },
         {
-            id: 'ollama',
-            label: 'Ollama（本地）',
-            value: OLLAMA_BASE_URL,
+            id: 'aliyun-token-plan',
+            label: '阿里Token Plan',
+            value: ALIYUN_TOKEN_PLAN_BASE_URL,
         },
         {
             id: 'vibeapi',
             label: 'VibeAPI',
             value: 'https://vibeapi.cc',
+        },
+        {
+            id: 'ollama',
+            label: 'Ollama（本地）',
+            value: OLLAMA_BASE_URL,
+        },
+        {
+            id: 'llama',
+            label: 'llama（本地）',
+            value: LLAMA_BASE_URL,
         },
     ];
     // codex「上游格式 = Responses」时的 Base URL 建议（id 与 Anthropic 模式的 deepseek 条目区分，避免预设串扰）
@@ -109,6 +116,11 @@ export function createSettingsProviderController(options) {
             label: 'Kimi',
             models: KIMI_CODING_MODELS,
             matchUrl: isKimiCodingBaseUrl,
+        },
+        {
+            label: 'llama',
+            models: ['qwen3.8'],
+            matchUrl: isLlamaBaseUrl,
         },
     ];
 
@@ -270,8 +282,32 @@ export function createSettingsProviderController(options) {
     }
 
     function isOllamaBaseUrl(baseUrl) {
+        // 优先认 ?anybot=ollama 标识（任意端口），回环 11434 作为兜底
+        if (getProviderBaseUrlType(baseUrl) === 'ollama') return true;
         var normalized = normalizeProviderBaseUrl(baseUrl);
         return /^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]):11434(\/|$)/.test(normalized);
+    }
+
+    // 读取 Base URL 上的 ?anybot=xxx 识别标识（与后端 src/utils/provider-base-url.ts 一致）
+    function getProviderBaseUrlType(baseUrl) {
+        var match = /[?&]anybot=([a-z0-9-]+)(?=[&#]|$)/i.exec(String(baseUrl || '').trim());
+        return match ? match[1].toLowerCase() : '';
+    }
+
+    function isLlamaBaseUrl(baseUrl) {
+        // 优先认 ?anybot=llama 标识（任意端口），回环 8080 作为兜底
+        if (getProviderBaseUrlType(baseUrl) === 'llama') return true;
+        var normalized = normalizeProviderBaseUrl(baseUrl);
+        return /^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]):8080(\/|$)/.test(normalized);
+    }
+
+    // 本地免鉴权的兼容服务（Ollama / llama.cpp）
+    function isLocalProviderBaseUrl(baseUrl) {
+        return isOllamaBaseUrl(baseUrl) || isLlamaBaseUrl(baseUrl);
+    }
+
+    function getLocalProviderPlaceholderApiKey(baseUrl) {
+        return isLlamaBaseUrl(baseUrl) ? LLAMA_PLACEHOLDER_API_KEY : OLLAMA_PLACEHOLDER_API_KEY;
     }
 
     function getRemoteProviderModelSource(baseUrl) {
@@ -281,6 +317,7 @@ export function createSettingsProviderController(options) {
         if (lower.indexOf('api.deepseek.com') !== -1) return 'DeepSeek';
         if (lower.indexOf('api.minimaxi.com') !== -1) return 'MiniMax';
         if (isOllamaBaseUrl(baseUrl)) return 'Ollama';
+        if (isLlamaBaseUrl(baseUrl)) return 'llama';
         return '';
     }
 
@@ -539,7 +576,7 @@ export function createSettingsProviderController(options) {
         var baseUrl = getProviderModelSuggestionBaseUrl();
         var apiKey = getProviderModelSuggestionApiKey();
         var source = getRemoteProviderModelSource(baseUrl);
-        if (!source || (!apiKey && !isOllamaBaseUrl(baseUrl))) {
+        if (!source || (!apiKey && !isLocalProviderBaseUrl(baseUrl))) {
             clearRemoteProviderModelSuggestions();
             return;
         }
@@ -1031,7 +1068,7 @@ export function createSettingsProviderController(options) {
 
     function updateProviderApiKeyVisibility() {
         var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
-        var hide = isOllamaBaseUrl(baseUrlInput ? baseUrlInput.value : '');
+        var hide = isLocalProviderBaseUrl(baseUrlInput ? baseUrlInput.value : '');
         Array.prototype.forEach.call(document.querySelectorAll('.provider-api-key-row'), function (row) {
             row.style.display = hide ? 'none' : '';
         });
@@ -1194,8 +1231,8 @@ export function createSettingsProviderController(options) {
         }
         if (apiKeyInput) {
             next.apiKey = apiKeyInput.value;
-            if (!next.apiKey.trim() && isOllamaBaseUrl(anthropicBaseUrl)) {
-                next.apiKey = OLLAMA_PLACEHOLDER_API_KEY;
+            if (!next.apiKey.trim() && isLocalProviderBaseUrl(anthropicBaseUrl)) {
+                next.apiKey = getLocalProviderPlaceholderApiKey(anthropicBaseUrl);
             }
         }
         if (anthropicBaseUrlInput) next.anthropicBaseUrl = anthropicBaseUrl;
@@ -1242,8 +1279,8 @@ export function createSettingsProviderController(options) {
         }
         if (apiKeyInput) {
             next.codexApiKey = apiKeyInput.value;
-            if (!next.codexApiKey.trim() && isOllamaBaseUrl(baseUrl)) {
-                next.codexApiKey = OLLAMA_PLACEHOLDER_API_KEY;
+            if (!next.codexApiKey.trim() && isLocalProviderBaseUrl(baseUrl)) {
+                next.codexApiKey = getLocalProviderPlaceholderApiKey(baseUrl);
             }
         }
         if (baseUrlInput) next.codexAnthropicBaseUrl = baseUrl;
@@ -1268,7 +1305,7 @@ export function createSettingsProviderController(options) {
 
     function validateClaudeCodeSettings() {
         var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
-        var ollamaLocal = isOllamaBaseUrl(baseUrlInput ? baseUrlInput.value : '');
+        var localProvider = isLocalProviderBaseUrl(baseUrlInput ? baseUrlInput.value : '');
         var fields = [
             ['Anthropic Base URL', baseUrlInput],
             ['API Key', document.getElementById('settings-provider-api-key')],
@@ -1281,7 +1318,7 @@ export function createSettingsProviderController(options) {
         var missing = fields.filter(function (entry) {
             var input = entry[1];
             if (!input) return false;
-            if (ollamaLocal && input.id === 'settings-provider-api-key') return false;
+            if (localProvider && input.id === 'settings-provider-api-key') return false;
             var value = input.value.trim();
             return !value;
         }).map(function (entry) {
@@ -1298,7 +1335,7 @@ export function createSettingsProviderController(options) {
         var baseUrlInput = document.getElementById('settings-provider-anthropic-base-url');
         var formatSelect = document.getElementById('settings-provider-codex-upstream-format');
         var baseUrlLabel = formatSelect && formatSelect.value === 'anthropic' ? 'Anthropic Base URL' : 'Responses Base URL';
-        var ollamaLocal = isOllamaBaseUrl(baseUrlInput ? baseUrlInput.value : '');
+        var localProvider = isLocalProviderBaseUrl(baseUrlInput ? baseUrlInput.value : '');
         var fields = [
             [baseUrlLabel, baseUrlInput],
             ['API Key', document.getElementById('settings-provider-api-key')],
@@ -1309,7 +1346,7 @@ export function createSettingsProviderController(options) {
         var missing = fields.filter(function (entry) {
             var input = entry[1];
             if (!input) return false;
-            if (ollamaLocal && input.id === 'settings-provider-api-key') return false;
+            if (localProvider && input.id === 'settings-provider-api-key') return false;
             return !input.value.trim();
         }).map(function (entry) {
             return entry[0];

@@ -19,7 +19,7 @@ AnyBot 是一个本机 AI Coding Agent 控制台与远程入口，可以让你�
 
 AnyBot 默认使用随 `@openai/codex-sdk` 和 `@anthropic-ai/claude-agent-sdk` 提供的平台 native binary，不要求用户额外全局安装 `codex` 或 Claude Code；如果需要，也可以在设置中指定外部 CLI。Provider、模型映射、环境变量和 MCP 配置都保存在 AnyBot 内部。
 
-如果不想使用本机全局模型配置，可以在 AnyBot 内为 Codex / Claude Code 单独配置兼容接口和模型映射，接入阿里 Token Plan、DeepSeek、Kimi、MiniMax、Ollama（本地）、VibeAPI 或其它 Anthropic API 兼容服务。AnyBot 内配置只在 AnyBot 内生效，不会影响本机全局配置。
+如果不想使用本机全局模型配置，可以在 AnyBot 内为 Codex / Claude Code 单独配置兼容接口和模型映射，接入DeepSeek、Kimi、MiniMax、阿里 Token Plan、VibeAPI、Ollama（本地）、llama（本地）或其它 Anthropic API 兼容服务。AnyBot 内配置只在 AnyBot 内生效，不会影响本机全局配置。
 
 桌面 App 支持 **macOS** 和 **Windows**；源码运行支持 **macOS**、**Linux** 和 **Windows**。
 
@@ -154,7 +154,7 @@ Provider 和模型选择会在 Web UI 中保存；每个 Provider 会记住上�
 
 ## 兼容模型支持
 
-AnyBot 可以在设置页为 Codex 和 Claude Code 单独配置 Anthropic API 兼容服务。当前内置 Base URL 建议项包括阿里 Token Plan、DeepSeek、Kimi、MiniMax、Ollama（本地）和 VibeAPI；也可以手动填写其它兼容服务地址。
+AnyBot 可以在设置页为 Codex 和 Claude Code 单独配置 Anthropic API 兼容服务。当前内置 Base URL 建议项包括 DeepSeek、Kimi、MiniMax、阿里 Token Plan、VibeAPI、Ollama（本地）和 llama（本地）；也可以手动填写其它兼容服务地址。
 
 Codex 通过 **Responses 适配层** 接入兼容服务。开启后，Codex Provider 会使用 AnyBot 内置的兼容服务配置和模型映射，并使用独立 `CODEX_HOME`，不影响用户全局 `~/.codex` 配置。
 

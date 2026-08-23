@@ -3,6 +3,7 @@ import { fetch as undiciFetch } from "undici";
 import { logger } from "../../logger.js";
 import { getObjectArrayValue, getObjectStringValue } from "./object-utils.js";
 import { findStoredApiKeyForBaseUrl, SECRET_MASK } from "./secrets.js";
+import { getLocalProviderBaseUrlType } from "../../utils/provider-base-url.js";
 
 const PROVIDER_MODEL_FETCH_TIMEOUT_MS = 10000;
 const PROVIDER_MODEL_CACHE_TTL_MS = 30 * 60 * 1000;
@@ -26,8 +27,9 @@ export type ProviderModelsResult = {
   expiresAt: string;
 };
 
-function isOllamaBaseUrl(baseUrl: string): boolean {
-  return /^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]):11434(\/|$)/i.test(baseUrl.trim());
+// 本地免鉴权的兼容服务（Ollama / llama.cpp），识别规则统一在 utils/provider-base-url.ts
+function isLocalProviderBaseUrl(baseUrl: string): boolean {
+  return getLocalProviderBaseUrlType(baseUrl) !== "";
 }
 
 function buildProviderModelsRequest(baseUrl: string): { modelsUrl: string; provider: string } {
@@ -45,10 +47,14 @@ function buildProviderModelsRequest(baseUrl: string): { modelsUrl: string; provi
   if (lower.includes("api.minimaxi.com")) {
     return { modelsUrl: new URL("/anthropic/v1/models", parsed.origin).toString(), provider: "MiniMax" };
   }
-  if (isOllamaBaseUrl(baseUrl)) {
+  const localType = getLocalProviderBaseUrlType(baseUrl);
+  if (localType === "ollama") {
     return { modelsUrl: new URL("/v1/models", parsed.origin).toString(), provider: "Ollama" };
   }
-  throw new Error("仅支持 阿里Token Plan、VibeAPI、DeepSeek、MiniMax 或 Ollama Base URL 自动获取模型");
+  if (localType === "llama") {
+    return { modelsUrl: new URL("/v1/models", parsed.origin).toString(), provider: "llama" };
+  }
+  throw new Error("仅支持 阿里Token Plan、VibeAPI、DeepSeek、MiniMax、Ollama 或 llama Base URL 自动获取模型");
 }
 
 function getProviderModelCacheKey(modelsUrl: string, apiKey: string): string {
@@ -85,7 +91,7 @@ export async function fetchProviderModels(baseUrl: string, apiKey: string): Prom
   if (apiKey === SECRET_MASK) {
     apiKey = findStoredApiKeyForBaseUrl(baseUrl);
   }
-  if (!apiKey && !isOllamaBaseUrl(baseUrl)) {
+  if (!apiKey && !isLocalProviderBaseUrl(baseUrl)) {
     throw new ProviderModelFetchError("缺少 API Key", 400);
   }
 

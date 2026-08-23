@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { createHash, randomUUID } from "node:crypto";
 import { fetch as undiciFetch } from "undici";
 import { getProviderRuntimeSettings } from "../../app-settings.js";
+import { stripProviderBaseUrlType } from "../../utils/provider-base-url.js";
 import { publishCodexAdapterStreamEvent } from "../../codex-adapter-stream.js";
 import { logger } from "../../logger.js";
 
@@ -181,7 +182,7 @@ function getRequiredAdapterConfig(): {
   upstreamModel: string;
 } {
   const settings = getCodexSettings();
-  const baseUrl = settings.codexAnthropicBaseUrl?.trim();
+  const baseUrl = stripProviderBaseUrlType(settings.codexAnthropicBaseUrl?.trim());
   const apiKey = settings.codexApiKey?.trim();
   const upstreamModel = settings.codexDefaultModel?.trim() || "";
 
