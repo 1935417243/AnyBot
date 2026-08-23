@@ -1,0 +1,19 @@
+src/providers/codebuddy.ts
+  s_de4da5b5a003ef::t_e2c2686df2acc4 40-41,242,247,369,431
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "f241a1dbe2a2a461652a1beddcc9e2a483c4034b",
+  "prompts": {},
+  "sessions": {
+    "s_de4da5b5a003ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02eed-4d02-72d2-b884-24ee21012c08",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
