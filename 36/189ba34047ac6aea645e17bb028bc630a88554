@@ -1,0 +1,134 @@
+src/web/public/scripts/app/settings/settings-controller.js
+  s_36d14790a5c719::t_32527e48019ced 487-518
+  s_71ff404a86f215::t_41d9900bece94b 700
+  s_36d14790a5c719::t_ce99f4cc558a72 1417
+  s_71ff404a86f215::t_11d302ca57fcee 46
+  s_36d14790a5c719::t_ec1c0e39b7eacf 100-102
+src/web/events.ts
+  s_36d14790a5c719::t_5c5379461b1e80 27-32
+  s_36d14790a5c719::t_289b914301971a 106-115
+  s_36d14790a5c719::t_376588d740de3d 26
+package.json
+  s_36d14790a5c719::t_1b9144f31b84eb 85-86
+  s_36d14790a5c719::t_ebe740d75b9822 29
+src/web/slash-items.ts
+  s_36d14790a5c719::t_599ba2f3331e10 34
+src/cli-runtime/manifest.ts
+  s_36d14790a5c719::t_1b8b2a90ef1199 15
+  s_36d14790a5c719::t_e87e108d3c667c 141-151
+  s_36d14790a5c719::t_022ab7a94cbb69 33-36
+  s_36d14790a5c719::t_9248259c4c725c 92
+src/web/public/scripts/app/app/create-app.js
+  s_71ff404a86f215::t_18f4ea75b1d42b 128
+  s_71ff404a86f215::t_091218468b8b63 391
+  s_36d14790a5c719::t_2eee58dd7cb503 1138
+src/web/public/index.html
+  s_71ff404a86f215::t_ddeeb3f62b191a 381-382
+  s_36d14790a5c719::t_82d03cfa7b0c5b 365-377
+src/providers/types.ts
+  s_36d14790a5c719::t_d330d85858c6ba 19-21
+src/web/model-config.ts
+  s_36d14790a5c719::t_1d6c3c1faa9ece 13
+  s_36d14790a5c719::t_7af6dd6b377556 345,361
+  s_36d14790a5c719::t_7609a88ed8319a 41
+src/web/public/scripts/app/chat/effort-mode.js
+  s_36d14790a5c719::t_ee12cde7ecfd78 2
+  s_36d14790a5c719::t_79fb100a01daea 261-262
+  s_36d14790a5c719::t_80f522b1db347f 12
+  s_36d14790a5c719::t_af28af983fd284 75-76
+  s_36d14790a5c719::t_154f24e7ff1d17 38,40-42
+  s_36d14790a5c719::t_784279355484c6 13-15
+  s_36d14790a5c719::t_f14cf76e61d623 16-17
+src/web/public/styles/settings.css
+  s_36d14790a5c719::t_3de938e3ce2225 885-891,895-899
+  s_36d14790a5c719::t_31076ee6245402 1476-1483
+  s_36d14790a5c719::t_0c7fc30bcb7f4e 1471
+  s_36d14790a5c719::t_29d138fb4e3f9a 661-666
+  s_36d14790a5c719::t_1e42e6d0d0ecac 1134-1135,1137-1140,1143-1169
+  s_71ff404a86f215::t_ab41dc34119418 892-894
+  s_36d14790a5c719::t_aae559b4885ecf 1392
+src/cli-runtime/installer.ts
+  s_36d14790a5c719::t_e8da8a19a3f214 68
+src/chat-runner.ts
+  s_36d14790a5c719::t_6f0e837353e88d 12
+  s_36d14790a5c719::t_5114deeac5dfa0 167
+  s_36d14790a5c719::t_9d8f8d9cf04574 172-176,181-183
+src/web/public/scripts/app/app/dom.js
+  s_71ff404a86f215::t_b82e493c196ce3 87-88
+src/providers/codebuddy.ts
+  s_36d14790a5c719::t_c0549c65e270fe 1-186,191-255,274-427,430-643
+  s_36d14790a5c719::t_40d55c2f2b5bf9 187-190
+  s_36d14790a5c719::t_785fb7956b5435 256-273
+  s_8b682eae48f92f::t_b104230947aecd 428-429
+src/providers/index.ts
+  s_36d14790a5c719::t_55bff3c1ace676 220-224,226-227
+  s_36d14790a5c719::t_5129f051cc6016 2
+  s_36d14790a5c719::t_3c4b46d19c41fc 366
+  s_36d14790a5c719::t_73b7bc705f9a36 171-184
+  s_36d14790a5c719::t_08c50bdbe8123f 244-245
+  s_36d14790a5c719::t_62a948c43d28f9 3-4,9
+  s_36d14790a5c719::t_6d92f1ae68cb96 92-101
+  s_36d14790a5c719::t_0835400aa0f57c 225
+  s_36d14790a5c719::t_389db4c68bc186 257-258
+  s_36d14790a5c719::t_e1a21d032aced5 295-312
+src/web/public/scripts/app/settings/settings-provider-controller.js
+  s_36d14790a5c719::t_6a02e9e78800c7 915-920,922-923,927-928,935-936,941,946,951-952
+  s_71ff404a86f215::t_3b257dab8c7730 9-10
+  s_36d14790a5c719::t_2dcb65e93885e6 43
+  s_36d14790a5c719::t_0e996953bcef29 66,68-70
+  s_36d14790a5c719::t_76cfd13943e54d 53
+  s_36d14790a5c719::t_79e89a23da1057 163-175
+  s_36d14790a5c719::t_85d2c0d5f50ef1 258
+  s_36d14790a5c719::t_0b55d6349093b9 1889-1893
+  s_36d14790a5c719::t_5fa9d73efb9a04 1170-1177
+  s_36d14790a5c719::t_aa56ed4bdb3326 925,1168-1169,1178-1189
+  s_36d14790a5c719::t_b2303e3c84e6a4 894
+  s_36d14790a5c719::t_18eab220055b3c 835,837
+  s_71ff404a86f215::t_11d449335702b7 863-874,876-879
+  s_36d14790a5c719::t_cf60a18dfab65c 914,924,929-932
+  s_36d14790a5c719::t_ac93089c60cf25 54-56
+  s_36d14790a5c719::t_e1a9da5c5315e0 926
+  s_36d14790a5c719::t_03abdcec64a8dc 57-58
+src/web/public/scripts/agent-loop.js
+  s_8b682eae48f92f::t_b104230947aecd 993
+src/web/routes/cli-runtime.ts
+  s_36d14790a5c719::t_be6c712080b2c6 19,22-24
+src/web/public/scripts/app/chat/cli-runtime-bar.js
+  s_36d14790a5c719::t_1915e079ef916f 14
+src/web/public/scripts/app/chat/send-message.js
+  s_36d14790a5c719::t_05ab53a72d9580 12,16-18
+package-lock.json
+  s_36d14790a5c719::t_f5a75ff67431b0 16,40-48,1540-1552
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "36189ba34047ac6aea645e17bb028bc630a88554",
+  "prompts": {},
+  "sessions": {
+    "s_36d14790a5c719": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08650643-3666-49e1-b641-3c22c42a3167",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_71ff404a86f215": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "817895d0-8e08-4fa7-a37d-d0e9b540be8a",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_8b682eae48f92f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02e85-e457-7752-bb3f-d52e633b5b72",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
