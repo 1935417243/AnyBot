@@ -942,16 +942,16 @@ export function createSettingsProviderController(options) {
         return html;
     }
 
-    /** 渲染内联组件状态（未就绪时）；已就绪或非内置组件 provider 时隐藏 */
+    /** 渲染内联组件状态（内置 runtime 未就绪时）；已就绪或非内置组件 provider 时隐藏 */
     function renderCliRuntimeFields(provider) {
         if (!settingsProviderRuntimeFields) return;
-        var showFields = !!provider && isCliRuntimeProvider(provider.type) && !!cliRuntimeStore && !isProviderInstalled(provider);
+        var status = provider && cliRuntimeStore ? cliRuntimeStore.get(provider.type) : null;
+        var showFields = !!provider && isCliRuntimeProvider(provider.type) && !!status && status.phase !== 'ready';
         if (!showFields) {
             settingsProviderRuntimeFields.hidden = true;
             settingsProviderRuntimeFields.innerHTML = '';
             return;
         }
-        var status = cliRuntimeStore.get(provider.type);
         settingsProviderRuntimeFields.innerHTML = buildCliRuntimeInlineHtml(status);
         settingsProviderRuntimeFields.hidden = false;
         bindCliRuntimeFields(provider);
@@ -1440,7 +1440,6 @@ export function createSettingsProviderController(options) {
                 item.innerHTML = buildSettingsProviderOptionHtml(
                     false,
                     p.displayName,
-                    isInstalled ? '' : (isDownloadable ? '需下载' : '未安装'),
                 );
                 item.addEventListener('click', async function (e) {
                     e.stopPropagation();
@@ -1471,8 +1470,8 @@ export function createSettingsProviderController(options) {
         return !!provider && (isProviderInstalled(provider) || isProviderDownloadable(provider));
     }
 
-    function buildSettingsProviderOptionHtml(isActive, displayName, statusText) {
-        return buildSettingsComboboxOptionHtml(isActive, displayName, statusText || '');
+    function buildSettingsProviderOptionHtml(isActive, displayName) {
+        return buildSettingsComboboxOptionHtml(isActive, displayName);
     }
 
     settingsProviderModelComboboxController = createSettingsSingleSelectCombobox({
@@ -1542,7 +1541,6 @@ export function createSettingsProviderController(options) {
             item.innerHTML = buildSettingsProviderOptionHtml(
                 isActive,
                 item.dataset.providerDisplayName || '',
-                isInstalled ? '' : (isDownloadable ? '需下载' : '未安装'),
             );
         });
     }
