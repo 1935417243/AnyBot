@@ -5,9 +5,9 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（1.0.7）
-- Claude Code 支持接入本地免鉴权模型服务：新增 Ollama / llama.cpp 本地适配层，在设置页选择「Ollama（本地）」或「llama（本地）」Base URL 即可直连本地模型
-- 设置页 Base URL 快捷项调整：新增 llama（本地），本地服务地址自动识别并填充占位 API Key，无需手动填写
+### 本次更新（1.0.8）
+- 新增 CodeBuddy 提供商
+- Claude Code 接入 llama / Ollama 本地模型时，强度滑块自动切换为 0.0～1.0 的温度调节
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
