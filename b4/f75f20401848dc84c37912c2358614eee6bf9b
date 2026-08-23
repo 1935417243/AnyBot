@@ -1,0 +1,23 @@
+release-notes.md
+  s_fab7aa0f8c2f4e::t_25c9a6ebb343dd 8-9
+package.json
+  s_fab7aa0f8c2f4e::t_86e86f34c98d4c 3
+package-lock.json
+  s_fab7aa0f8c2f4e::t_bf7cac5afa90ac 3,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "b4f75f20401848dc84c37912c2358614eee6bf9b",
+  "prompts": {},
+  "sessions": {
+    "s_fab7aa0f8c2f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "50de202e-449b-4a44-ae6e-0e9b75fd5058",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
