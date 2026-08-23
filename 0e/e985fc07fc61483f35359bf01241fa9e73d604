@@ -1,0 +1,21 @@
+src/web/routes/cli-runtime.ts
+  s_fab7aa0f8c2f4e::t_36883fccb589e5 29-40
+  s_fab7aa0f8c2f4e::t_3e4e9782d43a48 77
+  s_fab7aa0f8c2f4e::t_8a83f05b49fcea 12-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "0ee985fc07fc61483f35359bf01241fa9e73d604",
+  "prompts": {},
+  "sessions": {
+    "s_fab7aa0f8c2f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "50de202e-449b-4a44-ae6e-0e9b75fd5058",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
