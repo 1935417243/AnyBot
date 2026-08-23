@@ -1,0 +1,19 @@
+src/providers/codebuddy.ts
+  s_9514211a5e5f43::t_5ae36434c6daa8 269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "41883d2c2735e829cc88c355d0e777f7aae81073",
+  "prompts": {},
+  "sessions": {
+    "s_9514211a5e5f43": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02eb4-06e3-7cb0-a54a-c4a1d8a4b608",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
