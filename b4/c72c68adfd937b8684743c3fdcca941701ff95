@@ -1,0 +1,21 @@
+package.json
+  s_c897224836e05f::t_828d84a6273aa4 3
+package-lock.json
+  s_c897224836e05f::t_090e5225406625 3,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "b4c72c68adfd937b8684743c3fdcca941701ff95",
+  "prompts": {},
+  "sessions": {
+    "s_c897224836e05f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d14b3d7a-b87d-438f-b0fc-4ceefcfa27c5",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
