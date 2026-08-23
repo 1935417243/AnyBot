@@ -42,6 +42,9 @@ const PROVIDER_SKILL_DIRS: Record<string, () => SkillSource[]> = {
   "claude-code": () => {
     return [{ label: "Claude Code 技能", dir: getClaudeSkillsDir() }];
   },
+  codebuddy: () => {
+    return [{ label: "CodeBuddy 用户技能", dir: path.join(os.homedir(), ".codebuddy", "skills") }];
+  },
 };
 
 function resolveSkillProviderType(providerType?: string): string {
