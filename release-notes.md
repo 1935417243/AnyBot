@@ -5,7 +5,7 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（1.0.5）
+### 本次更新（1.0.6）
 - 修复下载 Claude Code / Codex 内置组件后发送消息报错（提示找不到 CLI）、需重启应用才能恢复的问题，现在下载完成即可直接使用
 
 ### 使用说明
