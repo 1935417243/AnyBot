@@ -37,6 +37,8 @@ import {getCliExecutablePath} from "../cli-runtime/installer.js";
 import {emitModelConfigChanged} from "../web/events.js";
 
 const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
+/** AnyBot 的 CodeBuddy 场景仅使用中国区，避免 CLI 根据 Windows 历史登录状态误判为国际区 */
+const CODEBUDDY_ENVIRONMENT = "internal" as const;
 
 const WORKDIR_SAFETY_PROMPT = [
     "## 工作目录规则",
@@ -237,10 +239,12 @@ export class CodeBuddyProvider implements IProvider {
     /** 通过 SDK 控制通道拉取 CLI 当前支持的模型列表（不发 prompt，不消耗轮次） */
     private async fetchSupportedModels(): Promise<ProviderModel[]> {
         const env: NodeJS.ProcessEnv = {...process.env};
+        env.CODEBUDDY_INTERNET_ENVIRONMENT = CODEBUDDY_ENVIRONMENT;
         if (this.apiKey) env.CODEBUDDY_API_KEY = this.apiKey;
         const stream = query({
             prompt: "",
             options: {
+                environment: CODEBUDDY_ENVIRONMENT,
                 pathToCodebuddyCode: this.resolveCliExecutable(),
                 permissionMode: "plan",
                 env,
@@ -362,6 +366,7 @@ export class CodeBuddyProvider implements IProvider {
             let resultMessage: ResultMessage | null = null;
             let streamedResponseText = "";
             const env: NodeJS.ProcessEnv = {...process.env};
+            env.CODEBUDDY_INTERNET_ENVIRONMENT = CODEBUDDY_ENVIRONMENT;
             if (this.apiKey) {
                 env.CODEBUDDY_API_KEY = this.apiKey;
             } else if (!env.CODEBUDDY_API_KEY) {
@@ -423,6 +428,7 @@ export class CodeBuddyProvider implements IProvider {
                 prompt,
                 options: {
                     abortController,
+                    environment: CODEBUDDY_ENVIRONMENT,
                     cwd: workdir,
                     model: resultModel,
                     // 显式开启自适应思考，避免依赖 CLI 或用户配置中的默认开关
