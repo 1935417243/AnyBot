@@ -1,0 +1,27 @@
+src/web/public/styles/settings.css
+  s_4e85cbacc47b4d::t_794824bc966966 781,1150-1151,1153
+  s_4e85cbacc47b4d::t_f013e97a931199 780,1145,1152
+  s_4e85cbacc47b4d::t_e5bb5a3d2dba29 898
+  s_4e85cbacc47b4d::t_afc928090dde35 1154,1278-1293
+  s_4e85cbacc47b4d::t_d12df25807f657 1155
+src/web/public/scripts/app/settings/settings-provider-controller.js
+  s_4e85cbacc47b4d::t_afc928090dde35 841,849-851
+src/web/model-config.ts
+  s_4e85cbacc47b4d::t_33ae223e60c6c6 135-143,152-157,159-161,270-287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "ab4b954d208a5dec50b1d42acd730afd68e1a357",
+  "prompts": {},
+  "sessions": {
+    "s_4e85cbacc47b4d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02e9c-c716-7a51-82a8-8e0d7cdbc36f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
