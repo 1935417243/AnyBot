@@ -5,8 +5,9 @@
 | macOS | `AnyBot-*.dmg` |
 | Windows | `AnyBot-Setup-*.exe` |
 
-### 本次更新（1.0.6）
-- 修复下载 Claude Code / Codex 内置组件后发送消息报错（提示找不到 CLI）、需重启应用才能恢复的问题，现在下载完成即可直接使用
+### 本次更新（1.0.7）
+- Claude Code 支持接入本地免鉴权模型服务：新增 Ollama / llama.cpp 本地适配层，在设置页选择「Ollama（本地）」或「llama（本地）」Base URL 即可直连本地模型
+- 设置页 Base URL 快捷项调整：新增 llama（本地），本地服务地址自动识别并填充占位 API Key，无需手动填写
 
 ### 使用说明
 - **macOS**：打开 `.dmg` 后将 `AnyBot.app` 拖到 Applications，再双击启动。
