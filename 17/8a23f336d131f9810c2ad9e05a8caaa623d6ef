@@ -1,0 +1,19 @@
+src/web/skills.ts
+  s_eadab2434b6339::t_e392dbdd2f5ee8 45-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "178a23f336d131f9810c2ad9e05a8caaa623d6ef",
+  "prompts": {},
+  "sessions": {
+    "s_eadab2434b6339": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02ed1-2003-7a30-9249-d053317775c1",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
