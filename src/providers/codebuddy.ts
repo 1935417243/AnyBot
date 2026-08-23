@@ -266,7 +266,7 @@ export class CodeBuddyProvider implements IProvider {
                     const id = raw.id ?? raw.value ?? "";
                     return {
                         id,
-                        name: raw.name ?? raw.displayName ?? id,
+                        name: id,
                         description: raw.description ?? "",
                     };
                 })
