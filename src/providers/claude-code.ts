@@ -42,6 +42,7 @@ import {DEFAULT_SANDBOX} from "../sandbox-config.js";
 import type {SandboxMode} from "../types.js";
 import {getClaudeConfigDir, getClaudeSkillsDir, getIsolatedClaudeConfigDir} from "../claude-config.js";
 import {getClaudeMcpServersConfig} from "../mcp-config.js";
+import {getCliExecutablePath} from "../cli-runtime/installer.js";
 
 const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
 const require = createRequire(import.meta.url);
@@ -105,6 +106,13 @@ function isSdkCompactBoundaryMessage(message: SDKMessage): message is SDKCompact
 
 function isSdkStatusMessage(message: SDKMessage): message is SDKStatusMessage {
     return message.type === "system" && "subtype" in message && message.subtype === "status";
+}
+
+/** 判断是否为 SDK 找不到 CLI 二进制的错误（生产包已裁剪随包平台包，未下载内置组件时触发） */
+function isMissingCliBinaryError(err: unknown): boolean {
+    return err instanceof Error
+        && err.message.includes("Native CLI binary")
+        && err.message.includes("not found");
 }
 
 function mapSandboxToPermissionMode(sandbox: SandboxMode): PermissionMode {
@@ -445,6 +453,8 @@ export class ClaudeCodeProvider implements IProvider {
         // ultracode 是 AnyBot 的 UI 档位，SDK 侧没有对应取值，等价于 xhigh
         const sdkEffort = effort === "ultracode" ? "xhigh" : effort;
         const mcpServers = getClaudeMcpServersConfig() as Options["mcpServers"] | undefined;
+        // 执行时实时解析 CLI 路径，组件后下载完成也能立即生效
+        const cliExecutable = this.resolveCliExecutable();
 
         let timedOut = false;
         let hardExpired = false;
@@ -477,7 +487,7 @@ export class ClaudeCodeProvider implements IProvider {
 
         logger.info("provider.exec.start", {
             provider: this.type,
-            bin: this.pathToClaudeCodeExecutable || null,
+            bin: cliExecutable || null,
             claudeConfigDir: claudeConfigDir || null,
             claudeSkillsDir: claudeSkillsMapping?.sourceDir || getClaudeSkillsDir(),
             claudeRuntimeSkillsDir: claudeSkillsMapping?.runtimeDir || null,
@@ -626,7 +636,7 @@ export class ClaudeCodeProvider implements IProvider {
                     effort: sdkEffort,
                     resume: sessionId,
                     sessionId: sessionId ? undefined : newSessionId,
-                    pathToClaudeCodeExecutable: this.pathToClaudeCodeExecutable,
+                    pathToClaudeCodeExecutable: cliExecutable,
                     maxTurns: this.maxTurns,
                     permissionMode,
                     allowDangerouslySkipPermissions: permissionMode === "bypassPermissions",
@@ -852,6 +862,11 @@ export class ClaudeCodeProvider implements IProvider {
                 throw new ProviderCancelledError();
             }
 
+            // SDK 找不到 CLI 时的原始英文报错对用户不可读，替换为可操作的引导文案（原始错误仍完整落日志）
+            const displayErr = isMissingCliBinaryError(err)
+                ? new Error("Claude Code 组件未安装，请到「设置」页下载内置组件后重试")
+                : err;
+
             logger.error("provider.exec.error", {
                 provider: this.type,
                 workdir,
@@ -862,10 +877,10 @@ export class ClaudeCodeProvider implements IProvider {
             await onEvent?.({
                 type: "agent_status",
                 status: "failed",
-                message: err instanceof Error ? err.message : "Claude Code Agent 执行失败",
+                message: displayErr instanceof Error ? displayErr.message : "Claude Code Agent 执行失败",
                 durationMs: Date.now() - startedAt,
             });
-            throw err;
+            throw displayErr;
         } finally {
             clearTimeout(timer);
             if (hardTimer) clearTimeout(hardTimer);
@@ -878,6 +893,14 @@ export class ClaudeCodeProvider implements IProvider {
         if (model === "claude-opus-4-7") return this.anthropicOpusModel || model;
         if (model === "claude-sonnet-4-6") return this.anthropicSonnetModel || model;
         return model;
+    }
+
+    /**
+     * 解析 Claude CLI 可执行文件路径：优先用构造时显式指定的值；
+     * 为空时兜底重查按需下载的组件，覆盖 provider 创建后才完成下载的场景
+     */
+    private resolveCliExecutable(): string | undefined {
+        return this.pathToClaudeCodeExecutable || getCliExecutablePath("claude-code") || undefined;
     }
 
     private hasAnthropicCompatConfig(): boolean {

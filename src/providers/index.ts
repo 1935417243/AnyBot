@@ -55,7 +55,8 @@ function getClaudeCodeExecutable(
 ): string | undefined {
   const configured = cleanString(settings.pathToClaudeCodeExecutable) || cleanString(settings.bin);
   if (useAnthropicCompat) {
-    return configured;
+    // compat 只改上游地址，CLI 本身不受影响，同样允许回退到已下载的内置组件
+    return configured || getCliExecutablePath("claude-code") || undefined;
   }
   // 未显式指定时优先用按需下载到 userData 的 CLI；
   // 返回 undefined 则由 SDK 自行解析随包平台包（dev 环境下 node_modules 里有）
