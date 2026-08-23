@@ -777,7 +777,8 @@
         }
 
         .provider-timeout-input {
-            width: 180px;
+            width: 300px;
+            max-width: 100%;
             min-width: 120px;
             min-height: 42px;
             border-radius: 8px;
@@ -894,7 +895,7 @@
 
         /* settings-field 布局内的密钥输入控件与上方下拉框同宽，左右边缘对齐 */
         .provider-settings-config-scroll .settings-field .provider-settings-input-control {
-            width: 260px;
+            width: 300px;
             max-width: 100%;
             flex: none;
         }
@@ -1141,9 +1142,15 @@
         }
 
         .settings-provider-default-controls > .settings-combobox {
-            width: 260px;
+            width: 300px;
             max-width: 100%;
             flex-shrink: 0;
+        }
+
+        #settings-provider-model-combobox,
+        #settings-provider-effort-combobox {
+            width: 300px;
+            max-width: 100%;
         }
 
         .settings-provider-runtime-inline:not([hidden]) {
@@ -1266,6 +1273,22 @@
 
         .provider-settings-config-card > .settings-section-title {
             flex-shrink: 0;
+        }
+
+        .provider-settings-config-card.codebuddy-save-bottom {
+            position: relative;
+        }
+
+        .provider-settings-config-card.codebuddy-save-bottom .provider-settings-config-scroll {
+            padding-bottom: 86px;
+        }
+
+        .provider-settings-config-card.codebuddy-save-bottom .provider-save-row {
+            position: absolute;
+            right: 20px;
+            bottom: 18px;
+            display: flex;
+            margin: 0;
         }
 
         .provider-settings-config-scroll {

@@ -838,6 +838,7 @@ export function createSettingsProviderController(options) {
         var providerModelField = settingsProviderModelSelect && settingsProviderModelSelect.closest('.settings-field');
         var providerEffortField = settingsProviderEffortCombobox && settingsProviderEffortCombobox.closest('.settings-field');
         var providerActions = settingsSaveBtn && settingsSaveBtn.closest('.settings-button-row');
+        var providerConfigCard = providerActions && providerActions.closest('.provider-settings-config-card');
         if (providerModelField) {
             providerModelField.style.display = showModelSelect ? '' : 'none';
         }
@@ -845,6 +846,9 @@ export function createSettingsProviderController(options) {
             providerEffortField.style.display = showEffortSelect ? '' : 'none';
         }
         if (providerActions) providerActions.style.display = showProviderFields ? '' : 'none';
+        if (providerConfigCard) {
+            providerConfigCard.classList.toggle('codebuddy-save-bottom', provider.type === 'codebuddy');
+        }
         if (settingsProviderTimeoutFields) {
             settingsProviderTimeoutFields.style.display = showTimeoutField ? '' : 'none';
             settingsProviderTimeoutFields.innerHTML = showTimeoutField ? buildProviderTimeoutField(provider.type, cfg) : '';
@@ -1167,7 +1171,7 @@ export function createSettingsProviderController(options) {
 
     // CodeBuddy 官方接入仅需 API Key；留空则使用 CLI 本地已登录凭据
     function buildCodeBuddyFields(cfg) {
-        var tooltip = 'CodeBuddy 服务密钥；留空则使用 CLI 已登录凭据。';
+        var tooltip = 'CodeBuddy 服务密钥';
         return '<div class="settings-field provider-api-key-row">' +
             '<span class="settings-field-label settings-field-label-with-help">API Key' +
             '<span class="settings-field-help" tabindex="0" aria-label="' + escapeAttr(tooltip) + '"' +

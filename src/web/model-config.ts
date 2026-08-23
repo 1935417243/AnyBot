@@ -132,6 +132,15 @@ export function readModelConfig(): ModelConfig {
   // effort 字段始终镜像当前 provider 的档位，保证 GET 返回值与 provider 一致
   config.effort = config.lastEffort[provider.type];
   const providerModels = provider.listModels();
+  // CodeBuddy 启动时会先返回仅含 auto 的临时清单；此时不能用它覆盖上次已保存的具体模型。
+  const isCodeBuddyFallback =
+    provider.type === "codebuddy" &&
+    providerModels.length === 1 &&
+    providerModels[0].id === "auto";
+  const canKeepCachedCodeBuddyModels =
+    isCodeBuddyFallback &&
+    config.provider === provider.type &&
+    config.models?.some((model) => model.id !== "auto");
   const needsRefresh =
     config.provider !== provider.type ||
     !config.models ||
@@ -140,9 +149,16 @@ export function readModelConfig(): ModelConfig {
     !areSameModels(config.models, providerModels);
 
   if (needsRefresh) {
-    const currentModel = selectCurrentModel(config, provider.type, providerModels);
+    const currentModel = isCodeBuddyFallback
+      ? config.lastSelected[provider.type] ||
+        (config.provider === provider.type ? config.currentModel : undefined) ||
+        providerModels[0]?.id ||
+        ""
+      : selectCurrentModel(config, provider.type, providerModels);
     config.provider = provider.type;
-    config.models = providerModels;
+    if (!canKeepCachedCodeBuddyModels) {
+      config.models = providerModels;
+    }
     config.currentModel = currentModel;
     config.lastSelected[provider.type] = currentModel;
     writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
@@ -251,8 +267,24 @@ export function readModelConfigForProvider(providerType: string): ModelConfig {
   }
 
   const provider = createProvider(providerType);
-  const models = provider.listModels();
-  const model = selectCurrentModel(config, provider.type, models);
+  const providerModels = provider.listModels();
+  // CodeBuddy 的实时清单尚未返回时，继续使用已持久化的模型，避免读取动作把默认值短暂降级为 auto。
+  const isCodeBuddyFallback =
+    provider.type === "codebuddy" &&
+    providerModels.length === 1 &&
+    providerModels[0].id === "auto";
+  const models =
+    isCodeBuddyFallback &&
+    config.provider === provider.type &&
+    config.models?.some((entry) => entry.id !== "auto")
+      ? config.models
+      : providerModels;
+  const model = isCodeBuddyFallback
+    ? config.lastSelected[provider.type] ||
+      (config.provider === provider.type ? config.currentModel : undefined) ||
+      models[0]?.id ||
+      ""
+    : selectCurrentModel(config, provider.type, models);
   if (!config.lastSelected[provider.type]) {
     config.lastSelected[provider.type] = model;
     writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
