@@ -1,0 +1,27 @@
+src/providers/index.ts
+  s_fab7aa0f8c2f4e::t_07e132beb9071a 58-59
+src/providers/claude-code.ts
+  s_fab7aa0f8c2f4e::t_ada4c587cac753 898-905
+  s_fab7aa0f8c2f4e::t_6c34d74c72e72a 456-457
+  s_fab7aa0f8c2f4e::t_867815e5fd3bfc 45
+  s_fab7aa0f8c2f4e::t_91f801fcdd9f31 865-869,880,883
+  s_fab7aa0f8c2f4e::t_85e64b031fb5ef 639
+  s_fab7aa0f8c2f4e::t_229cc6a7fd0e46 111-117
+  s_fab7aa0f8c2f4e::t_876aebb867ca76 490
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "2925a8bd7812e7da6aee32b2d7342c02dd03ccc3",
+  "prompts": {},
+  "sessions": {
+    "s_fab7aa0f8c2f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "50de202e-449b-4a44-ae6e-0e9b75fd5058",
+        "model": "k3-256k"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
