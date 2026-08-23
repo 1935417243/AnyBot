@@ -1,0 +1,20 @@
+src/web/public/scripts/app/settings/settings-provider-controller.js
+  s_9514211a5e5f43::t_fc61f7af475461 1473-1474
+  s_9514211a5e5f43::t_f0e018ae207b28 945,948-949
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "9a2943b6f2b5b883d40bb79c5e5359e7d52612bb",
+  "prompts": {},
+  "sessions": {
+    "s_9514211a5e5f43": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02eb4-06e3-7cb0-a54a-c4a1d8a4b608",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
