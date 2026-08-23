@@ -31,6 +31,8 @@ export interface ModelConfig {
   effort?: EffortLevel;
   /** 各 provider 各自持久化的推理强度档位（claude-code 与 codex 档位集合不同） */
   lastEffort?: Record<string, EffortLevel>;
+  /** 本地后端（llama/Ollama）的采样温度；未设置时沿用 Claude Code 默认的 temperature=1 */
+  localTemperature?: number;
 }
 
 /** 各 provider 支持的推理强度档位；不支持的 provider 返回 null */
@@ -157,6 +159,7 @@ export function writeModelConfig(config: ModelConfig): ModelConfig {
     lastSelected: config.lastSelected || {},
     lastEffort: config.lastEffort || {},
     effort: config.effort,
+    localTemperature: config.localTemperature,
   };
   writeFileSync(CONFIG_PATH, JSON.stringify(next, null, 2), "utf-8");
   return next;
@@ -200,6 +203,31 @@ export function setEffortForProvider(providerType: string, effort: EffortLevel):
   }
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
   return readModelConfigForProvider(providerType);
+}
+
+/** 本地后端（llama/Ollama）温度滑块的合法档位（与聊天输入区滑块一致：0.0 ~ 1.0，步进 0.2） */
+export const LOCAL_TEMPERATURE_LEVELS = [0, 0.2, 0.4, 0.6, 0.8, 1];
+
+/** 校验并持久化本地后端的采样温度（本地适配层转发请求时覆盖请求体的 temperature） */
+export function setLocalTemperature(temperature: number): ModelConfig {
+  if (!LOCAL_TEMPERATURE_LEVELS.some((level) => Math.abs(level - temperature) < 1e-9)) {
+    throw new Error(`不支持的温度: ${temperature}`);
+  }
+  const config = readModelConfig();
+  config.localTemperature = temperature;
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
+  return config;
+}
+
+/** 读取持久化的本地后端温度；适配层热路径使用，直接读文件、不触发模型列表刷新 */
+export function getLocalTemperature(): number | undefined {
+  try {
+    if (!existsSync(CONFIG_PATH)) return undefined;
+    const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf-8")) as Partial<ModelConfig>;
+    return typeof raw.localTemperature === "number" ? raw.localTemperature : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function getCurrentProviderType(): string {

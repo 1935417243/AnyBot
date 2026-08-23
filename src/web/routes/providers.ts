@@ -11,10 +11,22 @@ import {
   setCurrentModel,
   setCurrentProvider,
   setEffortForProvider,
+  setLocalTemperature,
   setModelForProvider,
+  type ModelConfig,
 } from "../model-config.js";
 import type { EffortLevel } from "../../providers/types.js";
 import { fetchProviderModels, ProviderModelFetchError } from "../services/provider-models.js";
+import { getClaudeLocalBackendType } from "../services/claude-local-adapter.js";
+
+// 模型配置响应附带本地后端（llama/Ollama）信息：前端据此把强度滑块切换为温度滑块
+function withLocalBackendInfo(config: ModelConfig) {
+  return {
+    ...config,
+    localBackend: getClaudeLocalBackendType() || null,
+    temperature: config.localTemperature ?? null,
+  };
+}
 
 export function createProvidersRouter(): Router {
   const router = Router();
@@ -38,30 +50,32 @@ export function createProvidersRouter(): Router {
   router.get("/model-config", (req: Request, res: Response) => {
     try {
       const provider = typeof req.query.provider === "string" ? req.query.provider : "";
-      res.json(provider ? readModelConfigForProvider(provider) : readModelConfig());
+      res.json(withLocalBackendInfo(provider ? readModelConfigForProvider(provider) : readModelConfig()));
     } catch (error) {
       res.status(500).json({ error: "读取模型配置失败" });
     }
   });
 
   router.put("/model-config", (req: Request, res: Response) => {
-    const { modelId, provider, effort } = req.body as {
+    const { modelId, provider, effort, temperature } = req.body as {
       modelId?: string;
       provider?: string;
       effort?: string;
+      temperature?: number;
     };
-    if (!modelId && !effort) {
-      res.status(400).json({ error: "缺少 modelId 或 effort" });
+    if (!modelId && !effort && temperature === undefined) {
+      res.status(400).json({ error: "缺少 modelId、effort 或 temperature" });
       return;
     }
     try {
-      // 强度档位与模型互不依赖，允许同请求一起更新，后者覆盖返回体；
+      // 强度档位、本地温度与模型互不依赖，允许同请求一起更新，后者覆盖返回体；
       // 带 provider 时按该 provider 校验并持久化档位（claude-code 与 codex 档位集合不同）
-      let config = effort
-        ? provider
+      let config = temperature !== undefined ? setLocalTemperature(Number(temperature)) : undefined;
+      if (effort) {
+        config = provider
           ? setEffortForProvider(provider, effort as EffortLevel)
-          : setCurrentEffort(effort as EffortLevel)
-        : undefined;
+          : setCurrentEffort(effort as EffortLevel);
+      }
       if (modelId) {
         config = provider ? setModelForProvider(provider, modelId) : setCurrentModel(modelId);
         logger.info("model.switched", { modelId, provider: provider || config.provider });
@@ -69,7 +83,10 @@ export function createProvidersRouter(): Router {
       if (effort) {
         logger.info("model.effort_switched", { effort, provider: config?.provider });
       }
-      res.json(config);
+      if (temperature !== undefined) {
+        logger.info("model.temperature_switched", { temperature: Number(temperature) });
+      }
+      res.json(withLocalBackendInfo(config!));
     } catch (error) {
       const msg = error instanceof Error ? error.message : "切换模型失败";
       res.status(400).json({ error: msg });

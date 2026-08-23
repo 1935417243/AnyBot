@@ -17,8 +17,21 @@ var EFFORT_LEVELS_BY_PROVIDER = {
     ],
 };
 
-// 未持久化过时前端展示的默认档位（各 provider 的档位列表里都包含它）
+// claude-code 指向本地后端（llama/Ollama）时，后端不实现 thinking/effort 语义，
+// 强度滑块切换为温度滑块（从左到右「更保守 → 更发散」），由本地适配层覆盖请求体的 temperature
+var TEMPERATURE_LEVELS = [
+    { id: '0.0', name: '0.0' },
+    { id: '0.2', name: '0.2' },
+    { id: '0.4', name: '0.4' },
+    { id: '0.6', name: '0.6' },
+    { id: '0.8', name: '0.8' },
+    { id: '1.0', name: '1.0' },
+];
+
+// 未持久化过时前端展示的默认档位（各 provider 的档位列表里都包含它）；
+// 温度默认 1.0，与 Claude Code 未配置时写死的 temperature=1 一致
 var DEFAULT_EFFORT = 'high';
+var DEFAULT_TEMPERATURE = '1.0';
 
 // 刻度/滑块距容器两侧的内边距（px）= 轨道内边距（chat.css 中 .effort-slider-track 的 left/right，8px）+ 滑块半宽（6px），
 // 使滑块滑到两端时外缘与轨道端部齐平，填充圆弧与滑块圆角无缝接续
@@ -33,6 +46,8 @@ export function createEffortMode(options) {
     var currentEffort = DEFAULT_EFFORT;
     // 当前 provider 类型；null 表示该 provider 不支持强度档位，选择器隐藏
     var providerType = null;
+    // claude-code 指向的本地后端（'llama' / 'ollama'）；非本地后端为 null，滑块处于强度模式
+    var localBackend = null;
     // 拖动滑块时预览的档位索引，null 表示不在拖动中
     var dragIndex = null;
 
@@ -42,8 +57,18 @@ export function createEffortMode(options) {
     var thumbEl = null;
     var stopEls = [];
 
-    // 当前 provider 的档位列表；不支持的 provider 返回空数组
+    function isTemperatureMode() {
+        return providerType === 'claude-code' && !!localBackend;
+    }
+
+    // 当前模式下的默认档位 id
+    function defaultLevelId() {
+        return isTemperatureMode() ? DEFAULT_TEMPERATURE : DEFAULT_EFFORT;
+    }
+
+    // 当前模式的档位列表；不支持的 provider 返回空数组
     function currentLevels() {
+        if (isTemperatureMode()) return TEMPERATURE_LEVELS;
         return (providerType && EFFORT_LEVELS_BY_PROVIDER[providerType]) || [];
     }
 
@@ -60,8 +85,9 @@ export function createEffortMode(options) {
         for (var i = 0; i < levels.length; i++) {
             if (levels[i].id === id) return i;
         }
-        // 档位不在当前 provider 列表里时回落到默认档（两个列表都包含 high，不会死循环）
-        return id === DEFAULT_EFFORT ? 0 : levelIndex(DEFAULT_EFFORT);
+        // 档位不在当前模式列表里时回落到该模式的默认档（两个列表都包含各自的默认档，不会死循环）
+        var fallback = defaultLevelId();
+        return id === fallback ? 0 : levelIndex(fallback);
     }
 
     function setOpen(isOpen) {
@@ -88,13 +114,13 @@ export function createEffortMode(options) {
             stop.classList.toggle('filled', index <= activeIndex);
         });
         sliderEl.classList.toggle('dragging', previewIndex != null);
-        if (titleEl) titleEl.textContent = '强度 ' + levels[activeIndex].name;
+        if (titleEl) titleEl.textContent = (isTemperatureMode() ? '温度 ' : '强度 ') + levels[activeIndex].name;
     }
 
     function render() {
-        var level = findLevel(currentEffort) || findLevel(DEFAULT_EFFORT) || { name: '' };
+        var level = findLevel(currentEffort) || findLevel(defaultLevelId()) || { name: '' };
         if (nameEl) nameEl.textContent = level.name;
-        if (badge) badge.title = '强度：' + level.name;
+        if (badge) badge.title = (isTemperatureMode() ? '温度：' : '强度：') + level.name;
         // 不支持的 provider 直接 display:none 移除占位，避免留下一块空白区域
         if (switcher) switcher.style.display = providerType ? '' : 'none';
         updateSliderVisual(null);
@@ -111,7 +137,9 @@ export function createEffortMode(options) {
 
         var labels = document.createElement('div');
         labels.className = 'effort-slider-labels';
-        labels.innerHTML = '<span>快速</span><span>深度</span>';
+        labels.innerHTML = isTemperatureMode()
+            ? '<span>更保守</span><span>更发散</span>'
+            : '<span>快速</span><span>深度</span>';
         dropdown.appendChild(labels);
 
         sliderEl = document.createElement('div');
@@ -200,20 +228,27 @@ export function createEffortMode(options) {
         }
     }
 
-    // 同步模型配置中的 provider 与 effort：切换 provider 时控制显隐并重建滑块档位，恢复已持久化的档位
+    // 同步模型配置中的 provider、本地后端与档位：切换 provider 或本地后端时控制显隐并重建滑块档位，恢复已持久化的档位
     function applyModelConfig(data) {
         if (!data) return;
         var nextProviderType = EFFORT_LEVELS_BY_PROVIDER[data.provider] ? data.provider : null;
-        if (nextProviderType !== providerType) {
+        // localBackend 仅对 claude-code 有意义（本地适配层只代理 Claude Code 的流量）
+        var nextLocalBackend = data.provider === 'claude-code' ? (data.localBackend || null) : null;
+        if (nextProviderType !== providerType || nextLocalBackend !== localBackend) {
             providerType = nextProviderType;
-            // 档位数可能变化（如 claude-code 6 档 ↔ codex 4 档），关闭弹层并重建滑块
+            localBackend = nextLocalBackend;
+            // 档位数或模式可能变化（强度 ↔ 温度、claude-code 6 档 ↔ codex 4 档），关闭弹层并重建滑块
             setOpen(false);
             buildDropdown();
         }
-        // 持久化档位可能超出当前 provider 的支持范围（如 codex 没有 max/ultracode），回落到默认档
-        if (findLevel(data.effort)) {
+        if (isTemperatureMode()) {
+            // 温度模式：取持久化温度（数值转一位小数的档位 id），未设置时显示默认 1.0
+            var temperatureId = typeof data.temperature === 'number' ? data.temperature.toFixed(1) : null;
+            currentEffort = (temperatureId && findLevel(temperatureId)) ? temperatureId : DEFAULT_TEMPERATURE;
+        } else if (findLevel(data.effort)) {
             currentEffort = data.effort;
         } else if (!findLevel(currentEffort)) {
+            // 持久化档位可能超出当前 provider 的支持范围（如 codex 没有 max/ultracode），回落到默认档
             currentEffort = DEFAULT_EFFORT;
         }
         render();
@@ -226,15 +261,17 @@ export function createEffortMode(options) {
             updateSliderVisual(null);
             return;
         }
+        var temperatureMode = isTemperatureMode();
+        var saveErrorText = temperatureMode ? '保存温度配置失败' : '保存强度配置失败';
         try {
             var res = await fetch('/api/model-config', {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({effort: id}),
+                body: JSON.stringify(temperatureMode ? {temperature: parseFloat(id)} : {effort: id}),
             });
             if (!res.ok) {
                 var err = await res.json().catch(function () { return {}; });
-                if (options.onError) options.onError(err.error || '保存强度配置失败');
+                if (options.onError) options.onError(err.error || saveErrorText);
                 updateSliderVisual(null);
                 return;
             }
@@ -242,7 +279,7 @@ export function createEffortMode(options) {
             render();
             if (options.onChanged) options.onChanged(currentEffort);
         } catch (e) {
-            if (options.onError) options.onError('保存强度配置失败');
+            if (options.onError) options.onError(saveErrorText);
             updateSliderVisual(null);
         }
     }
@@ -278,9 +315,10 @@ export function createEffortMode(options) {
         },
         refresh: fetchConfig,
         applyModelConfig: applyModelConfig,
-        // 发消息时透传给后端的档位；当前 provider 不支持强度档位时不携带
+        // 发消息时透传给后端的档位；当前 provider 不支持强度档位时不携带，
+        // 温度模式下也不携带（温度由本地适配层读持久化配置覆盖，不走 effort 通道）
         getEffort: function () {
-            return providerType ? currentEffort : null;
+            return providerType && !isTemperatureMode() ? currentEffort : null;
         },
     };
 }

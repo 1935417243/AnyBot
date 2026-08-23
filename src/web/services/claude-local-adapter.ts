@@ -1,15 +1,17 @@
 import type { Request, Response } from "express";
 import { fetch as undiciFetch } from "undici";
 import { getProviderRuntimeSettings } from "../../app-settings.js";
-import { stripProviderBaseUrlType } from "../../utils/provider-base-url.js";
+import { getLocalProviderBaseUrlType, stripProviderBaseUrlType } from "../../utils/provider-base-url.js";
+import { getLocalTemperature } from "../model-config.js";
 import { logger } from "../../logger.js";
 
 // Claude Code 本地后端适配层：Claude Code 的 mid-conversation-system beta 会在
 // messages 数组中间插入 role:"system" 的消息（anthropics/claude-code#74226，
 // CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS 对该 beta 无效），本地服务（llama.cpp /
 // Ollama）的 chat template 大多强制 system 只能在开头，直接 500。
-// 这里只做一件事：把中间的 system 消息原位降级为 user 段并合并连续同角色消息，
-// 其余请求/响应（含流式）原样透传。远程服务不经过这里。
+// 这里做两件事：把中间的 system 消息原位降级为 user 段并合并连续同角色消息；
+// 用户配置过本地温度时覆盖请求体的 temperature。其余请求/响应（含流式）原样透传。
+// 远程服务不经过这里。
 
 type JsonObject = Record<string, unknown>;
 
@@ -54,6 +56,13 @@ function getAdapterUpstreamConfig(): { baseUrl: string; apiKey: string } {
   return { baseUrl, apiKey };
 }
 
+/** 当前 Claude Code 配置指向的本地后端类型；非本地后端返回空串（与 provider 注册时是否走适配层的判定口径一致） */
+export function getClaudeLocalBackendType(): "ollama" | "llama" | "" {
+  const settings = getProviderRuntimeSettings("claude-code");
+  const baseUrl = settings.anthropicBaseUrl?.trim() || process.env.ANTHROPIC_BASE_URL?.trim() || "";
+  return getLocalProviderBaseUrlType(baseUrl);
+}
+
 /** 转发给上游时只保留语义相关的头，鉴权头优先用请求自带的（与 Claude Code 实际发送一致） */
 function buildUpstreamHeaders(req: Request, apiKey: string): Record<string, string> {
   const headers: Record<string, string> = { "content-type": "application/json" };
@@ -82,6 +91,13 @@ export async function handleClaudeLocalAdapterRequest(req: Request, res: Respons
     let body = req.body as JsonObject | undefined;
     if (body && Array.isArray(body.messages)) {
       body = { ...body, messages: sanitizeAnthropicMessages(body.messages) };
+    }
+    // 本地后端不实现 Anthropic 的 thinking/effort 语义，强度滑块在本地模式下改为温度档，
+    // 这里用持久化的温度覆盖 Claude Code 默认写死的 temperature=1
+    const localTemperature = getLocalTemperature();
+    if (body && localTemperature !== undefined) {
+      body = { ...body, temperature: localTemperature };
+      logger.info("claude_local_adapter.temperature_override", { temperature: localTemperature });
     }
 
     const controller = new AbortController();
