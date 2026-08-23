@@ -6,6 +6,8 @@ export function createSettingsProviderController(options) {
     const settingsProviderCompatToggleFields = options.settingsProviderCompatToggleFields;
     const settingsProviderCurrent = options.settingsProviderCurrent;
     const settingsProviderExtraFields = options.settingsProviderExtraFields;
+    // 紧随「默认提供商」的优先字段容器（CodeBuddy 的 API Key 渲染在这里）
+    const settingsProviderPriorityFields = options.settingsProviderPriorityFields;
     const settingsProviderBinFields = options.settingsProviderBinFields;
     const settingsProviderRuntimeFields = options.settingsProviderRuntimeFields;
     const settingsProviderMenu = options.settingsProviderMenu;
@@ -38,7 +40,7 @@ export function createSettingsProviderController(options) {
     let remoteProviderModelFetchSeq = 0;
 
     const DEFAULT_PROVIDER_TIMEOUT_MINUTES = 30;
-    // 各 provider 的推理强度档位（与聊天输入区强度滑块一致）：claude-code 6 档，codex 4 档
+    // 各 provider 的推理强度档位（与聊天输入区强度滑块一致）：claude-code 6 档，codebuddy / codex 4 档
     const PROVIDER_EFFORT_LEVELS = {
         'claude-code': [
             { id: 'low', name: 'Low' },
@@ -48,6 +50,12 @@ export function createSettingsProviderController(options) {
             { id: 'max', name: 'Max' },
             { id: 'ultracode', name: 'Ultracode' },
         ],
+        'codebuddy': [
+            { id: 'low', name: 'Low' },
+            { id: 'medium', name: 'Medium' },
+            { id: 'high', name: 'High' },
+            { id: 'xhigh', name: 'XHigh' },
+        ],
         'codex': [
             { id: 'low', name: 'Low' },
             { id: 'medium', name: 'Medium' },
@@ -55,8 +63,11 @@ export function createSettingsProviderController(options) {
             { id: 'xhigh', name: 'XHigh' },
         ],
     };
-    // 未持久化过时展示的默认档位（各 provider 的档位列表里都包含它）
+    // 未持久化过时展示的默认档位（各 provider 的档位列表里都包含它）；codebuddy 仅 4 档，默认 medium
     const DEFAULT_PROVIDER_EFFORT = 'high';
+    const DEFAULT_PROVIDER_EFFORT_BY_PROVIDER = {
+        'codebuddy': 'medium',
+    };
     const ALIYUN_TOKEN_PLAN_BASE_URL = 'https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic';
     const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
     const KIMI_CODING_MODELS = ['kimi-for-coding', 'k3', 'k3-256k', 'kimi-for-coding-highspeed'];
@@ -149,6 +160,19 @@ export function createSettingsProviderController(options) {
             refreshProviderOnSave: true,
             showModelSelect: true,
         },
+        // CodeBuddy 走官方接口：无 Anthropic 兼容开关，仅 API Key 一项配置
+        'codebuddy': {
+            isExpanded: function () {
+                return true;
+            },
+            buildToggle: function () {
+                return '';
+            },
+            buildFields: buildCodeBuddyFields,
+            collect: collectCodeBuddySettings,
+            refreshProviderOnSave: true,
+            showModelSelect: true,
+        },
     };
 
     function showError(message) {
@@ -231,7 +255,7 @@ export function createSettingsProviderController(options) {
         var matched = levels.some(function (level) {
             return level.id === current;
         });
-        if (!matched) current = DEFAULT_PROVIDER_EFFORT;
+        if (!matched) current = (provider && DEFAULT_PROVIDER_EFFORT_BY_PROVIDER[provider.type]) || DEFAULT_PROVIDER_EFFORT;
         settingsProviderEffortComboboxController.render(levels.map(function (level) {
             return {
                 value: level.id,
@@ -808,9 +832,9 @@ export function createSettingsProviderController(options) {
         var hasProviderSettings = !!definition;
         var showProviderFields = !!(definition && definition.isExpanded(cfg));
         var showModelSelect = isProviderInstalled(provider);
-        // 默认强度仅 claude-code / codex 支持，其余 provider 隐藏该字段
+        // 默认强度仅 claude-code / codebuddy / codex 支持，其余 provider 隐藏该字段
         var showEffortSelect = showModelSelect && !!PROVIDER_EFFORT_LEVELS[provider.type];
-        var showTimeoutField = provider.type === 'codex' || provider.type === 'claude-code';
+        var showTimeoutField = provider.type === 'codex' || provider.type === 'claude-code' || provider.type === 'codebuddy';
         var providerModelField = settingsProviderModelSelect && settingsProviderModelSelect.closest('.settings-field');
         var providerEffortField = settingsProviderEffortCombobox && settingsProviderEffortCombobox.closest('.settings-field');
         var providerActions = settingsSaveBtn && settingsSaveBtn.closest('.settings-button-row');
@@ -836,10 +860,23 @@ export function createSettingsProviderController(options) {
             settingsProviderBinFields.innerHTML = '';
         }
         renderCliRuntimeFields(provider);
+        // CodeBuddy 的扩展字段（API Key）渲染到「默认提供商」正下方的优先容器，其余 provider 仍在底部扩展区
+        var usePriorityFields = provider.type === 'codebuddy';
+        if (settingsProviderPriorityFields) {
+            var showPriorityFields = showProviderFields && usePriorityFields;
+            settingsProviderPriorityFields.style.display = showPriorityFields ? '' : 'none';
+            settingsProviderPriorityFields.innerHTML = showPriorityFields ? definition.buildFields(cfg) : '';
+            if (showPriorityFields) {
+                bindProviderModelSuggestionInputs();
+                bindProviderSecretToggles();
+                updateProviderApiKeyVisibility();
+            }
+        }
         if (settingsProviderExtraFields) {
-            settingsProviderExtraFields.style.display = showProviderFields ? '' : 'none';
-            settingsProviderExtraFields.innerHTML = showProviderFields ? definition.buildFields(cfg) : '';
-            if (showProviderFields) {
+            var showExtraFields = showProviderFields && !usePriorityFields;
+            settingsProviderExtraFields.style.display = showExtraFields ? '' : 'none';
+            settingsProviderExtraFields.innerHTML = showExtraFields ? definition.buildFields(cfg) : '';
+            if (showExtraFields) {
                 bindProviderModelSuggestionInputs();
                 bindProviderSecretToggles();
                 updateProviderApiKeyVisibility();
@@ -854,6 +891,7 @@ export function createSettingsProviderController(options) {
     const CLI_RUNTIME_PROVIDER_LABELS = {
         'codex': 'Codex',
         'claude-code': 'Claude Code',
+        'codebuddy': 'CodeBuddy',
     };
 
     function isCliRuntimeProvider(providerType) {
@@ -865,13 +903,6 @@ export function createSettingsProviderController(options) {
         return !!provider && !isProviderInstalled(provider) && !!provider.cliRuntime;
     }
 
-    function formatRuntimeSize(bytes) {
-        var value = Number(bytes || 0);
-        if (!Number.isFinite(value) || value <= 0) return '';
-        var mb = value / (1024 * 1024);
-        return (mb >= 100 ? String(Math.round(mb)) : mb.toFixed(1)) + ' MB';
-    }
-
     /** 状态条色调复用 settings-update-status 的 ready/warn/error */
     function getCliRuntimeTone(status) {
         if (!status) return 'warn';
@@ -880,65 +911,45 @@ export function createSettingsProviderController(options) {
         return 'warn';
     }
 
-    function buildCliRuntimeStatusText(provider, status) {
-        var label = CLI_RUNTIME_PROVIDER_LABELS[provider.type] || provider.displayName || provider.type;
-        var sizeText = status ? formatRuntimeSize(status.sizeBytes) : '';
-        if (!status) return label + ' 内置组件状态加载中…';
-        if (!status.supported) return label + ' 内置组件暂不支持当前平台自动下载，请配置外部 CLI';
-        if (status.phase === 'ready') return label + ' 内置组件已就绪（' + status.version + '）';
-        if (status.phase === 'downloading') return label + ' 内置组件下载中…';
-        if (status.phase === 'verifying') return label + ' 内置组件校验中…';
-        if (status.phase === 'error') {
-            return label + ' 内置组件下载失败' + (status.message ? '：' + status.message : '');
+    /** 内联在「默认提供商」下拉框后的组件状态文案（下拉里已有 provider 名，这里不再重复）；未下载时无文案，只展示下载按钮 */
+    function buildCliRuntimeInlineText(status) {
+        if (!status) return '内置组件状态加载中…';
+        if (!status.supported) return '暂不支持自动下载，请配置外部 CLI';
+        if (status.phase === 'downloading') {
+            var percent = Math.max(0, Math.min(100, Number(status.percent || 0)));
+            return '下载中 ' + percent.toFixed(1) + '%' + (status.source ? ' · ' + status.source : '');
         }
-        return label + ' 内置组件未下载' + (sizeText ? '（约 ' + sizeText + '）' : '');
+        if (status.phase === 'verifying') return '正在校验文件完整性…';
+        if (status.phase === 'error') return '下载失败' + (status.message ? '：' + status.message : '');
+        return '';
     }
 
-    /** 未下载/下载中/失败时展示的状态条；结构复用桌面更新的 settings-update-* 三件套 */
-    function buildCliRuntimeStatusHtml(provider, status) {
-        var html = '<div class="settings-cli-runtime-status settings-update-status ' +
-            getCliRuntimeTone(status) + '" id="settings-cli-runtime-status">' +
-            escapeHtml(buildCliRuntimeStatusText(provider, status)) + '</div>';
-        var showProgress = status && (status.phase === 'downloading' || status.phase === 'verifying');
-        if (showProgress) {
-            var percent = status.phase === 'verifying'
-                ? 100
-                : Math.max(0, Math.min(100, Number(status.percent || 0)));
-            var detail = status.phase === 'verifying'
-                ? '正在校验文件完整性…'
-                : percent.toFixed(1) + '%' +
-                    (status.percent != null && status.sizeBytes
-                        ? ' · ' + formatRuntimeSize(status.sizeBytes * percent / 100) + ' / ' + formatRuntimeSize(status.sizeBytes)
-                        : '') +
-                    (status.source ? ' · ' + status.source : '');
-            html += '<div class="settings-update-progress">' +
-                '<div class="settings-update-progress-bar"><span style="width:' + percent.toFixed(1) + '%"></span></div>' +
-                '<div class="settings-update-progress-text">' + escapeHtml(detail) + '</div>' +
-                '</div>';
-        }
+    /** 未下载/下载中/失败时展示的内联状态（状态文本 + 下载按钮） */
+    function buildCliRuntimeInlineHtml(status) {
+        var text = buildCliRuntimeInlineText(status);
+        var html = text
+            ? '<span class="settings-provider-runtime-text ' + getCliRuntimeTone(status) + '">' + escapeHtml(text) + '</span>'
+            : '';
         var canDownload = status && status.supported && status.phase !== 'downloading' && status.phase !== 'verifying';
         if (canDownload) {
-            html += '<div class="settings-button-row settings-cli-runtime-actions">' +
-                '<button class="settings-primary-btn compact" id="settings-cli-runtime-download-btn" type="button">' +
-                (status.phase === 'error' ? '重试下载' : '立即下载') + '</button>' +
-                '</div>';
+            html += '<button class="settings-primary-btn compact" id="settings-cli-runtime-download-btn" type="button">' +
+                (status.phase === 'error' ? '重试下载' : '立即下载') + '</button>';
         }
         return html;
     }
 
-    /** 渲染组件状态条（未就绪时）；已就绪或非内置组件 provider 时隐藏 */
+    /** 渲染内联组件状态（未就绪时）；已就绪或非内置组件 provider 时隐藏 */
     function renderCliRuntimeFields(provider) {
         if (!settingsProviderRuntimeFields) return;
         var showFields = !!provider && isCliRuntimeProvider(provider.type) && !!cliRuntimeStore && !isProviderInstalled(provider);
         if (!showFields) {
-            settingsProviderRuntimeFields.style.display = 'none';
+            settingsProviderRuntimeFields.hidden = true;
             settingsProviderRuntimeFields.innerHTML = '';
             return;
         }
         var status = cliRuntimeStore.get(provider.type);
-        settingsProviderRuntimeFields.innerHTML =
-            '<div class="settings-cli-runtime">' + buildCliRuntimeStatusHtml(provider, status) + '</div>';
-        settingsProviderRuntimeFields.style.display = '';
+        settingsProviderRuntimeFields.innerHTML = buildCliRuntimeInlineHtml(status);
+        settingsProviderRuntimeFields.hidden = false;
         bindCliRuntimeFields(provider);
     }
 
@@ -1152,6 +1163,28 @@ export function createSettingsProviderController(options) {
             buildProviderModelInput('settings-provider-codex-fast-model', cfg.codexFastModel || '', 'gpt-mini') + '</div>' +
             '<div class="settings-row"><span><strong>gpt-codex</strong><small>映射到编程模型</small></span>' +
             buildProviderModelInput('settings-provider-codex-code-model', cfg.codexCodeModel || '', 'gpt-codex') + '</div>';
+    }
+
+    // CodeBuddy 官方接入仅需 API Key；留空则使用 CLI 本地已登录凭据
+    function buildCodeBuddyFields(cfg) {
+        var tooltip = 'CodeBuddy 服务密钥；留空则使用 CLI 已登录凭据。';
+        return '<div class="settings-field provider-api-key-row">' +
+            '<span class="settings-field-label settings-field-label-with-help">API Key' +
+            '<span class="settings-field-help" tabindex="0" aria-label="' + escapeAttr(tooltip) + '"' +
+            ' data-tooltip="' + escapeAttr(tooltip) + '">?</span>' +
+            '</span>' +
+            buildProviderSecretInput('settings-provider-api-key', cfg.apiKey || '', 'API Key') +
+            '</div>';
+    }
+
+    function collectCodeBuddySettings(current) {
+        var next = Object.assign({}, current);
+        var apiKeyInput = document.getElementById('settings-provider-api-key');
+        if (apiKeyInput) next.apiKey = apiKeyInput.value;
+        Object.keys(next).forEach(function (key) {
+            if (next[key] === '') delete next[key];
+        });
+        return next;
     }
 
     function buildClaudeCodeCompatToggle(cfg) {
@@ -1853,6 +1886,11 @@ export function createSettingsProviderController(options) {
         handleDocumentClick: handleDocumentClick,
         handleProviderMenuEscape: handleProviderMenuEscape,
         handleTransientEscape: handleTransientEscape,
+        // 后台模型清单刷新（如 CodeBuddy 实时拉取成功）后调用；仅当设置面板当前选中的就是该 provider 时才重新拉取
+        refreshModelConfigForProvider: function (providerType) {
+            var provider = getSelectedSettingsProvider();
+            if (provider && provider.type === providerType) fetchSettingsModelConfig(providerType);
+        },
         renderProviderDetails: renderProviderDetails,
         renderProviderSelect: renderProviderSelect,
         setProviderMenuOpen: setSettingsProviderMenuOpen,

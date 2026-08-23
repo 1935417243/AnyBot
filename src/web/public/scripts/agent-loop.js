@@ -990,7 +990,7 @@
     }
 
     function canStream(providerType) {
-        return providerType === 'claude-code' || providerType === 'codex';
+        return providerType === 'claude-code' || providerType === 'codex' || providerType === 'codebuddy';
     }
 
     window.ClaudeAgentLoop = {

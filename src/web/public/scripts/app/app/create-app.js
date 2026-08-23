@@ -125,6 +125,7 @@ export function createAnyBotApp(dom, deps) {
         settingsProviderBinFields,
         settingsProviderRuntimeFields,
         settingsProviderExtraFields,
+        settingsProviderPriorityFields,
         settingsDefaultWorkdir,
         settingsWorkdirOpenBtn,
         settingsWorkdirPickBtn,
@@ -387,6 +388,7 @@ export function createAnyBotApp(dom, deps) {
         settingsProviderCompatToggleFields: settingsProviderCompatToggleFields,
         settingsProviderCurrent: settingsProviderCurrent,
         settingsProviderExtraFields: settingsProviderExtraFields,
+        settingsProviderPriorityFields: settingsProviderPriorityFields,
         settingsProviderBinFields: settingsProviderBinFields,
         settingsProviderRuntimeFields: settingsProviderRuntimeFields,
         cliRuntimeStore: cliRuntimeStore,
@@ -1133,6 +1135,7 @@ export function createAnyBotApp(dom, deps) {
         cliRuntimeStore.bindEvents();
         if (cliRuntimeBar) cliRuntimeBar.render();
         settings.startDesktopUpdateStatusRefresh();
+        settings.startModelConfigEvents();
         var initialSessions = sidebar.getSessions();
         if (initialSessions.length > 0) {
             await session.loadSession(initialSessions[0].id);

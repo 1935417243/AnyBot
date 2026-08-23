@@ -1,5 +1,5 @@
 // 推理强度档位（顺序即滑块从左到右「快速 → 深度」）；按 provider 区分：
-// claude-code 有 6 档（ultracode 是 UI 档，后端会映射为 xhigh 传给 SDK），codex 与 CLI 选择器一致共 4 档
+// claude-code 有 6 档（ultracode 是 UI 档，后端会映射为 xhigh 传给 SDK），codebuddy / codex 与各自 CLI 一致共 4 档
 var EFFORT_LEVELS_BY_PROVIDER = {
     'claude-code': [
         { id: 'low', name: 'Low' },
@@ -8,6 +8,12 @@ var EFFORT_LEVELS_BY_PROVIDER = {
         { id: 'xhigh', name: 'XHigh' },
         { id: 'max', name: 'Max' },
         { id: 'ultracode', name: 'Ultracode' },
+    ],
+    'codebuddy': [
+        { id: 'low', name: 'Low' },
+        { id: 'medium', name: 'Medium' },
+        { id: 'high', name: 'High' },
+        { id: 'xhigh', name: 'XHigh' },
     ],
     'codex': [
         { id: 'low', name: 'Low' },
@@ -29,8 +35,11 @@ var TEMPERATURE_LEVELS = [
 ];
 
 // 未持久化过时前端展示的默认档位（各 provider 的档位列表里都包含它）；
-// 温度默认 1.0，与 Claude Code 未配置时写死的 temperature=1 一致
+// codebuddy 仅 4 档，默认 medium；温度默认 1.0，与 Claude Code 未配置时写死的 temperature=1 一致
 var DEFAULT_EFFORT = 'high';
+var DEFAULT_EFFORT_BY_PROVIDER = {
+    'codebuddy': 'medium',
+};
 var DEFAULT_TEMPERATURE = '1.0';
 
 // 刻度/滑块距容器两侧的内边距（px）= 轨道内边距（chat.css 中 .effort-slider-track 的 left/right，8px）+ 滑块半宽（6px），
@@ -63,7 +72,8 @@ export function createEffortMode(options) {
 
     // 当前模式下的默认档位 id
     function defaultLevelId() {
-        return isTemperatureMode() ? DEFAULT_TEMPERATURE : DEFAULT_EFFORT;
+        if (isTemperatureMode()) return DEFAULT_TEMPERATURE;
+        return DEFAULT_EFFORT_BY_PROVIDER[providerType] || DEFAULT_EFFORT;
     }
 
     // 当前模式的档位列表；不支持的 provider 返回空数组
@@ -248,8 +258,8 @@ export function createEffortMode(options) {
         } else if (findLevel(data.effort)) {
             currentEffort = data.effort;
         } else if (!findLevel(currentEffort)) {
-            // 持久化档位可能超出当前 provider 的支持范围（如 codex 没有 max/ultracode），回落到默认档
-            currentEffort = DEFAULT_EFFORT;
+            // 持久化档位可能超出当前 provider 的支持范围（如 codex/codebuddy 没有 max/ultracode），回落到该 provider 的默认档
+            currentEffort = defaultLevelId();
         }
         render();
     }

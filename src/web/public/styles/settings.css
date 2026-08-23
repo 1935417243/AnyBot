@@ -658,6 +658,12 @@
             margin: 18px 20px;
         }
 
+        /* 未渲染内容的空容器（如 CodeBuddy 无兼容开关时）不占垂直空间 */
+        .provider-settings-config-scroll > div[id^="settings-provider-"]:empty {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
         .settings-row {
             min-height: 72px;
             padding: 14px 20px;
@@ -876,7 +882,21 @@
         }
 
         .provider-save-row {
-            justify-content: flex-end;
+            display: grid;
+            grid-template-columns: 96px minmax(0, 1fr);
+            gap: 16px;
+        }
+
+        .provider-save-row > .settings-secondary-btn {
+            grid-column: 2;
+            justify-self: end;
+        }
+
+        /* settings-field 布局内的密钥输入控件与上方下拉框同宽，左右边缘对齐 */
+        .provider-settings-config-scroll .settings-field .provider-settings-input-control {
+            width: 260px;
+            max-width: 100%;
+            flex: none;
         }
 
         .settings-path-row .settings-inline-input {
@@ -1111,21 +1131,42 @@
             white-space: nowrap;
         }
 
-        /* 内置 CLI 组件下载状态条（设置-提供商页），复用 settings-update-* 进度样式 */
-        .settings-cli-runtime {
+        /* 内置 CLI 组件下载状态（设置-提供商页）：内联在「默认提供商」下拉框后面 */
+        .settings-provider-default-controls {
             display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding: 10px 12px;
-            margin-bottom: 10px;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            background: var(--subtle-hover);
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            flex-wrap: wrap;
         }
 
-        .settings-cli-runtime-actions {
-            margin: 0;
-            padding: 0;
+        .settings-provider-default-controls > .settings-combobox {
+            width: 260px;
+            max-width: 100%;
+            flex-shrink: 0;
+        }
+
+        .settings-provider-runtime-inline:not([hidden]) {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .settings-provider-runtime-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .settings-provider-runtime-text.warn {
+            color: #f59e0b;
+        }
+
+        .settings-provider-runtime-text.error {
+            color: #fb7185;
         }
 
         .settings-danger-btn {
@@ -1348,7 +1389,7 @@
         }
 
         .settings-view .settings-section-card > .settings-field,
-        .settings-view .provider-settings-config-scroll > .settings-field {
+        .settings-view .provider-settings-config-scroll .settings-field {
             display: grid;
             grid-template-columns: 96px minmax(0, 1fr);
             align-items: center;
@@ -1427,9 +1468,17 @@
             }
 
             .settings-view .settings-section-card > .settings-field,
-            .settings-view .provider-settings-config-scroll > .settings-field {
+            .settings-view .provider-settings-config-scroll .settings-field {
                 grid-template-columns: 1fr;
                 gap: 8px;
+            }
+
+            .provider-save-row {
+                grid-template-columns: 1fr;
+            }
+
+            .provider-save-row > .settings-secondary-btn {
+                grid-column: 1;
             }
 
             .settings-row {

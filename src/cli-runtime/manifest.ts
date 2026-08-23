@@ -12,7 +12,7 @@
  */
 
 /** 支持按需下载的内置 CLI 组件标识 */
-export type CliRuntimeProvider = "codex" | "claude-code";
+export type CliRuntimeProvider = "codex" | "claude-code" | "codebuddy";
 
 /** 单个平台目标的下载描述 */
 export interface CliTargetSpec {
@@ -30,6 +30,10 @@ export interface CliTargetSpec {
 
 const CODEX_CLI_VERSION = "0.148.0";
 const CLAUDE_CODE_PACKAGE_VERSION = "0.3.237";
+// CodeBuddy 是单一通用 npm 包（不按平台拆分），bin/codebuddy 为 node 脚本入口
+const CODEBUDDY_PACKAGE_VERSION = "2.137.1";
+const CODEBUDDY_INTEGRITY = "sha512-8tdT/WCHIIgcKxfWVZ/wbu5Z+u/K7fugquMMbtIgld0suQ16salO9gI0l/eqzBUVC/5m31aV818/RL1ZYZ/CMQ==";
+const CODEBUDDY_SIZE_BYTES = 42_415_169;
 
 /** Codex 各 target triple 对应的平台版本后缀（与 @openai/codex 主包 optionalDependencies 的 alias 对齐） */
 const CODEX_PLATFORM_SUFFIX_BY_TRIPLE: Record<string, string> = {
@@ -85,6 +89,7 @@ const CLAUDE_SIZE_BY_TARGET: Record<string, number> = {
 export const CLI_RUNTIME_VERSIONS: Record<CliRuntimeProvider, string> = {
   codex: CODEX_CLI_VERSION,
   "claude-code": CLAUDE_CODE_PACKAGE_VERSION,
+  codebuddy: CODEBUDDY_PACKAGE_VERSION,
 };
 
 /** 当前进程平台对应的 Codex target triple（与 codex.ts 的映射保持一致） */
@@ -133,6 +138,17 @@ function getClaudeCodeTarget(): string | null {
 
 /** 取指定组件在当前平台的下载描述；平台未覆盖时返回 null（UI 提示不支持自动下载） */
 export function getCliTarget(provider: CliRuntimeProvider): CliTargetSpec | null {
+  if (provider === "codebuddy") {
+    // 全平台通用包，无平台差异
+    return {
+      registryPackage: "@tencent-ai/codebuddy-code",
+      registryVersion: CODEBUDDY_PACKAGE_VERSION,
+      integrity: CODEBUDDY_INTEGRITY,
+      sizeBytes: CODEBUDDY_SIZE_BYTES,
+      binRelPath: "bin/codebuddy",
+    };
+  }
+
   if (provider === "codex") {
     const triple = getCodexTriple();
     if (!triple) return null;

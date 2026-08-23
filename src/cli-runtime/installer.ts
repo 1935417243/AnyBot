@@ -65,7 +65,7 @@ interface InflightInstall {
   listeners: Set<(event: CliRuntimeEvent) => void>;
 }
 
-const PROVIDERS: CliRuntimeProvider[] = ["codex", "claude-code"];
+const PROVIDERS: CliRuntimeProvider[] = ["codex", "claude-code", "codebuddy"];
 const runtimeStates = new Map<CliRuntimeProvider, CliRuntimeStatus>();
 const inflightInstalls = new Map<CliRuntimeProvider, InflightInstall>();
 

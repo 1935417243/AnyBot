@@ -31,6 +31,7 @@ export interface WebSlashItemsPayload {
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   codex: "Codex",
   "claude-code": "Claude Code",
+  codebuddy: "CodeBuddy",
 };
 
 function resolveSlashProviderType(providerType?: string): string {

@@ -16,10 +16,12 @@ import {
   switchProvider,
 } from "../../providers/index.js";
 
-/** 归一化 provider 参数，仅支持两个内置 CLI 组件 */
+/** 归一化 provider 参数，仅支持内置 CLI 组件 */
 function parseProvider(value: unknown): CliRuntimeProvider | null {
   const normalized = value === "claude-agent" ? "claude-code" : value;
-  return normalized === "codex" || normalized === "claude-code" ? normalized : null;
+  return normalized === "codex" || normalized === "claude-code" || normalized === "codebuddy"
+    ? normalized
+    : null;
 }
 
 function writeDownloadEvent(res: Response, event: CliRuntimeEvent): void {

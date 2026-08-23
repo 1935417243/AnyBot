@@ -16,6 +16,9 @@ export const EFFORT_LEVELS: EffortLevel[] = ["low", "medium", "high", "xhigh", "
 /** Codex 支持的强度档位（与 Codex CLI 选择器一致，共 4 档） */
 export const CODEX_EFFORT_LEVELS: EffortLevel[] = ["low", "medium", "high", "xhigh"];
 
+/** CodeBuddy 支持的强度档位（CLI 实测仅接受这 4 档；默认 medium） */
+export const CODEBUDDY_EFFORT_LEVELS: EffortLevel[] = ["low", "medium", "high", "xhigh"];
+
 export interface RunOptions {
   workdir: string;
   prompt: string;

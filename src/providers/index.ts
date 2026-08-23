@@ -1,8 +1,12 @@
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
+import type { PermissionMode as CodeBuddyPermissionMode } from "@tencent-ai/agent-sdk";
+import { existsSync } from "fs";
+import path from "path";
 import { createRequire } from "module";
 import type { IProvider } from "./types.js";
 import { CodexProvider, resolveCodexExecutable } from "./codex.js";
 import { ClaudeCodeProvider } from "./claude-code.js";
+import { CodeBuddyProvider } from "./codebuddy.js";
 import { resolveExecutable } from "../utils/process.js";
 import { getLocalProviderBaseUrlType, stripProviderBaseUrlType } from "../utils/provider-base-url.js";
 import { getCliExecutablePath } from "../cli-runtime/installer.js";
@@ -85,6 +89,16 @@ function isBundledClaudeAvailable(): boolean {
   return false;
 }
 
+/** 随包的 CodeBuddy CLI 是否可用（SDK 内置 cli/ 目录，生产包已裁剪，仅 dev 环境为 true） */
+function isBundledCodeBuddyAvailable(): boolean {
+  try {
+    const sdkEntry = moduleRequire.resolve("@tencent-ai/agent-sdk");
+    return existsSync(path.join(path.dirname(sdkEntry), "..", "..", "cli", "bin", "codebuddy"));
+  } catch {
+    return false;
+  }
+}
+
 export function getProviderConfig(type: string): Record<string, unknown> {
   const settings = getProviderRuntimeSettings(normalizeProviderType(type));
   const useAnthropicCompat = settings.anthropicCompatEnabled === true;
@@ -154,6 +168,20 @@ export function getProviderConfig(type: string): Record<string, unknown> {
         permissionMode: process.env.CLAUDE_AGENT_PERMISSION_MODE || settings.permissionMode,
       });
     }
+    case "codebuddy": {
+      // 官方接入：只需要 API Key（留空则用 CLI 已登录凭据），不提供 Anthropic 兼容配置
+      return dropUndefined({
+        pathToCodebuddyCode:
+          cleanString(process.env.CODEBUDDY_CODE_PATH) ||
+          cleanString(settings.bin) ||
+          getCliExecutablePath("codebuddy") ||
+          undefined,
+        timeoutMs: settings.timeoutMs,
+        maxTurns: settings.maxTurns,
+        permissionMode: settings.permissionMode,
+        apiKey: cleanString(settings.apiKey) || cleanString(process.env.CODEBUDDY_API_KEY),
+      });
+    }
     default:
       return {};
   }
@@ -189,6 +217,14 @@ const providerFactories: Record<string, ProviderFactory> = {
       anthropicHaikuModel: config?.anthropicHaikuModel as string | undefined,
       claudeCodeSubagentModel: config?.claudeCodeSubagentModel as string | undefined,
     }),
+  codebuddy: (config) =>
+    new CodeBuddyProvider({
+      pathToCodebuddyCode: config?.pathToCodebuddyCode as string | undefined,
+      maxTurns: config?.maxTurns as number | undefined,
+      timeoutMs: config?.timeoutMs as number | undefined,
+      permissionMode: config?.permissionMode as CodeBuddyPermissionMode | undefined,
+      apiKey: config?.apiKey as string | undefined,
+    }),
 };
 
 export function normalizeProviderType(type: string): string {
@@ -205,6 +241,8 @@ function getProviderBin(type: string, config: Record<string, unknown>): string {
       return resolveCodexExecutable(config.bin as string | undefined).bin;
     case "claude-code":
       return (config.pathToClaudeCodeExecutable as string | undefined) || "bundled Claude Code";
+    case "codebuddy":
+      return (config.pathToCodebuddyCode as string | undefined) || "bundled CodeBuddy";
     default:
       return type;
   }
@@ -216,6 +254,8 @@ function getProviderInstallHint(type: string): string {
       return "请在设置页下载内置组件；如需使用外部 CLI，可设置 CODEX_BIN 为可执行文件路径";
     case "claude-code":
       return "请在设置页下载内置组件；如需指定外部 CLI，可设置 CLAUDE_CODE_BIN";
+    case "codebuddy":
+      return "请在设置页下载内置组件；如需指定外部 CLI，可设置 CODEBUDDY_CODE_PATH";
     default:
       return "";
   }
@@ -247,6 +287,24 @@ export function getProviderInstallationStatus(type: string): ProviderInstallatio
     }
     return {
       installed: isBundledClaudeAvailable(),
+      bin,
+      executablePath: null,
+      installHint: getProviderInstallHint(normalizedType),
+    };
+  }
+  if (normalizedType === "codebuddy" && !config.pathToCodebuddyCode) {
+    // 真实探测：已下载 > 随包 CLI（dev）> 未安装
+    const downloadedExecutable = getCliExecutablePath("codebuddy");
+    if (downloadedExecutable) {
+      return {
+        installed: true,
+        bin: "已下载的 CodeBuddy",
+        executablePath: downloadedExecutable,
+        installHint: getProviderInstallHint(normalizedType),
+      };
+    }
+    return {
+      installed: isBundledCodeBuddyAvailable(),
       bin,
       executablePath: null,
       installHint: getProviderInstallHint(normalizedType),
@@ -305,6 +363,7 @@ export type {
 } from "./types.js";
 export { CodexProvider } from "./codex.js";
 export { ClaudeCodeProvider } from "./claude-code.js";
+export { CodeBuddyProvider } from "./codebuddy.js";
 export {
   ProviderTimeoutError,
   ProviderProcessError,

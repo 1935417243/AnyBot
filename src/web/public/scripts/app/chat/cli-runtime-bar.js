@@ -11,6 +11,7 @@ export function createCliRuntimeBar(options) {
     var PROVIDER_LABELS = {
         'codex': 'Codex',
         'claude-code': 'Claude Code',
+        'codebuddy': 'CodeBuddy',
     };
 
     var bar = document.createElement('div');

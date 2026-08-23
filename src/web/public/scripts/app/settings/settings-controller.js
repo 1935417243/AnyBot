@@ -43,6 +43,7 @@ export function createSettingsController(options) {
     const settingsProviderCompatToggleFields = options.settingsProviderCompatToggleFields;
     const settingsProviderCurrent = options.settingsProviderCurrent;
     const settingsProviderExtraFields = options.settingsProviderExtraFields;
+    const settingsProviderPriorityFields = options.settingsProviderPriorityFields;
     const settingsProviderBinFields = options.settingsProviderBinFields;
     const settingsProviderRuntimeFields = options.settingsProviderRuntimeFields;
     const settingsProviderMenu = options.settingsProviderMenu;
@@ -96,6 +97,9 @@ export function createSettingsController(options) {
     let desktopUpdateRefreshTimer = null;
     let sessionModelSelections = {};
     let settingsProviderController = null;
+    /** 模型清单变更事件的 SSE 连接（断线后延迟重连） */
+    let modelConfigEvents = null;
+    let modelConfigEventsReconnectTimer = null;
     let currentThemeSetting = readStoredTheme();
     let currentFontSize = readStoredFontSize();
 
@@ -480,6 +484,38 @@ export function createSettingsController(options) {
         modelBadge.title = currentModelNameEl.textContent;
     }
 
+    // 订阅后端模型清单变更事件（如 CodeBuddy 实时拉取成功）：刷新聊天区模型下拉与设置页模型列表
+    function startModelConfigEvents() {
+        if (!window.EventSource || modelConfigEvents) return;
+        var source = new EventSource(window.withApiToken('/api/events'));
+        modelConfigEvents = source;
+        source.addEventListener('model_config_changed', function (e) {
+            var payload = {};
+            try {
+                payload = JSON.parse(e.data || '{}');
+            } catch (parseError) {
+                return;
+            }
+            if (!payload.provider) return;
+            var currentProvider = getCurrentSessionProvider() || (modelConfig && modelConfig.provider) || '';
+            if (payload.provider === currentProvider) {
+                fetchModelConfig(currentProvider);
+            }
+            if (settingsProviderController && settingsProviderController.refreshModelConfigForProvider) {
+                settingsProviderController.refreshModelConfigForProvider(payload.provider);
+            }
+        });
+        source.onerror = function () {
+            source.close();
+            modelConfigEvents = null;
+            if (modelConfigEventsReconnectTimer) return;
+            modelConfigEventsReconnectTimer = setTimeout(function () {
+                modelConfigEventsReconnectTimer = null;
+                startModelConfigEvents();
+            }, 5000);
+        };
+    }
+
     async function fetchModelConfig(providerType) {
         try {
             var targetProvider = providerType || getCurrentSessionProvider() || '';
@@ -661,6 +697,7 @@ export function createSettingsController(options) {
         settingsProviderCompatToggleFields: settingsProviderCompatToggleFields,
         settingsProviderCurrent: settingsProviderCurrent,
         settingsProviderExtraFields: settingsProviderExtraFields,
+        settingsProviderPriorityFields: settingsProviderPriorityFields,
         settingsProviderBinFields: settingsProviderBinFields,
         settingsProviderRuntimeFields: settingsProviderRuntimeFields,
         cliRuntimeStore: options.cliRuntimeStore || null,
@@ -1377,5 +1414,6 @@ export function createSettingsController(options) {
         handleDocumentEscape: handleDocumentEscape,
         openSettingsPanel: openSettingsPanel,
         startDesktopUpdateStatusRefresh: startDesktopUpdateStatusRefresh,
+        startModelConfigEvents: startModelConfigEvents,
     };
 }

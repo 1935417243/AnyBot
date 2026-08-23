@@ -362,19 +362,24 @@
                                 <div class="provider-settings-config-scroll">
                                     <div class="settings-field">
                                         <span class="settings-field-label" id="settings-provider-label">默认提供商</span>
-                                        <div class="settings-combobox" id="settings-provider-combobox">
-                                            <button class="settings-combobox-trigger" id="settings-provider-trigger" type="button"
-                                                    aria-haspopup="listbox" aria-expanded="false"
-                                                    aria-labelledby="settings-provider-label settings-provider-current">
-                                                <span class="settings-combobox-value" id="settings-provider-current">加载中…</span>
-                                                <svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                                    <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                                                </svg>
-                                            </button>
-                                            <div class="settings-combobox-menu" id="settings-provider-menu" role="listbox" aria-labelledby="settings-provider-label"></div>
+                                        <div class="settings-provider-default-controls">
+                                            <div class="settings-combobox" id="settings-provider-combobox">
+                                                <button class="settings-combobox-trigger" id="settings-provider-trigger" type="button"
+                                                        aria-haspopup="listbox" aria-expanded="false"
+                                                        aria-labelledby="settings-provider-label settings-provider-current">
+                                                    <span class="settings-combobox-value" id="settings-provider-current">加载中…</span>
+                                                    <svg class="settings-combobox-arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                        <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                                                    </svg>
+                                                </button>
+                                                <div class="settings-combobox-menu" id="settings-provider-menu" role="listbox" aria-labelledby="settings-provider-label"></div>
+                                            </div>
+                                            <div class="settings-provider-runtime-inline" id="settings-provider-runtime-fields" hidden></div>
                                         </div>
                                         <select class="settings-select" id="settings-provider-select" aria-hidden="true" tabindex="-1"></select>
                                     </div>
+                                    <!-- 紧随「默认提供商」的优先字段容器（CodeBuddy 的 API Key 渲染在这里） -->
+                                    <div id="settings-provider-priority-fields"></div>
                                     <div class="settings-field">
                                         <span class="settings-field-label" id="settings-provider-model-label">默认模型</span>
                                         <div class="settings-combobox" id="settings-provider-model-combobox">
@@ -407,7 +412,6 @@
                                     <div class="settings-field" id="settings-provider-timeout-fields"></div>
                                     <div id="settings-provider-compat-toggle-fields"></div>
                                     <div id="settings-provider-bin-fields"></div>
-                                    <div id="settings-provider-runtime-fields"></div>
                                     <div id="settings-provider-extra-fields"></div>
                                     <div class="settings-button-row provider-save-row">
                                         <button class="settings-secondary-btn compact" id="settings-save-btn" type="button">保存配置</button>

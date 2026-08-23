@@ -84,6 +84,8 @@ export function getAppDom(documentRef) {
         settingsProviderBinFields: byId(documentRef, 'settings-provider-bin-fields'),
         settingsProviderRuntimeFields: byId(documentRef, 'settings-provider-runtime-fields'),
         settingsProviderExtraFields: byId(documentRef, 'settings-provider-extra-fields'),
+        // 紧随「默认提供商」的优先字段容器（CodeBuddy 的 API Key 渲染在这里）
+        settingsProviderPriorityFields: byId(documentRef, 'settings-provider-priority-fields'),
         settingsDefaultWorkdir: byId(documentRef, 'settings-default-workdir'),
         settingsWorkdirOpenBtn: byId(documentRef, 'settings-workdir-open-btn'),
         settingsWorkdirPickBtn: byId(documentRef, 'settings-workdir-pick-btn'),

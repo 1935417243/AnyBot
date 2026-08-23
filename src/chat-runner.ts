@@ -9,7 +9,7 @@ import {
 } from "./providers/index.js";
 import type { IProvider, RunResult } from "./providers/index.js";
 import type { ClaudeAgentStreamEvent } from "./providers/claude-code-agent-events.js";
-import { ProviderCancelledError, EFFORT_LEVELS, CODEX_EFFORT_LEVELS, type EffortLevel } from "./providers/types.js";
+import { ProviderCancelledError, EFFORT_LEVELS, CODEX_EFFORT_LEVELS, CODEBUDDY_EFFORT_LEVELS, type EffortLevel } from "./providers/types.js";
 import {
   includeContentInLogs,
   includePromptInLogs,
@@ -164,20 +164,23 @@ function resolveRunModel(provider: IProvider, requestedModelId?: string): string
   return modelId;
 }
 
-/** 解析本次运行的推理强度：仅 claude-code / codex 支持；未指定时回落到持久化的默认档位 */
+/** 解析本次运行的推理强度：仅 claude-code / codebuddy / codex 支持；未指定时回落到持久化的默认档位 */
 function resolveRunEffort(provider: IProvider, requestedEffort?: string): EffortLevel | undefined {
   // 各 provider 支持的强度档位；不在表中的 provider 忽略强度参数
   const supportedLevels = provider.type === "claude-code"
     ? EFFORT_LEVELS
-    : provider.type === "codex"
-      ? CODEX_EFFORT_LEVELS
-      : null;
+    : provider.type === "codebuddy"
+      ? CODEBUDDY_EFFORT_LEVELS
+      : provider.type === "codex"
+        ? CODEX_EFFORT_LEVELS
+        : null;
   if (!supportedLevels) return undefined;
   const effort = requestedEffort?.trim();
   if (!effort) {
     const persisted = getCurrentEffort();
-    // 持久化档位可能超出当前 provider 的支持范围（如 codex 不支持 max/ultracode），此时回落到 high
-    return persisted && supportedLevels.includes(persisted) ? persisted : "high";
+    // 持久化档位可能超出当前 provider 的支持范围（如 codex/codebuddy 不支持 max/ultracode），此时回落到各 provider 的默认档
+    if (persisted && supportedLevels.includes(persisted)) return persisted;
+    return provider.type === "codebuddy" ? "medium" : "high";
   }
 
   if (!supportedLevels.includes(effort as EffortLevel)) {

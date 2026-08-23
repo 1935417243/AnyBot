@@ -24,6 +24,13 @@ type WebUiEvent =
       updatedAt: number;
     }
   | {
+      /** provider 模型清单被后台刷新（如 CodeBuddy 实时拉取成功）时推送，前端据此重新拉取模型配置 */
+      type: "model_config_changed";
+      provider: string;
+      reason?: string;
+      updatedAt: number;
+    }
+  | {
       type: "ready" | "ping";
       updatedAt: number;
     };
@@ -93,6 +100,16 @@ export function emitCliRuntimeChanged(provider: string): void {
   broadcast({
     type: "cli_runtime_changed",
     provider,
+    updatedAt: Date.now(),
+  });
+}
+
+/** provider 模型清单后台刷新完成后广播，前端收到后重新拉取模型配置 */
+export function emitModelConfigChanged(provider: string, reason?: string): void {
+  broadcast({
+    type: "model_config_changed",
+    provider,
+    reason,
     updatedAt: Date.now(),
   });
 }

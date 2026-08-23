@@ -10,7 +10,7 @@ import {
   normalizeProviderType,
 } from "../providers/index.js";
 import { getCliRuntimeStatus, type CliRuntimeStatus } from "../cli-runtime/installer.js";
-import { EFFORT_LEVELS, CODEX_EFFORT_LEVELS, type EffortLevel } from "../providers/types.js";
+import { EFFORT_LEVELS, CODEX_EFFORT_LEVELS, CODEBUDDY_EFFORT_LEVELS, type EffortLevel } from "../providers/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DATA_DIR || process.env.CODEX_DATA_DIR || path.resolve(__dirname, "../../.data");
@@ -38,6 +38,7 @@ export interface ModelConfig {
 /** 各 provider 支持的推理强度档位；不支持的 provider 返回 null */
 function effortLevelsForProvider(providerType: string): EffortLevel[] | null {
   if (providerType === "claude-code") return EFFORT_LEVELS;
+  if (providerType === "codebuddy") return CODEBUDDY_EFFORT_LEVELS;
   if (providerType === "codex") return CODEX_EFFORT_LEVELS;
   return null;
 }
@@ -341,7 +342,7 @@ export function getProviderTypes(): Array<{
   bin: string;
   executablePath: string | null;
   installHint: string;
-  /** 内置 CLI 组件的下载状态；仅 codex / claude-code 有值，其他 provider 为 null */
+  /** 内置 CLI 组件的下载状态；仅 codex / claude-code / codebuddy 有值，其他 provider 为 null */
   cliRuntime: CliRuntimeStatus | null;
 }> {
   return getRegisteredProviderTypes().map((type) => {
@@ -357,7 +358,7 @@ export function getProviderTypes(): Array<{
       executablePath: installation.executablePath,
       installHint: installation.installHint,
       cliRuntime:
-        normalized === "codex" || normalized === "claude-code"
+        normalized === "codex" || normalized === "claude-code" || normalized === "codebuddy"
           ? getCliRuntimeStatus(normalized)
           : null,
     };
