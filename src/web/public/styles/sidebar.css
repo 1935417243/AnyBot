@@ -11,12 +11,13 @@
             transition: width 0.2s ease, min-width 0.2s ease, border-color 0.2s ease;
         }
 
-        /* 折叠动画期间保持内容原始宽度，随容器收窄被裁剪，避免文字重排闪烁 */
+        /* 折叠动画期间保持内容原始宽度，随容器收窄被裁剪，避免文字重排闪烁。
+           注意不能给 .sidebar-scroll 设 flex-shrink: 0：纵向 flex 下它作用于高度，
+           会导致内容超高时滚动区不收缩、内部无溢出，从而无法滚动 */
         #sidebar > .sidebar-top,
         #sidebar > .sidebar-scroll,
         #sidebar > .sidebar-footer {
             width: 256px;
-            flex-shrink: 0;
         }
 
         /* 折叠状态：宽度收起、分割线隐藏，主内容区随 flex 布局自动扩展 */
