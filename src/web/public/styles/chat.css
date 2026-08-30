@@ -1192,6 +1192,208 @@
             border-radius: 0;
         }
 
+        /* 代码块预览卡片（html/mermaid/svg） */
+        .message-row.ai .message-content .code-preview-card {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin: 14px 0;
+        }
+
+        .message-row.ai .message-content .code-preview-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: var(--code-header-bg);
+            border-bottom: 1px solid var(--border);
+            border-radius: 10px 10px 0 0;
+        }
+
+        .message-row.ai .message-content .code-preview-card.collapsed .code-preview-header {
+            border-bottom: none;
+            border-radius: 10px;
+        }
+
+        .message-row.ai .message-content .code-preview-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            background: none;
+            border: none;
+            border-radius: 5px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .message-row.ai .message-content .code-preview-toggle:hover {
+            background: var(--subtle-hover);
+            color: var(--text);
+        }
+
+        .message-row.ai .message-content .code-preview-toggle svg {
+            transition: transform 0.16s ease;
+        }
+
+        .message-row.ai .message-content .code-preview-card.collapsed .code-preview-toggle svg {
+            transform: rotate(-90deg);
+        }
+
+        .message-row.ai .message-content .code-preview-title {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .message-row.ai .message-content .code-preview-actions {
+            position: relative;
+            flex: 0 0 auto;
+        }
+
+        .message-row.ai .message-content .code-preview-menu-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .message-row.ai .message-content .code-preview-menu-btn:hover,
+        .message-row.ai .message-content .code-preview-card.menu-open .code-preview-menu-btn {
+            background: var(--subtle-hover);
+            color: var(--text);
+            border-color: rgba(124, 111, 247, 0.3);
+        }
+
+        .message-row.ai .message-content .code-preview-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 116px;
+            background: var(--popover-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 5px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-4px);
+            transition: all 0.18s ease;
+            z-index: 50;
+            box-shadow: 0 8px 32px var(--popover-shadow);
+        }
+
+        .message-row.ai .message-content .code-preview-card.menu-open .code-preview-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .message-row.ai .message-content .code-preview-option {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 7px 10px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            text-align: left;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .message-row.ai .message-content .code-preview-option:hover {
+            background: var(--sidebar-hover);
+        }
+
+        .message-row.ai .message-content .code-preview-body {
+            border-radius: 0 0 10px 10px;
+            overflow: hidden;
+        }
+
+        .message-row.ai .message-content .code-preview-card.collapsed .code-preview-body {
+            display: none;
+        }
+
+        .message-row.ai .message-content .code-preview-stage {
+            display: none;
+        }
+
+        .message-row.ai .message-content .code-preview-card:not(.show-code) .code-preview-stage {
+            display: block;
+        }
+
+        .message-row.ai .message-content .code-preview-card.show-code .code-preview-stage {
+            display: none;
+        }
+
+        .message-row.ai .message-content .code-preview-card:not(.show-code) .code-preview-source {
+            display: none;
+        }
+
+        /* 卡片内的源码视图去掉 pre 自带的边框与外边距，贴合卡片边缘 */
+        .message-row.ai .message-content pre.code-preview-source {
+            margin: 0;
+            border: none;
+            border-radius: 0;
+        }
+
+        .message-row.ai .message-content .code-preview-frame {
+            display: block;
+            width: 100%;
+            height: 320px;
+            border: none;
+            background: #fff;
+        }
+
+        .message-row.ai .message-content .code-preview-image {
+            display: block;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 16px;
+            background: #fff;
+            box-sizing: border-box;
+        }
+
+        .message-row.ai .message-content .code-preview-stage svg {
+            display: block;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+
+        .message-row.ai .message-content .code-preview-loading,
+        .message-row.ai .message-content .code-preview-error {
+            padding: 24px 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .message-row.ai .message-content .code-preview-error {
+            color: #ef4444;
+        }
+
         .message-row.ai .message-content ul,
         .message-row.ai .message-content ol {
             margin: 10px 0;

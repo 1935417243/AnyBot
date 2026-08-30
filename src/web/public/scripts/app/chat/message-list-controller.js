@@ -1,4 +1,5 @@
 import { createMessageRenderer } from './message-renderer.js';
+import { handleCodePreviewClick } from './code-block-preview.js';
 
 export function createMessageListController(config) {
     var BOTTOM_THRESHOLD_PX = 64;
@@ -28,6 +29,9 @@ export function createMessageListController(config) {
 
     function bindMessageListEvents() {
         messagesEl.addEventListener('click', function (e) {
+            var previewHandled = e.target && messagesEl.contains(e.target) && handleCodePreviewClick(e.target);
+            if (previewHandled) return;
+
             var copyButton = e.target && e.target.closest ? e.target.closest('.code-copy') : null;
             if (copyButton && messagesEl.contains(copyButton)) {
                 config.copyCode(copyButton);

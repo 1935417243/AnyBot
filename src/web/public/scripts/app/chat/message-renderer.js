@@ -1,5 +1,6 @@
 import { escapeHtml } from '../utils/html.js';
 import { enhanceLocalFileLinks } from './local-file-links.js';
+import { enhanceCodeBlocks } from './code-block-preview.js';
 import {
     createMessageFileRefs,
     createMessageProjectRefs,
@@ -28,6 +29,7 @@ export function createMessageRenderer(config) {
             content.textContent = fullText;
         }
         enhanceLocalFileLinks(content);
+        enhanceCodeBlocks(content);
     }
 
     function showEmptyState() {
