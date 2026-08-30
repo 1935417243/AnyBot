@@ -1193,6 +1193,18 @@
         }
 
         /* 代码块预览卡片（html/mermaid/svg） */
+        /* 气泡与消息内容都是收缩适应布局，含预览卡片时给气泡定宽（行宽 90%）、
+           内容撑满气泡，卡片才能达到设计的 860px 阅读宽度而不是被 intrinsic 宽度压窄 */
+        .message-row.ai .bubble:has(.code-preview-card) {
+            width: 90%;
+        }
+
+        .message-row.ai .message-content:has(.code-preview-card) {
+            flex: 1 1 auto;
+            min-width: 0;
+            width: 100%;
+        }
+
         .message-row.ai .message-content .code-preview-card {
             background: var(--code-bg);
             border: 1px solid var(--border);
@@ -1357,12 +1369,14 @@
             border-radius: 0;
         }
 
+        /* 高度先给 320px 兜底，水合后由探针脚本上报内容高度自适应（120px ~ 70vh） */
         .message-row.ai .message-content .code-preview-frame {
             display: block;
             width: 100%;
             height: 320px;
             border: none;
             background: #fff;
+            transition: height 0.2s ease;
         }
 
         .message-row.ai .message-content .code-preview-image {
