@@ -1,0 +1,34 @@
+.zcode/plans/plan-sess_8c40bab0-52f3-4082-8c72-0c236ac3bba3.md
+  h_7a561dec792e5b 1-47
+src/web/public/scripts/agent-loop.js
+  h_7a561dec792e5b 91-99,366,390,509
+src/web/public/scripts/app/chat/code-block-preview.js
+  h_7a561dec792e5b 1-207
+src/web/public/scripts/app/chat/message-list-controller.js
+  h_7a561dec792e5b 2,32-34
+src/web/public/scripts/app/chat/message-renderer.js
+  h_7a561dec792e5b 3,32
+src/web/public/scripts/app/main.js
+  h_7a561dec792e5b 7,12
+src/web/public/scripts/app/markdown.js
+  h_7a561dec792e5b 73-112,123-124,126-132
+src/web/public/styles/chat.css
+  h_7a561dec792e5b 1195-1396
+src/web/public/vendor/README.md
+  h_7a561dec792e5b 10
+src/web/public/vendor/mermaid/LICENSE
+  h_7a561dec792e5b 1-21
+src/web/public/vendor/mermaid/mermaid.min.js
+  h_7a561dec792e5b 1-3636
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "9ac311b5029aadc5252ea4f2f8fd952f330bf3b2",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
