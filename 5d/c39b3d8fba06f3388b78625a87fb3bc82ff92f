@@ -1,0 +1,16 @@
+src/web/public/scripts/app/chat/code-block-preview.js
+  h_7a561dec792e5b 8-30,71-114,120,137-147,163-164,167-174
+src/web/public/styles/chat.css
+  h_7a561dec792e5b 1196-1207,1372,1379
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "5dc39b3d8fba06f3388b78625a87fb3bc82ff92f",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
