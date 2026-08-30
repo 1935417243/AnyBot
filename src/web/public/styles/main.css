@@ -158,9 +158,14 @@
             display: none;
         }
 
-        /* Web 浏览器端：侧边栏顶部下移，为左上角固定 Toggle 按钮腾出空间 */
+        /* Web 浏览器端：Logo 与 Toggle 均隐藏，压缩侧边栏顶部留白 */
         body:not(.platform-macos-desktop):not(.platform-windows-desktop) .sidebar-top {
-            padding-top: 44px;
+            padding-top: 10px;
+        }
+
+        /* Web 浏览器端：隐藏左上角标题条（侧边栏折叠/展开开关仅桌面端展示） */
+        body:not(.platform-macos-desktop):not(.platform-windows-desktop) #titlebar-strip {
+            display: none;
         }
 
         body.platform-macos-desktop .sidebar-top button,
