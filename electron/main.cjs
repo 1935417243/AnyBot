@@ -975,6 +975,16 @@ function createWindow() {
 
   mainWindow = new BrowserWindow(browserWindowOptions);
 
+  // 仅将侧边栏折叠开关的渲染进程诊断日志转存到 desktop.log，避免记录其它页面内容。
+  mainWindow.webContents.on("console-message", (details, _level, legacyMessage) => {
+    const message =
+      typeof details?.message === "string" ? details.message : legacyMessage;
+    if (typeof message !== "string" || !message.startsWith("[sidebar-toggle]")) {
+      return;
+    }
+    writeLog("renderer:sidebar-toggle", message.slice("[sidebar-toggle]".length).trim());
+  });
+
   // macOS：给页面 body 打上平台标记，用于启用顶部拖拽区域与红黄绿按钮避让样式
   if (process.platform === "darwin") {
     mainWindow.webContents.on("dom-ready", () => {

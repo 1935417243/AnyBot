@@ -653,7 +653,7 @@
 
         .home-project-dropdown {
             position: absolute;
-            top: calc(100% + 8px);
+            bottom: calc(100% + 8px);
             left: 50%;
             transform: translateX(-50%);
             min-width: 220px;
@@ -708,6 +708,13 @@
         .home-project-option-check-placeholder {
             width: 14px;
             flex-shrink: 0;
+        }
+
+        .home-project-option-icon {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+            opacity: 0.72;
         }
 
         .home-project-option-name {
@@ -839,7 +846,7 @@
         }
 
         .message-row.ai .bubble {
-            max-width: 72%;
+            max-width: 90%;
             display: flex;
             gap: 14px;
             align-items: flex-start;

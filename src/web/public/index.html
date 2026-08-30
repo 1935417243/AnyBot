@@ -38,6 +38,23 @@
 </head>
 <body>
 
+<!-- 窗口左上角标题条：承载侧边栏折叠/展开开关，折叠后仍保留。
+     macOS 桌面端该容器本身是窗口拖拽区，按钮作为其 no-drag 子元素保证可点击 -->
+<div id="titlebar-strip">
+    <button id="sidebar-toggle" type="button" aria-expanded="true" aria-label="收起侧边栏" title="收起侧边栏">
+        <svg class="sidebar-toggle-icon-collapse" width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <rect x="1.4" y="2" width="12.2" height="11" rx="2.2" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M5.8 2v11" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M10.8 5.4 8.9 7.5l1.9 2.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg class="sidebar-toggle-icon-expand" width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <rect x="1.4" y="2" width="12.2" height="11" rx="2.2" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M5.8 2v11" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M8.6 5.4l1.9 2.1-1.9 2.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+</div>
+
 <aside id="sidebar">
     <div class="sidebar-top">
         <div class="logo">

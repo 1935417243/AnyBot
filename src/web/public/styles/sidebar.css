@@ -8,7 +8,70 @@
             height: calc(100vh * var(--app-viewport-scale));
             overflow-x: hidden;
             overflow-y: hidden;
-            transition: width 0.25s ease;
+            transition: width 0.2s ease, min-width 0.2s ease, border-color 0.2s ease;
+        }
+
+        /* 折叠动画期间保持内容原始宽度，随容器收窄被裁剪，避免文字重排闪烁 */
+        #sidebar > .sidebar-top,
+        #sidebar > .sidebar-scroll,
+        #sidebar > .sidebar-footer {
+            width: 256px;
+            flex-shrink: 0;
+        }
+
+        /* 折叠状态：宽度收起、分割线隐藏，主内容区随 flex 布局自动扩展 */
+        body.sidebar-collapsed #sidebar {
+            width: 0;
+            min-width: 0;
+            border-right-color: transparent;
+        }
+
+        /* 窗口左上角标题条：承载侧边栏折叠/展开开关，折叠后仍然保留。
+           macOS 桌面端该容器整体从窗口拖拽区排除（见 main.css），保证按钮可点击 */
+        #titlebar-strip {
+            position: absolute;
+            top: 6px;
+            left: 4px;
+            z-index: 300;
+            width: 36px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 侧边栏折叠/展开开关按钮 */
+        #sidebar-toggle {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 0;
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        #sidebar-toggle:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+        }
+
+        #sidebar-toggle .sidebar-toggle-icon-expand {
+            display: none;
+        }
+
+        /* 折叠后图标切换为「展开侧边栏」状态 */
+        body.sidebar-collapsed #sidebar-toggle .sidebar-toggle-icon-collapse {
+            display: none;
+        }
+
+        body.sidebar-collapsed #sidebar-toggle .sidebar-toggle-icon-expand {
+            display: block;
         }
 
         .sidebar-scroll {

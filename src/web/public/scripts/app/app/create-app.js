@@ -333,6 +333,19 @@ export function createAnyBotApp(dom, deps) {
             sidebar.updateSelection();
             return requireSessionController().createNewChat(projectId || null, { deferSidebarReveal: true });
         },
+        // 与侧边栏"选择本地文件夹"一致：系统选目录后注册为项目，并在首页选中
+        openFolder: async function () {
+            var sidebar = requireSidebarController();
+            var res = await fetch('/api/projects/pick', { method: 'POST' });
+            var data = await res.json();
+            if (!res.ok) throw new Error(data.error || '添加项目失败');
+            if (data.canceled) return;
+            await sidebar.fetchProjects();
+            sidebar.setActiveProjectId(data.id);
+            sidebar.updateSelection();
+            await requireSessionController().createNewChat(data.id, { deferSidebarReveal: true });
+        },
+        onError: showError,
     });
 
     settingsController = createSettingsController({

@@ -121,11 +121,46 @@
             pointer-events: none;
         }
 
-        /* 顶部区域可拖动窗口，交互元素保持可点击 */
-        body.platform-macos-desktop .sidebar-top,
-        body.platform-macos-desktop .conversation-header,
+        /* 会话标题的内容区和首页主区可拖动窗口。
+           拖拽区从 conversation-header 移到受左侧 padding 约束的内层，
+           避免侧边栏收起后覆盖左上角 Toggle；sidebar-top 不再设为拖拽区 */
+        body.platform-macos-desktop .conversation-header-inner,
         body.platform-macos-desktop .home-hero {
             -webkit-app-region: drag;
+        }
+
+        /* 红黄绿按钮位于 (14, 16) 宽约 52px；标题条紧跟其右、垂直居中对齐。
+           整个标题条从窗口拖拽区排除，避免 macOS 原生标题栏命中吞掉 Toggle 的点击事件 */
+        body.platform-macos-desktop #titlebar-strip {
+            left: 72px;
+            top: 7px;
+            width: 40px;
+            height: 36px;
+            -webkit-app-region: no-drag;
+        }
+
+        /* 侧边栏收起后红黄绿按钮与 Toggle 悬浮在会话头部上方，为标题腾出左侧空间 */
+        body.platform-macos-desktop .conversation-header {
+            transition: padding-left 0.2s ease;
+        }
+
+        body.platform-macos-desktop.sidebar-collapsed .conversation-header {
+            padding-left: 116px;
+        }
+
+        /* Windows：侧边栏顶部下移，为左上角固定 Toggle 按钮腾出空间 */
+        body.platform-windows-desktop .sidebar-top {
+            padding-top: 44px;
+        }
+
+        /* Web 浏览器端：隐藏侧边栏 Logo 行（logo-icon 和 logo-text），并移除占位高度 */
+        body:not(.platform-macos-desktop):not(.platform-windows-desktop) .sidebar-top .logo {
+            display: none;
+        }
+
+        /* Web 浏览器端：侧边栏顶部下移，为左上角固定 Toggle 按钮腾出空间 */
+        body:not(.platform-macos-desktop):not(.platform-windows-desktop) .sidebar-top {
+            padding-top: 44px;
         }
 
         body.platform-macos-desktop .sidebar-top button,
@@ -148,4 +183,3 @@
         body.platform-macos-desktop .skill-picker {
             -webkit-app-region: no-drag;
         }
-
