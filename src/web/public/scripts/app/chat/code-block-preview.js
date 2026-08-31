@@ -226,6 +226,187 @@ function downloadCard(card) {
     downloadBlob(code, 'image/svg+xml;charset=utf-8', 'image.svg');
 }
 
+// 保存为图片的调试日志，导出卡住时用于定位停在哪一步
+function saveImageLog() {
+    var args = ['[code-preview][save-image]'];
+    for (var i = 0; i < arguments.length; i++) args.push(arguments[i]);
+    console.log.apply(console, args);
+}
+
+function closeCardMenu(card) {
+    card.classList.remove('menu-open');
+    var btn = card.querySelector('.code-preview-menu-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+// 标签文字按可用宽度换行：英文按词分（空格处断行），中文逐字可断，超长单词硬切
+function wrapLabelText(text, maxChars) {
+    var tokens = [];
+    text.split(/(\s+)/).forEach(function (part) {
+        if (!part) return;
+        if (/^\s+$/.test(part)) {
+            tokens.push(' ');
+            return;
+        }
+        if (/[\u4e00-\u9fff\uff00-\uffef]/.test(part)) {
+            part.split('').forEach(function (ch) { tokens.push(ch); });
+        } else if (part.length > maxChars) {
+            for (var i = 0; i < part.length; i += maxChars) tokens.push(part.slice(i, i + maxChars));
+        } else {
+            tokens.push(part);
+        }
+    });
+    var lines = [];
+    var current = '';
+    tokens.forEach(function (token) {
+        if (current && (current + token).length > maxChars) {
+            lines.push(current.replace(/\s+$/, ''));
+            current = token.replace(/^\s+/, '');
+        } else {
+            current += token;
+        }
+    });
+    if (current.trim()) lines.push(current.replace(/\s+$/, ''));
+    return lines;
+}
+
+// 含 foreignObject 的 SVG 画进 canvas 会被标记为 tainted 禁止导出（浏览器安全规范），
+// 导出前把其中的 HTML 标签原地替换为原生 <text>：继承父级 g 的定位变换，
+// 所以坐标直接用 foreignObject 本地坐标系的中心，颜色、字号从页面已渲染的图表量取
+function convertForeignObjectsToText(liveSvg, cloneSvg) {
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var liveFos = liveSvg.querySelectorAll('foreignObject');
+    var cloneFos = cloneSvg.querySelectorAll('foreignObject');
+    liveFos.forEach(function (liveFo, i) {
+        var target = cloneFos[i];
+        if (!target || !target.parentNode) return;
+        var text = (liveFo.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!text) {
+            target.parentNode.removeChild(target);
+            return;
+        }
+        var localW = parseFloat(liveFo.getAttribute('width')) || 0;
+        var localH = parseFloat(liveFo.getAttribute('height')) || 0;
+        var styleSource = liveFo.querySelector('span, p, div') || liveFo;
+        var cs = getComputedStyle(styleSource);
+        var fontSize = parseFloat(cs.fontSize) || 14;
+
+        var textEl = document.createElementNS(SVG_NS, 'text');
+        textEl.setAttribute('text-anchor', 'middle');
+        textEl.setAttribute('fill', cs.color || '#000000');
+        textEl.setAttribute('font-size', fontSize + 'px');
+        textEl.setAttribute('font-family', cs.fontFamily || 'sans-serif');
+
+        // 按 foreignObject 可用宽度换行，垂直居中排列
+        var maxChars = Math.max(4, Math.floor(localW / (fontSize * 0.62)));
+        var lines = wrapLabelText(text, maxChars);
+        var lineHeight = fontSize * 1.35;
+        var startY = localH / 2 - ((lines.length - 1) * lineHeight) / 2 + fontSize * 0.35;
+        lines.forEach(function (line, idx) {
+            var tspan = document.createElementNS(SVG_NS, 'tspan');
+            tspan.setAttribute('x', localW / 2);
+            tspan.setAttribute('y', startY + idx * lineHeight);
+            tspan.textContent = line;
+            textEl.appendChild(tspan);
+        });
+        target.parentNode.replaceChild(textEl, target);
+    });
+}
+
+// 把卡片里渲染好的 mermaid SVG 栅格化为 PNG 下载（2 倍清晰度，铺卡片底色防透明底看不清）
+// 导出是异步的，菜单保持打开直到出结果，失败提示才不会被菜单关闭吞掉
+function saveMermaidPng(card, option) {
+    var svgEl = card.querySelector('.code-preview-stage svg');
+    if (!svgEl) {
+        // 懒加载下卡片可能尚未进视口渲染
+        option.textContent = '图表未就绪';
+        return;
+    }
+    option.textContent = '导出中…';
+    var viewBox = svgEl.viewBox && svgEl.viewBox.baseVal;
+    var rect = svgEl.getBoundingClientRect();
+    var width = Math.ceil((viewBox && viewBox.width) || rect.width);
+    var height = Math.ceil((viewBox && viewBox.height) || rect.height);
+    if (!width || !height) {
+        option.textContent = '导出失败';
+        return;
+    }
+
+    var clone = svgEl.cloneNode(true);
+    convertForeignObjectsToText(svgEl, clone);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', width);
+    clone.setAttribute('height', height);
+    var svgText = new XMLSerializer().serializeToString(clone);
+    saveImageLog('start', 'size:', width, 'x', height, 'svgTextLength:', svgText.length);
+
+    var fail = function (reason) {
+        saveImageLog('failed:', reason);
+        option.textContent = '导出失败，可改用下载 SVG';
+        setTimeout(function () { option.textContent = '保存为图片'; }, 2500);
+    };
+    var succeed = function () {
+        saveImageLog('done');
+        option.textContent = '已保存';
+        setTimeout(function () {
+            option.textContent = '保存为图片';
+            closeCardMenu(card);
+        }, 800);
+    };
+
+    // SVG 图片加载偶发挂起（onload/onerror 都不触发），每次尝试用全新 blob 和 Image，最多 3 次
+    var attemptsLeft = 3;
+    (function attempt() {
+        var svgUrl = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' }));
+        var settled = false;
+        var img = new Image();
+        saveImageLog('attempt', 4 - attemptsLeft, 'of 3');
+        img.onload = function () {
+            if (settled) return;
+            settled = true;
+            saveImageLog('image loaded', img.naturalWidth, 'x', img.naturalHeight);
+            try {
+                // 超长图表按 2 倍导出可能超出 canvas 上限，按需要自动降倍
+                var scale = Math.min(2, 16000 / width, 16000 / height);
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.floor(width * scale);
+                canvas.height = Math.floor(height * scale);
+                var ctx = canvas.getContext('2d');
+                if (!ctx) throw new Error('canvas 2d context unavailable');
+                ctx.fillStyle = getComputedStyle(card).backgroundColor || '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                saveImageLog('drawn to canvas', canvas.width, 'x', canvas.height);
+                setTimeout(function () { URL.revokeObjectURL(svgUrl); }, 1000);
+                canvas.toBlob(function (png) {
+                    saveImageLog('toBlob result:', png ? (png.size + ' bytes') : 'null');
+                    if (png) {
+                        downloadBlob(png, 'image/png', 'diagram.png');
+                        succeed();
+                    } else {
+                        fail('canvas toBlob returned null');
+                    }
+                }, 'image/png');
+            } catch (err) {
+                saveImageLog('draw exception:', err && err.message);
+                fail('draw exception: ' + (err && err.message));
+            }
+        };
+        var retryOrFail = function (reason) {
+            if (settled) return;
+            settled = true;
+            URL.revokeObjectURL(svgUrl);
+            attemptsLeft -= 1;
+            saveImageLog('attempt ended:', reason, 'attemptsLeft:', attemptsLeft);
+            if (attemptsLeft > 0) attempt();
+            else fail(reason);
+        };
+        img.onerror = function () { retryOrFail('image error'); };
+        setTimeout(function () { retryOrFail('image load timeout'); }, 6000);
+        img.src = svgUrl;
+    })();
+}
+
 function handleMenuAction(card, action, option) {
     if (action === 'toggle-view') {
         card.classList.toggle('show-code');
@@ -263,10 +444,13 @@ export function handleCodePreviewClick(target) {
     var option = target.closest('.code-preview-option');
     if (option) {
         var optionCard = option.closest('.code-preview-card');
+        // 保存为图片是异步导出，菜单开合与结果反馈由 saveMermaidPng 自己管理
+        if (option.dataset.action === 'save-image') {
+            saveMermaidPng(optionCard, option);
+            return true;
+        }
         handleMenuAction(optionCard, option.dataset.action, option);
-        optionCard.classList.remove('menu-open');
-        var btn = optionCard.querySelector('.code-preview-menu-btn');
-        if (btn) btn.setAttribute('aria-expanded', 'false');
+        closeCardMenu(optionCard);
         return true;
     }
 
