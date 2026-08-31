@@ -219,8 +219,9 @@ function downloadCard(card) {
     }
     var stageSvg = card.querySelector('.code-preview-stage svg');
     if (lang === 'mermaid') {
-        if (stageSvg) downloadBlob(stageSvg.outerHTML, 'image/svg+xml;charset=utf-8', 'diagram.svg');
-        else downloadBlob(code, 'text/plain;charset=utf-8', 'diagram.mmd');
+        var base = buildMermaidFileBase(card);
+        if (stageSvg) downloadBlob(stageSvg.outerHTML, 'image/svg+xml;charset=utf-8', base + '.svg');
+        else downloadBlob(code, 'text/plain;charset=utf-8', base + '.mmd');
         return;
     }
     downloadBlob(code, 'image/svg+xml;charset=utf-8', 'image.svg');
@@ -313,6 +314,60 @@ function convertForeignObjectsToText(liveSvg, cloneSvg) {
     });
 }
 
+// mermaid 首行关键字到图表类型中文名的映射，用于导出文件命名
+var MERMAID_TYPE_NAMES = [
+    [/^(graph|flowchart)\b/, '流程图'],
+    [/^sequencediagram\b/i, '时序图'],
+    [/^classdiagram\b/i, '类图'],
+    [/^statediagram/i, '状态图'],
+    [/^erdiagram\b/i, 'ER图'],
+    [/^gantt\b/i, '甘特图'],
+    [/^journey\b/i, '用户旅程图'],
+    [/^pie\b/i, '饼图'],
+    [/^gitgraph\b/i, 'Git图'],
+    [/^mindmap\b/i, '思维导图'],
+    [/^timeline\b/i, '时间线图'],
+    [/^quadrantchart\b/i, '象限图'],
+];
+
+// 生成带业务辨识度的导出文件名主体：图表类型 + 首个节点标签摘要 + 时分秒，兜底 diagram
+function buildMermaidFileBase(card) {
+    var code = getCardCode(card);
+    var firstLine = code.trim().split('\n')[0].trim();
+    var typeName = '图表';
+    for (var i = 0; i < MERMAID_TYPE_NAMES.length; i++) {
+        if (MERMAID_TYPE_NAMES[i][0].test(firstLine)) {
+            typeName = MERMAID_TYPE_NAMES[i][1];
+            break;
+        }
+    }
+    // 已渲染图表里第一个非空标签通常就是业务主题
+    var label = '';
+    var svgEl = card.querySelector('.code-preview-stage svg');
+    if (svgEl) {
+        var fos = svgEl.querySelectorAll('foreignObject');
+        for (var j = 0; j < fos.length; j++) {
+            var text = (fos[j].textContent || '').replace(/\s+/g, ' ').trim();
+            if (text) {
+                label = text;
+                break;
+            }
+        }
+        if (!label) {
+            var textEl = svgEl.querySelector('text');
+            if (textEl) label = (textEl.textContent || '').replace(/\s+/g, ' ').trim();
+        }
+    }
+    // 清理文件名非法字符并截断，避免过长
+    label = label.replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 30);
+    // 拼时分秒（如 104230），区分同一图的多次导出
+    var now = new Date();
+    var time = String(now.getHours()).padStart(2, '0')
+        + String(now.getMinutes()).padStart(2, '0')
+        + String(now.getSeconds()).padStart(2, '0');
+    return (label ? typeName + '-' + label : typeName) + '-' + time;
+}
+
 // 把卡片里渲染好的 mermaid SVG 栅格化为 PNG 下载（2 倍清晰度，铺卡片底色防透明底看不清）
 // 导出是异步的，菜单保持打开直到出结果，失败提示才不会被菜单关闭吞掉
 function saveMermaidPng(card, option) {
@@ -381,7 +436,7 @@ function saveMermaidPng(card, option) {
                 canvas.toBlob(function (png) {
                     saveImageLog('toBlob result:', png ? (png.size + ' bytes') : 'null');
                     if (png) {
-                        downloadBlob(png, 'image/png', 'diagram.png');
+                        downloadBlob(png, 'image/png', buildMermaidFileBase(card) + '.png');
                         succeed();
                     } else {
                         fail('canvas toBlob returned null');

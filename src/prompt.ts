@@ -58,16 +58,22 @@ export function buildSystemPrompt(options: {
     "- 禁止直接执行应用二进制文件（除非已用上述方式包裹）",
   ].join("\n");
 
+  // 图示输出引导：与 WebUI 的 mermaid 渲染能力对齐，软引导不禁止用户指定其它格式
+  const diagramRule = [
+    "当用户请求流程图、时序图、架构图、甘特图、状态图等图示时，默认用 ```mermaid 代码块输出，除非用户明确指定其它格式（如 PlantUML、ASCII、HTML）。",
+    "输出 mermaid 前自检语法（节点 id 合法、标签含特殊字符时用引号包裹、箭头语法正确），确保可直接渲染。",
+  ].join("\n");
+
   if (options.isFirstTurn !== false && includeWorkspaceMemory) {
     const workspaceContext = buildWorkspaceContext(options.workdir);
     if (workspaceContext) {
-      const parts = [env, launchRule, workspaceContext];
+      const parts = [env, launchRule, diagramRule, workspaceContext];
       if (options.extraPrompt?.trim()) parts.push(options.extraPrompt.trim());
       return parts.join("\n\n");
     }
   }
 
-  const parts = [env, launchRule];
+  const parts = [env, launchRule, diagramRule];
 
   if (options.isFirstTurn !== false && includeWorkspaceMemory) {
     parts.push(
