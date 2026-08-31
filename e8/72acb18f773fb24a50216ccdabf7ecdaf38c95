@@ -1,0 +1,16 @@
+src/prompt.ts
+  h_7a561dec792e5b 61-66,70,76
+src/web/public/scripts/app/chat/code-block-preview.js
+  h_7a561dec792e5b 222-224,317-370,439
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "e872acb18f773fb24a50216ccdabf7ecdaf38c95",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
