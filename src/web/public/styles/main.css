@@ -143,6 +143,13 @@
             pointer-events: none;
         }
 
+        /* 侧边栏收起后红黄绿按钮与折叠 Toggle 悬浮在主区左上角，
+           首页拖拽带与会话页 header 一样让出左侧 116px，
+           否则拖拽命中会吞掉 Toggle 点击，折叠后无法再展开 */
+        body.platform-macos-desktop.sidebar-collapsed #chat-view.chat-view--home::before {
+            left: 116px;
+        }
+
         /* 红黄绿按钮位于 (14, 16) 宽约 52px；标题条紧跟其右、垂直居中对齐。
            整个标题条从窗口拖拽区排除，避免 macOS 原生标题栏命中吞掉 Toggle 的点击事件 */
         body.platform-macos-desktop #titlebar-strip {
