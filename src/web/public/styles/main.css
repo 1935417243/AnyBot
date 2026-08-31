@@ -121,12 +121,26 @@
             pointer-events: none;
         }
 
-        /* 会话标题的内容区和首页主区可拖动窗口。
+        /* 会话标题的内容区可拖动窗口。
            拖拽区从 conversation-header 移到受左侧 padding 约束的内层，
            避免侧边栏收起后覆盖左上角 Toggle；sidebar-top 不再设为拖拽区 */
-        body.platform-macos-desktop .conversation-header-inner,
-        body.platform-macos-desktop .home-hero {
+        body.platform-macos-desktop .conversation-header-inner {
             -webkit-app-region: drag;
+        }
+
+        /* 首页隐藏了 conversation-header，用顶部一条窄带保留窗口拖拽能力。
+           首页 hero 不再整块拖拽：大块 drag 区域会让 Chromium 对区域内的鼠标事件
+           做同步命中计算，面积越大鼠标交互越迟滞（首页卡顿的来源）。
+           pointer-events: none 不拦截下层点击，拖拽命中由 app-region 独立完成 */
+        body.platform-macos-desktop #chat-view.chat-view--home::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 44px;
+            -webkit-app-region: drag;
+            pointer-events: none;
         }
 
         /* 红黄绿按钮位于 (14, 16) 宽约 52px；标题条紧跟其右、垂直居中对齐。

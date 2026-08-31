@@ -209,19 +209,13 @@ function downloadBlob(content, type, filename) {
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
 }
 
-// html 下载源码（即产物）；svg/mermaid 优先下载渲染产物，未渲染成功时回退源码
+// html 下载源码（即产物）；svg 优先下载渲染产物，未渲染成功时回退源码
+// mermaid 不提供下载（菜单已隐藏），统一走「保存为图片」导出 PNG
 function downloadCard(card) {
     var lang = card.dataset.codeLang;
     var code = getCardCode(card);
     if (lang === 'html') {
-        downloadBlob(code, 'text/html;charset=utf-8', 'preview.html');
-        return;
-    }
-    var stageSvg = card.querySelector('.code-preview-stage svg');
-    if (lang === 'mermaid') {
-        var base = buildMermaidFileBase(card);
-        if (stageSvg) downloadBlob(stageSvg.outerHTML, 'image/svg+xml;charset=utf-8', base + '.svg');
-        else downloadBlob(code, 'text/plain;charset=utf-8', base + '.mmd');
+        downloadBlob(code, 'text/html;charset=utf-8', buildHtmlFileBase(card) + '.html');
         return;
     }
     downloadBlob(code, 'image/svg+xml;charset=utf-8', 'image.svg');
@@ -330,6 +324,14 @@ var MERMAID_TYPE_NAMES = [
     [/^quadrantchart\b/i, '象限图'],
 ];
 
+// 生成时分秒后缀（如 104230），区分同一内容的多次导出
+function buildExportTimestamp() {
+    var now = new Date();
+    return String(now.getHours()).padStart(2, '0')
+        + String(now.getMinutes()).padStart(2, '0')
+        + String(now.getSeconds()).padStart(2, '0');
+}
+
 // 生成带业务辨识度的导出文件名主体：图表类型 + 首个节点标签摘要 + 时分秒，兜底 diagram
 function buildMermaidFileBase(card) {
     var code = getCardCode(card);
@@ -360,12 +362,17 @@ function buildMermaidFileBase(card) {
     }
     // 清理文件名非法字符并截断，避免过长
     label = label.replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 30);
-    // 拼时分秒（如 104230），区分同一图的多次导出
-    var now = new Date();
-    var time = String(now.getHours()).padStart(2, '0')
-        + String(now.getMinutes()).padStart(2, '0')
-        + String(now.getSeconds()).padStart(2, '0');
-    return (label ? typeName + '-' + label : typeName) + '-' + time;
+    return (label ? typeName + '-' + label : typeName) + '-' + buildExportTimestamp();
+}
+
+// html 导出的文件名主体：取 <title> 当业务名，拼时分秒；取不到兜底 preview
+function buildHtmlFileBase(card) {
+    var code = getCardCode(card);
+    var match = code.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    var label = match ? match[1].replace(/\s+/g, ' ').trim() : '';
+    // 清理文件名非法字符并截断，避免过长
+    label = label.replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 30);
+    return (label || 'preview') + '-' + buildExportTimestamp();
 }
 
 // 把卡片里渲染好的 mermaid SVG 栅格化为 PNG 下载（2 倍清晰度，铺卡片底色防透明底看不清）
@@ -397,7 +404,7 @@ function saveMermaidPng(card, option) {
 
     var fail = function (reason) {
         saveImageLog('failed:', reason);
-        option.textContent = '导出失败，可改用下载 SVG';
+        option.textContent = '导出失败';
         setTimeout(function () { option.textContent = '保存为图片'; }, 2500);
     };
     var succeed = function () {

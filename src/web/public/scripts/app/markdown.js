@@ -99,7 +99,8 @@ function buildPreviewCard(lang, code) {
         + '<div class="code-preview-menu" role="menu">'
         + '<button class="code-preview-option" type="button" role="menuitem" data-action="toggle-view">查看预览</button>'
         + '<button class="code-preview-option" type="button" role="menuitem" data-action="copy">复制代码</button>'
-        + '<button class="code-preview-option" type="button" role="menuitem" data-action="download">下载</button>'
+        // 下载仅 html/svg 提供（导出源码/图像文件）；mermaid 只保留保存为图片，避免功能重复
+        + (lang !== 'mermaid' ? '<button class="code-preview-option" type="button" role="menuitem" data-action="download">下载</button>' : '')
         // 保存为图片仅 mermaid 图表提供：把渲染出的 SVG 栅格化为 PNG
         + (lang === 'mermaid' ? '<button class="code-preview-option" type="button" role="menuitem" data-action="save-image">保存为图片</button>' : '')
         + '</div>'

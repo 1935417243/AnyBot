@@ -931,6 +931,7 @@
         }
 
         .avatar.ai-avatar {
+            visibility: hidden;
             background: var(--accent);
             color: #fff;
             font-family: 'JetBrains Mono', monospace;
