@@ -1,0 +1,16 @@
+src/web/public/scripts/app/chat/code-block-preview.js
+  h_7a561dec792e5b 229-409,447-451,453
+src/web/public/scripts/app/markdown.js
+  h_7a561dec792e5b 103-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "092e3e3d66ea4ec21c65fdce7d82639395cdecee",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
