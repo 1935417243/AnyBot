@@ -17,9 +17,9 @@
 
 AnyBot is a local AI Coding Agent console and remote entry point that lets you control and manage AI Coding Agents on your computer through the desktop app, Web UI, Weixin, QQ, Telegram, Feishu, DingTalk, and other channels.
 
-AnyBot uses the platform native binaries provided by `@openai/codex-sdk` and `@anthropic-ai/claude-agent-sdk` by default, so users do not need to install `codex` or Claude Code globally. If needed, you can still configure an external CLI from settings. Provider settings, model mappings, environment variables, and MCP configuration are stored inside AnyBot.
+AnyBot supports **Codex, Claude Code, and CodeBuddy** through their respective SDKs. Desktop builds download CLI components on demand: select a Provider in settings and click “立即下载” (Download now). A global CLI installation is not required. Source development can also use runtime components shipped with the SDKs, and external CLI paths can be configured when needed.
 
-If you do not want to use the machine's global model configuration, you can configure separate compatibility endpoints and model mappings inside AnyBot for Codex / Claude Code, connecting DeepSeek, Kimi, MiniMax, Aliyun Token Plan, VibeAPI, Ollama (local), llama (local), or other Anthropic API-compatible services. AnyBot's settings only take effect inside AnyBot and do not affect the machine's global configuration.
+You can configure separate upstream endpoints and model mappings for Codex / Claude Code inside AnyBot, connecting services such as DeepSeek, Kimi, MiniMax, Aliyun Token Plan, VibeAPI, Ollama (local), and llama (local). Codex supports direct Responses connections or Anthropic adaptation; Claude Code supports Anthropic-compatible endpoints. CodeBuddy uses its official service with an API Key or existing CLI login credentials. These model settings only take effect inside AnyBot.
 
 The desktop app supports **macOS** and **Windows**; running from source supports **macOS**, **Linux**, and **Windows**.
 
@@ -27,18 +27,19 @@ The desktop app supports **macOS** and **Windows**; running from source supports
 
 ## Features
 
-- **Multiple Providers**: switch between Codex SDK/CLI and Claude Code from the Web UI or channel commands.
-- **Compatible model access**: configure the Codex Responses compatibility layer and Claude Code Anthropic-compatible interface inside AnyBot, including Base URL, API Key, and model mappings.
-- **MCP servers**: add, enable, disable, check, and inspect MCP Server logs from the Plugins page; verified servers are passed to both Codex and Claude Code.
+- **Multiple Providers**: switch between Codex, Claude Code, and CodeBuddy from the Web UI or channel commands, with runtime components downloaded on demand.
+- **Compatible model access**: configure custom Responses / Anthropic upstreams for Codex and Anthropic-compatible endpoints for Claude Code, including Base URL, API Key, and model mappings. Claude Code also supports temperature adjustment for local Ollama / llama models.
+- **MCP servers**: add, enable, disable, check, and inspect MCP Server logs from the Plugins page; one configuration serves all three Providers.
 - **Agent Web UI**: local chat UI with Markdown, code highlighting, streamed Agent events, cancellation, context compaction, and persistent history.
+- **Code and diagram previews**: preview HTML, Mermaid, and SVG code blocks; view or copy source, download HTML / SVG files, and save Mermaid diagrams as high-resolution PNG images.
 - **Project workspaces**: manage projects in the sidebar, including cloning from Git repositories, viewing and switching branches, and clearing the workspace; project sessions use the project path as the Provider working directory.
-- **Skills and Plugins page**: the sidebar Plugins page manages skills and MCP servers together; skills are isolated per Provider and can be browsed, enabled, disabled, and deleted, and the `/` picker shows Provider-specific skills and commands.
+- **Skills and Plugins page**: manage skills and MCP servers together. Skills are isolated per Provider and can be browsed, enabled, disabled, and deleted; Codex / Claude Code also support downloading selected official skills. The `/` picker shows skills and commands for the current Provider.
 - **Attachments**: upload by button, pasted images, or drag and drop. The upload limit is 50MB per file. Image support depends on the current Provider.
 - **Change review**: after Agent edits, inspect diffs and approve or revert changes from the Web UI.
 - **Channel integrations**: Feishu long connection, DingTalk Stream, QQ Bot WebSocket, Telegram long polling, and personal Weixin.
 - **Proactive messaging**: send notifications to configured channel owners through `/api/send`.
 - **Automations**: run local Agent tasks on minute, daily, weekly, or Cron schedules; activity stays visible in the Web UI, and final results can be saved locally or delivered to enabled channels.
-- **Desktop app**: Electron shell, tray support, login item support, in-app download and installation for Windows installer builds, and GitHub latest-release checks on other platforms.
+- **Desktop app**: collapsible sidebar, an Open Folder shortcut on the home page, window dragging, tray and login item support, in-app updates for Windows installer builds, and GitHub latest-release checks on other platforms.
 
 ---
 
@@ -73,15 +74,17 @@ flowchart LR
     User --> Channels[Feishu / DingTalk / QQ / Telegram / Weixin]
     WebUI --> Runner[ChatRunner]
     Channels --> Runner
+    Automation[Local Automation Scheduler] --> Runner
     Runner --> Providers[Provider Layer]
     Providers --> Codex[Codex CLI]
     Providers --> Claude[Claude Code]
-    Providers --> ThirdParty[Third-party Models]
+    Providers --> CodeBuddy[CodeBuddy]
+    Codex --> ThirdParty[Custom Model Services]
+    Claude --> ThirdParty
     Providers --> MCP[MCP Servers]
     Runner --> Workspace[Project Workspaces]
     Runner --> Skills[Skills]
     Runner --> Review[Change Review]
-    Runner --> Automation[Automations]
 ```
 
 ---
@@ -111,14 +114,17 @@ sudo xattr -rd com.apple.quarantine "/Applications/AnyBot.app"
 
 If your app is named `Anybot.app`, adjust the path accordingly.
 
-### 2. Configure a Provider
+### 2. Configure a Provider and Start Chatting
 
-Configure at least one Provider:
+Select at least one Provider under **Settings -> Providers**. If it needs a download, click “立即下载” (Download now) and wait for the component to become ready, then configure the corresponding account or service credentials.
 
 | Provider | Runtime | Notes |
 |----------|--------------|-------|
-| Codex | Uses the platform native binary provided by `@openai/codex-sdk` by default, so a globally installed `codex` command is not required. When **Responses compatibility layer** is enabled, Codex only uses AnyBot's compatibility service configuration and model mapping | Session resume, sandbox, image input, MCP |
-| Claude Code | Uses the platform native binary provided by `@anthropic-ai/claude-agent-sdk` by default, so a global Claude Code install is not required. Configure an external executable from advanced settings only when needed. See the [Claude Code docs](https://code.claude.com/docs/en/overview) | Session resume, sandbox mapping, streamed Agent events, MCP |
+| Codex | Use existing native CLI login / configuration, or enable **Custom upstream** (自定义上游), select Responses / Anthropic, and enter the endpoint, key, and model mappings | Session resume, sandbox, image input, MCP |
+| Claude Code | Use native CLI configuration, or enable the **Anthropic-compatible interface** and enter service settings. See the [Claude Code docs](https://code.claude.com/docs/en/overview) | Session resume, permission modes, streamed Agent events, MCP |
+| CodeBuddy | Enter an official service API Key, or leave it empty to use existing CLI login credentials | Session resume, permission modes, streamed Agent events, MCP, model list retrieved from the service |
+
+Return to the home page, select a project or add one with “打开文件夹” (Open Folder), and send a message. Choose “不在项目中工作” to chat without a project. Type `/` in the input to select skills or additional projects; manage skills and MCP servers from the Plugins page.
 
 ### 3. Run From Source
 
@@ -149,16 +155,23 @@ npm run bot:stop
 |----------|--------|-------------|-------|
 | `codex` | Available | Supported | Codex SDK/CLI with sandbox, Agent events, context usage, and MCP |
 | `claude-code` | Available | Not currently supported | Claude Agent SDK with session resume, permission modes, context compaction, streamed Agent events, and MCP |
+| `codebuddy` | Available | Not currently supported | Tencent Agent SDK with session resume, permission modes, streamed Agent events, skills, and MCP |
 
 Provider and model choices are saved from the Web UI. Each Provider remembers its last selected model.
 
 ## Compatible Model Support
 
-AnyBot can configure Anthropic API-compatible services separately for Codex and Claude Code from settings. Built-in Base URL suggestions currently include DeepSeek, Kimi, MiniMax, Aliyun Token Plan, VibeAPI, Ollama (local), and llama (local); you can also manually enter another compatible service URL.
+Choose the connection mode that matches the service's API protocol:
 
-Codex connects to compatible services through the **Responses compatibility layer**. When enabled, the Codex Provider uses AnyBot's local compatibility service configuration and model mapping with an isolated `CODEX_HOME`, so it does not affect the user's global `~/.codex` configuration.
+| Provider setting | Connection |
+|------------------|------------|
+| Codex: Custom upstream → Responses | Codex connects directly to an upstream supporting the OpenAI Responses API |
+| Codex: Custom upstream → Anthropic | AnyBot's local adapter translates requests to the Anthropic Messages API |
+| Claude Code: Anthropic-compatible interface | Connects to an Anthropic API-compatible service |
 
-Claude Code connects through the **Anthropic-compatible interface**. When enabled, the Claude Code Provider prefers AnyBot's configured Base URL, API Key, Auto/Opus/Sonnet/Haiku/Subagent model mappings, and optional external CLI path.
+Anthropic Base URL suggestions include DeepSeek, Kimi, MiniMax, Aliyun Token Plan, VibeAPI, Ollama (local), and llama (local); you can also enter another service URL. Codex uses an isolated `CODEX_HOME` when a custom upstream is enabled. Claude Code uses an isolated `CLAUDE_CONFIG_DIR` when its compatibility interface is enabled, keeping model configuration separate from global settings.
+
+CodeBuddy currently uses its official service with an API Key or CLI login credentials; it does not expose a custom compatibility endpoint.
 
 Common use cases:
 
@@ -167,7 +180,13 @@ Common use cases:
 - Remotely call the local Agent from Feishu, DingTalk, QQ, Telegram, or personal Weixin.
 - Combine project workspaces, skills, and automations for code analysis, scheduled checks, document generation, and similar local Agent tasks.
 
-After enabling **Responses compatibility layer** under **Settings -> Providers -> Codex**, the chat box shows only the stable aliases `gpt-5.5`, `gpt-mini`, and `gpt-codex`. The actual upstream models are controlled by the mapping in settings. The Claude Code compatibility interface maintains mappings by purpose: Auto, Opus, Sonnet, Haiku / Fast, and Subagent.
+With **Custom upstream** enabled for Codex, the chat box uses the aliases `gpt-5.6-sol`, `gpt-mini`, and `gpt-codex`; the actual upstream models are controlled by the mappings in settings. The Claude Code compatibility interface maintains mappings by purpose: Auto, Opus, Sonnet, Haiku / Fast, and Subagent.
+
+### Local Ollama / llama Models
+
+Start the local model service, then select Ollama or llama in the Anthropic connection settings and enter the model name. Suggested addresses are `http://localhost:11434?anybot=ollama` and `http://localhost:8080?anybot=llama`. Keep the `anybot` marker when using a custom port; AnyBot removes it before sending requests. The API Key can be left empty for these local services.
+
+When Claude Code connects to these local backends, the effort slider becomes a **0.0–1.0 temperature control**. AnyBot also adapts mid-conversation system messages that local model templates cannot handle.
 
 ---
 
@@ -178,6 +197,9 @@ The Web UI is the recommended entry point:
 - Persistent multi-session history backed by SQLite.
 - Project management, project sessions, directory tree browsing, Git repository cloning and branch switching, and default working directory settings.
 - Markdown rendering, code copy, long-message folding, and context usage display.
+- HTML / Mermaid / SVG preview cards load on demand, with automatic HTML preview height and serialized Mermaid rendering to reduce work in messages containing multiple diagrams.
+- Card menus let you view or copy source, download HTML / SVG, and save Mermaid as high-resolution PNG. Diagram requests default to Mermaid output guidance.
+- Collapsible sidebar and direct folder opening from the home page project menu.
 - Streamed Agent activity, response cancellation, and `/compact` context compaction.
 - File uploads, image preview, and local image access.
 - Slash picker for Provider-specific skills, projects, and native Provider commands.
@@ -247,7 +269,7 @@ Channel config is stored in `.data/channels.json` and is best managed from the W
 }
 ```
 
-When `weixin.botAgent` is left empty, it defaults to the current app version (for example, `AnyBot/1.0.3`).
+When `weixin.botAgent` is left empty, it is generated from the current app version as `AnyBot/<version>`.
 
 ### Feishu
 
@@ -277,10 +299,13 @@ Skills are isolated by Provider:
 
 | Provider | Skill directory |
 |----------|-----------------|
-| `codex` | Native Codex mode uses `$CODEX_HOME/skills/`, defaulting to `~/.codex/skills/`; with Responses compatibility layer enabled, it uses `codex/skills/` under AnyBot's runtime data directory |
-| `claude-code` | `$CLAUDE_CONFIG_DIR/skills/`, defaulting to `~/.claude/skills/` |
+| `codex` | Scans `~/.agents/skills/` and `$CODEX_HOME/skills/` (default `~/.codex/skills/`); custom upstream mode maps the latter into `codex/skills/` under AnyBot's runtime data directory |
+| `claude-code` | User skills are in `$CLAUDE_CONFIG_DIR/skills/`, defaulting to `~/.claude/skills/`; compatibility mode maps them into `claude-code/skills/` under AnyBot's runtime data directory |
+| `codebuddy` | `~/.codebuddy/skills/` |
 
-The Web UI `/` picker shows skills, projects, and commands for the current Provider. Selected skills inject only skill names for the current turn. Selected projects inject project names and absolute paths for the current turn.
+The Plugins page can browse and download selected official skills for Codex / Claude Code from `openai/skills` and `anthropics/skills`, respectively. Codex official skills are installed in `~/.agents/skills/`. Enabling or disabling a skill switches its file between `SKILL.md` and `SKILL.md.disabled`, which also affects external CLIs using the same skill directory.
+
+The Web UI `/` picker shows skills and implemented native commands for the current Provider; projects are available globally. Selected skills inject only their names for the current turn, while selected projects inject names and absolute paths. A project session excludes its own project from the picker; only additional projects are included in the prompt. Channel commands are maintained separately from this menu.
 
 ---
 
@@ -288,7 +313,7 @@ The Web UI `/` picker shows skills, projects, and commands for the current Provi
 
 MCP Servers are managed in the **Plugins** page's "MCP Servers" tab, and their configuration is stored in `.data/app-settings.json`. AnyBot currently supports pasting an `mcpServers` JSON object or a single Server config containing `command` / `url`; supported types are `stdio`, `http`, and `sse`.
 
-Enabled MCP Servers are checked on app startup. You can also refresh, recheck, view logs, disable, or delete them from the Plugins page. After verification, the same MCP configuration is passed to Codex and Claude Code: Codex receives Codex CLI `mcp_servers` config, while Claude Code receives Claude Agent SDK `mcpServers` config.
+Enabled MCP Servers are checked on app startup. You can also refresh, recheck, view logs, disable, or delete them from the Plugins page. The same MCP configuration serves Codex, Claude Code, and CodeBuddy: Codex receives `mcp_servers` config, while Claude Code and CodeBuddy receive their SDKs' `mcpServers` config.
 
 ---
 
@@ -322,6 +347,8 @@ Each automation run creates a new local session and still goes through `ChatRunn
 
 Runtime data defaults to `.data/`, and logs default to `.run/`. Desktop builds use Electron's user data directory and keep `.data/`, `.run/`, and uploads there.
 
+Source runs can override the data directory with `DATA_DIR` or `CODEX_DATA_DIR`. The app does not read `.env` files; manage common settings from the Web UI. Data exports mask secrets by default; to migrate credentials, explicitly request `/api/data/export?includeSecrets=1` with an API token.
+
 Common files:
 
 - `.data/chat.db`: sessions, messages, projects, and automations.
@@ -333,7 +360,7 @@ Common files:
 - `.data/proxy.json`: proxy configuration.
 - `.data/disabled-skills.json`: skill enabled state.
 - `.data/change-reviews/`: change review snapshots.
-- `.data/codex/`: isolated `CODEX_HOME` used by the Codex Responses compatibility layer, including Codex sessions and skills.
+- `.data/codex/`: isolated `CODEX_HOME` used by Codex custom upstream mode, including Codex sessions and skills.
 - `.data/claude-code/`: isolated `CLAUDE_CONFIG_DIR` used by the Claude Code Anthropic-compatible interface.
 
 ---
@@ -347,7 +374,7 @@ Common files:
 - `src/chat-runner.ts` is the shared orchestration layer for Web UI and channel messages. It handles Provider sessions, project working directories, prompts, message persistence, streamed events, and change review.
 - `src/automation-scheduler.ts` is the local automation scheduler. It skips missed runs after restart, triggers due tasks, records run history, and delivers final results.
 - Web sessions and channel sessions bind to native Provider sessions, and follow-up messages use session resume to keep context.
-- Enabled MCP Servers are included in Provider call configuration for Codex and Claude Code tasks.
+- Enabled MCP Servers are included in Provider call configuration for Codex, Claude Code, and CodeBuddy tasks.
 - Project sessions use the project directory as the Provider working directory; normal chats use the default working directory.
 - Web UI uploads are saved under `tmp/uploads/` inside the working directory.
 - Local image paths and `FILE: /path/to/file.ext` directives in Agent replies are uploaded only for channels that support attachment return.
@@ -363,7 +390,8 @@ AnyBot/
 │   ├── automation-scheduler.ts     # Local automation scheduling, run history, delivery
 │   ├── app-settings.ts             # App settings
 │   ├── sandbox-config.ts           # Provider sandbox / permission settings
-│   ├── mcp-config.ts               # MCP config transformation (injected into Codex / Claude Code)
+│   ├── mcp-config.ts               # MCP config transformation for all three Providers
+│   ├── cli-runtime/                # CLI manifests, on-demand downloads, integrity checks
 │   ├── prompt.ts                   # Shared system prompt builder
 │   ├── shared.ts                   # Runtime config and path helpers
 │   ├── logger.ts                   # Structured logging
@@ -413,7 +441,7 @@ Use `src/providers/codex.ts` and `src/providers/claude-code.ts` as references.
 
 ## Release Notes
 
-See [release-notes.md](./release-notes.md) for the changelog of each release.
+See [release-notes.md](./release-notes.md) for the current release notes and [GitHub Releases](https://github.com/1935417243/AnyBot/releases) for previous versions.
 
 ## Contributing
 
