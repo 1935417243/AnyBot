@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
-import path from "node:path";
 
 import {
   createProvider,
@@ -310,15 +309,11 @@ export function resetChannelSession(chatId: string, source?: string): void {
   }
 }
 
-export function getSessionWorkdir(session: Pick<db.ChatSession, "projectId">): string {
-  if (!session.projectId) return getWorkdir();
-  const project = db.getProject(session.projectId);
-  if (!project) {
-    throw new Error("项目不存在");
-  }
-  const resolved = fs.realpathSync(path.resolve(project.path));
-  if (!fs.statSync(resolved).isDirectory()) {
-    throw new Error("项目路径必须是文件夹");
+/** 解析本轮运行的工作目录；兜底重建后仍不存在时给出明确提示，避免 Provider 报出误导性的 spawn ENOENT */
+function resolveTurnWorkdir(workdir?: string): string {
+  const resolved = workdir || getWorkdir();
+  if (!fs.existsSync(resolved)) {
+    throw new ChatTurnValidationError(`工作目录不可用：${resolved}，请检查磁盘或在设置中重新选择工作目录`);
   }
   return resolved;
 }
@@ -331,7 +326,7 @@ export function prepareChatTurn(opts: PrepareChatTurnOptions): PreparedChatTurn 
 
   const model = resolveRunModel(provider, opts.modelId);
   const effort = resolveRunEffort(provider, opts.effort);
-  const workdir = opts.workdir || getWorkdir();
+  const workdir = resolveTurnWorkdir(opts.workdir);
   const sandbox = getSandbox();
   const source = opts.session.source || "web";
   const userText = opts.userText.trim();
@@ -373,7 +368,7 @@ export function prepareProviderCommandTurn(
 
   const model = resolveRunModel(provider, opts.modelId);
   const effort = resolveRunEffort(provider, opts.effort);
-  const workdir = opts.workdir || getWorkdir();
+  const workdir = resolveTurnWorkdir(opts.workdir);
   const sandbox = getSandbox();
   const source = opts.session.source || "web";
   const prompt = getProviderSlashCommandPrompt(command);
@@ -686,7 +681,7 @@ export async function compactChatSession(opts: {
     throw new ChatTurnValidationError("当前 Provider 不支持上下文压缩", 409);
   }
 
-  const workdir = opts.workdir || getWorkdir();
+  const workdir = resolveTurnWorkdir(opts.workdir);
   const model = resolveRunModel(provider, opts.modelId);
   const effort = resolveRunEffort(provider, opts.effort);
   const sandbox = getSandbox();

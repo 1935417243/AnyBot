@@ -76,7 +76,16 @@ export function normalizeProjectPath(inputPath: string): string {
   if (!inputPath || typeof inputPath !== "string") {
     throw new Error("缺少项目路径");
   }
-  const resolved = fs.realpathSync(path.resolve(inputPath));
+  let resolved: string;
+  try {
+    resolved = fs.realpathSync(path.resolve(inputPath));
+  } catch (error) {
+    // 目录被删除或移走时，把 Node 原始 ENOENT 转成可读提示
+    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
+      throw new Error(`目录不存在或已被删除：${path.resolve(inputPath)}`);
+    }
+    throw error;
+  }
   const stat = fs.statSync(resolved);
   if (!stat.isDirectory()) {
     throw new Error("项目路径必须是文件夹");

@@ -190,6 +190,25 @@ function ensureDesktopDefaultWorkdir(workdir: string): void {
   copyWorkspaceMemoryFiles(path.join(__dirname, "agent", "md_files"), workdir);
 }
 
+/**
+ * 运行时兜底设置中的工作区：目录被删除时重建（仅最后一级），并补齐缺失的 AGENTS.md/MEMORY.md/PROFILE.md 模板。
+ * 尽力而为，不抛错；父目录不存在时（如外接磁盘未挂载）不创建，避免在本地生成错误的挂载点目录。
+ */
+export function ensureWorkspaceDir(workdir: string): void {
+  const resolved = path.resolve(workdir);
+  // 非桌面模式下默认工作区就是启动目录（开发时为仓库根），不往里写模板文件
+  if (resolved === path.resolve(process.cwd())) return;
+  try {
+    if (!existsSync(resolved)) {
+      if (!existsSync(path.dirname(resolved))) return;
+      mkdirSync(resolved);
+    }
+  } catch {
+    return;
+  }
+  copyWorkspaceMemoryFiles(path.join(__dirname, "agent", "md_files"), resolved);
+}
+
 function ensureConfig(): void {
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(CONFIG_PATH)) {

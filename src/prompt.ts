@@ -1,15 +1,46 @@
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const WORKSPACE_CONTEXT_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md"] as const;
 const MAX_WORKSPACE_CONTEXT_FILE_CHARS = 80_000;
+/** 内置工作区记忆模板目录（src/ 与 dist/ 下均为 agent/md_files） */
+const WORKSPACE_TEMPLATE_DIR = join(dirname(fileURLToPath(import.meta.url)), "agent", "md_files");
+/** 内容与内置模板一致（用户未填写）时跳过注入的文件 */
+const SKIP_UNFILLED_TEMPLATE_FILES: ReadonlySet<string> = new Set(["MEMORY.md", "PROFILE.md"]);
+/** 内置模板正文缓存，key 为文件名，null 表示模板不存在或读取失败 */
+const templateBodyCache = new Map<string, string | null>();
+
+/** 规范换行并去掉文件开头的 YAML frontmatter，只保留对模型有意义的正文 */
+function normalizeContextContent(raw: string): string {
+  return raw
+    .replace(/\r\n/g, "\n")
+    .trim()
+    .replace(/^---\n[\s\S]*?\n---(?:\n|$)/, "")
+    .trim();
+}
+
+/** 读取内置模板正文（已去 frontmatter），用于判断工作区文件是否仍为未填写的模板 */
+function readTemplateBody(filename: string): string | null {
+  if (templateBodyCache.has(filename)) return templateBodyCache.get(filename) ?? null;
+  let body: string | null = null;
+  try {
+    const file = join(WORKSPACE_TEMPLATE_DIR, filename);
+    if (existsSync(file)) body = normalizeContextContent(readFileSync(file, "utf8"));
+  } catch {
+    body = null;
+  }
+  templateBodyCache.set(filename, body);
+  return body;
+}
 
 function readWorkspaceContextFile(workdir: string, filename: string): string | null {
   const file = join(workdir, filename);
   if (!existsSync(file)) return null;
   try {
-    const content = readFileSync(file, "utf8").trim();
+    const content = normalizeContextContent(readFileSync(file, "utf8"));
     if (!content) return null;
+    if (SKIP_UNFILLED_TEMPLATE_FILES.has(filename) && content === readTemplateBody(filename)) return null;
     if (content.length <= MAX_WORKSPACE_CONTEXT_FILE_CHARS) return content;
     return [
       content.slice(0, MAX_WORKSPACE_CONTEXT_FILE_CHARS),
@@ -33,7 +64,7 @@ function buildWorkspaceContext(workdir: string): string | null {
   return [
     "## 工作区启动上下文",
     "",
-    "下面是程序在本次新会话开始前已直接读取的工作目录文件内容。你必须视为已经完成启动读取步骤，遵循其中规则和记忆；不要为了首轮启动再次调用工具读取这些文件。只有在需要确认磁盘最新内容、修改记忆或用户明确要求时，才访问这些文件。",
+    "以下工作目录文件已由程序读取，请遵循其中规则和记忆，无需再用工具读取；仅在修改记忆或用户要求时访问。",
     "",
     ...sections,
   ].join("\n");
@@ -64,24 +95,11 @@ export function buildSystemPrompt(options: {
     "输出 mermaid 前自检语法（节点 id 合法、标签含特殊字符时用引号包裹、箭头语法正确），确保可直接渲染。",
   ].join("\n");
 
-  if (options.isFirstTurn !== false && includeWorkspaceMemory) {
-    const workspaceContext = buildWorkspaceContext(options.workdir);
-    if (workspaceContext) {
-      const parts = [env, launchRule, diagramRule, workspaceContext];
-      if (options.extraPrompt?.trim()) parts.push(options.extraPrompt.trim());
-      return parts.join("\n\n");
-    }
-  }
-
   const parts = [env, launchRule, diagramRule];
 
   if (options.isFirstTurn !== false && includeWorkspaceMemory) {
-    parts.push(
-      [
-        "工作目录下未找到 AGENTS.md、MEMORY.md 或 PROFILE.md。",
-        "这是新会话的第一条消息，后续消息不会重复此提示。只有在用户明确要求或需要写入记忆时，才按需访问这些文件。",
-      ].join("\n"),
-    );
+    const workspaceContext = buildWorkspaceContext(options.workdir);
+    if (workspaceContext) parts.push(workspaceContext);
   }
 
   if (options.extraPrompt?.trim()) {

@@ -34,6 +34,7 @@ import {
 } from "./shared.js";
 import { startDesktopUpdateAutoCheck } from "./web/services/desktop-update.js";
 import { verifyMcpServersOnStartup } from "./web/services/mcp.js";
+import { getSessionWorkdir } from "./web/services/projects.js";
 import {
   createActiveAgentStream,
   emitAgentStream,
@@ -44,7 +45,6 @@ import {
 import {
   canStreamPreparedChatTurn,
   createChannelSession,
-  getSessionWorkdir,
   getOrCreateChannelSession,
   prepareChatTurn,
   resetChannelSession,

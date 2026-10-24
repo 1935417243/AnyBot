@@ -257,6 +257,10 @@ export class CodeBuddyProvider implements IProvider {
                     setTimeout(() => reject(new Error("获取模型列表超时")), MODELS_FETCH_TIMEOUT_MS);
                 }),
             ]);
+            logger.info("provider.models.raw_response", {
+                provider: this.type,
+                models,
+            });
             // CLI 实际返回 { id, name }（d.ts 声明的 ModelInfo 字段名与运行时不一致），做容错映射
             return models
                 .map((model) => {

@@ -1,6 +1,5 @@
 import {
   canStreamPreparedChatTurn,
-  getSessionWorkdir,
   prepareChatTurn,
   runPreparedChatTurn,
 } from "../../chat-runner.js";
@@ -30,6 +29,7 @@ import {
   type AutomationDeliveryStatus,
   type AutomationRun,
 } from "./automations.js";
+import { getSessionWorkdir } from "./projects.js";
 import { prepareWebChatInput } from "./web-chat-input.js";
 
 const LOCAL_CHANNEL_TYPE = "local";
