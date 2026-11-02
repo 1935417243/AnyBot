@@ -1,0 +1,23 @@
+release-notes.md
+  s_9d7057d7bdc42b::t_f1e802c1410da8 8,10-12
+package.json
+  s_9d7057d7bdc42b::t_b50ce3fb4a1713 3
+package-lock.json
+  s_9d7057d7bdc42b::t_2f2d94710379fc 3,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "29e5eda1fec82f0e4624a76b40091d79cd5145aa",
+  "prompts": {},
+  "sessions": {
+    "s_9d7057d7bdc42b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0ef6d915-2ae8-4c65-a054-6f6f3c3f7b91",
+        "model": "grok-4.7"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
