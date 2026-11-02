@@ -31,9 +31,9 @@ export interface CliTargetSpec {
 const CODEX_CLI_VERSION = "0.148.0";
 const CLAUDE_CODE_PACKAGE_VERSION = "0.3.237";
 // CodeBuddy 是单一通用 npm 包（不按平台拆分），bin/codebuddy 为 node 脚本入口
-const CODEBUDDY_PACKAGE_VERSION = "2.137.1";
-const CODEBUDDY_INTEGRITY = "sha512-8tdT/WCHIIgcKxfWVZ/wbu5Z+u/K7fugquMMbtIgld0suQ16salO9gI0l/eqzBUVC/5m31aV818/RL1ZYZ/CMQ==";
-const CODEBUDDY_SIZE_BYTES = 42_415_169;
+const CODEBUDDY_PACKAGE_VERSION = "2.179.2";
+const CODEBUDDY_INTEGRITY = "sha512-zLNe/ltWkCFmbwMTRGddlmTocjzlPyXiUBVBovIe6msrT+sncb8Bc4rFDEvExUYpyoTdUSAoPipmVcs+B/YtJg==";
+const CODEBUDDY_SIZE_BYTES = 65_864_222;
 
 /** Codex 各 target triple 对应的平台版本后缀（与 @openai/codex 主包 optionalDependencies 的 alias 对齐） */
 const CODEX_PLATFORM_SUFFIX_BY_TRIPLE: Record<string, string> = {
