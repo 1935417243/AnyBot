@@ -81,7 +81,7 @@ if not exist ".data" mkdir ".data"
 if not exist ".run" mkdir ".run"
 
 if exist "resources\\md_files" (
-  for %%F in (AGENTS.md MEMORY.md PROFILE.md BOOTSTRAP.md) do (
+  for %%F in (AGENTS.md MEMORY.md BOOTSTRAP.md) do (
     if not exist "%%F" copy "resources\\md_files\\%%F" "%%F" >nul
   )
 )
@@ -140,7 +140,7 @@ function Open-AnyBotWindow {
 New-Item -ItemType Directory -Force -Path ".data", ".run" | Out-Null
 
 if (Test-Path "resources\\md_files") {
-  foreach ($file in "AGENTS.md", "MEMORY.md", "PROFILE.md", "BOOTSTRAP.md") {
+  foreach ($file in "AGENTS.md", "MEMORY.md", "BOOTSTRAP.md") {
     if (-not (Test-Path $file)) {
       Copy-Item (Join-Path "resources\\md_files" $file) $file
     }
@@ -201,7 +201,7 @@ Add-PathEntry "\${env:ProgramFiles(x86)}\\nodejs"
 New-Item -ItemType Directory -Force -Path ".data", ".run" | Out-Null
 
 if (Test-Path "resources\\md_files") {
-  foreach ($file in "AGENTS.md", "MEMORY.md", "PROFILE.md", "BOOTSTRAP.md") {
+  foreach ($file in "AGENTS.md", "MEMORY.md", "BOOTSTRAP.md") {
     if (-not (Test-Path $file)) {
       Copy-Item (Join-Path "resources\\md_files" $file) $file
     }
@@ -249,7 +249,7 @@ cd "$DIR"
 mkdir -p ".data" ".run"
 
 if [ -d "resources/md_files" ]; then
-  for f in AGENTS.md MEMORY.md PROFILE.md BOOTSTRAP.md; do
+  for f in AGENTS.md MEMORY.md BOOTSTRAP.md; do
     if [ ! -f "$f" ]; then
       cp "resources/md_files/$f" "$f"
     fi

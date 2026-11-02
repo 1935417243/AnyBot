@@ -107,7 +107,7 @@ const MAX_PROVIDER_TIMEOUT_MS = 2_147_000_000;
 const DESKTOP_DEFAULT_WORKDIR_NAME = "AnyBotData";
 const WINDOWS_HOME_WORKDIR_NAME = "AnyBotWorkspace";
 const WINDOWS_INSTALL_WORKDIR_NAME = "anybotworkspace";
-const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md"];
+const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md"];
 
 function isDesktopRuntime(): boolean {
   return process.env.ANYBOT_DESKTOP === "1";
@@ -191,7 +191,7 @@ function ensureDesktopDefaultWorkdir(workdir: string): void {
 }
 
 /**
- * 运行时兜底设置中的工作区：目录被删除时重建（仅最后一级），并补齐缺失的 AGENTS.md/MEMORY.md/PROFILE.md 模板。
+ * 运行时兜底设置中的工作区：目录被删除时重建（仅最后一级），并补齐缺失的 AGENTS.md/MEMORY.md 模板。
  * 尽力而为，不抛错；父目录不存在时（如外接磁盘未挂载）不创建，避免在本地生成错误的挂载点目录。
  */
 export function ensureWorkspaceDir(workdir: string): void {

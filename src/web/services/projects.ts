@@ -11,6 +11,7 @@ import * as db from "../db.js";
 import { emitProjectsChanged, emitSessionsChanged } from "../events.js";
 
 const execFile = promisify(execFileCallback);
+/** 工作区迁移与清空保护文件；PROFILE.md 仅为兼容旧工作区保留 */
 const WORKSPACE_MEMORY_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md"] as const;
 const GIT_OUTPUT_LIMIT = 1024 * 1024;
 const GIT_CREDENTIALS_PATH = path.join(getDataDir(), "git-credentials.json");

@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/** PROFILE.md 仅为兼容旧工作区保留读取，新工作区统一使用 MEMORY.md */
 const WORKSPACE_CONTEXT_FILES = ["AGENTS.md", "MEMORY.md", "PROFILE.md"] as const;
 const MAX_WORKSPACE_CONTEXT_FILE_CHARS = 80_000;
 /** 内置工作区记忆模板目录（src/ 与 dist/ 下均为 agent/md_files） */
