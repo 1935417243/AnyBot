@@ -1,0 +1,34 @@
+src/agent/md_files/AGENTS.md
+  s_8b9cfd92daa3cc::t_a1f60df93c2f07 1-3,5-8,43,45
+  s_8b9cfd92daa3cc::t_c0ac5d3e32f436 12,18-19,25
+src/agent/md_files/MEMORY.md
+  s_8b9cfd92daa3cc::t_3fd63044ef3421 2,7,9-12,14,16-20,22,24,33-36
+src/app-settings.ts
+  s_8b9cfd92daa3cc::t_6284427fd2a4eb 110
+  s_8b9cfd92daa3cc::t_39dcebed436bc1 194
+electron/main.cjs
+  s_8b9cfd92daa3cc::t_b9d8e4d00cd52f 110
+src/prompt.ts
+  s_8b9cfd92daa3cc::t_bf8219d451e30f 5
+src/web/services/projects.ts
+  s_8b9cfd92daa3cc::t_82289e23c6870d 14
+scripts/package-portable.mjs
+  s_8b9cfd92daa3cc::t_19038c5a5a075d 84,252
+  s_8b9cfd92daa3cc::t_2f06b5d59fb645 143,204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "2aee5ebb4a1536881f1bdc1a98ed97b3a2232dc4",
+  "prompts": {},
+  "sessions": {
+    "s_8b9cfd92daa3cc": {
+      "agent_id": {
+        "tool": "Kimi Code",
+        "id": "session_68e18f7d-1384-4fc6-880c-41180afe4d99",
+        "model": ""
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
