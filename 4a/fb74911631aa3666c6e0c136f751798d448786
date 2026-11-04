@@ -1,0 +1,21 @@
+release-notes.md
+  s_a9effd8d701e45::t_d7925f671b4725 8,10-15
+package.json
+  s_a9effd8d701e45::t_c8073155c8e104 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "4afb74911631aa3666c6e0c136f751798d448786",
+  "prompts": {},
+  "sessions": {
+    "s_a9effd8d701e45": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "36d970d6-c68a-4fe6-bb41-e12996a6d3f3",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
