@@ -90,6 +90,8 @@ const DEFAULT_CODEX_CONTEXT_WINDOW = 200000;
 const CODEX_NPM_NAME = "@openai/codex";
 const CODEX_BUNDLED_BIN_LABEL = "bundled Codex CLI";
 const CODEX_DOWNLOADED_BIN_LABEL = "已下载的 Codex CLI";
+/** responses 直连时上游 API Key 的环境变量名，经 model_providers.anybot.env_key 交给 Codex；CLI 0.166 起自定义 provider 不再读取 CODEX_API_KEY */
+const CODEX_UPSTREAM_API_KEY_ENV = "ANYBOT_CODEX_UPSTREAM_API_KEY";
 const moduleRequire = createRequire(import.meta.url);
 
 const CODEX_MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -562,8 +564,9 @@ async function readLatestCodexTokenCountInfo(
     if (!line.trim()) continue;
     try {
       const event: unknown = JSON.parse(line);
-      if (isCodexTokenCountEvent(event)) {
-        latest = event.payload?.info || null;
+      // 仅更新账号限额的 token_count 事件 info 为 null，不能覆盖之前的用量
+      if (isCodexTokenCountEvent(event) && event.payload?.info) {
+        latest = event.payload.info;
       }
     } catch {
       continue;
@@ -615,18 +618,21 @@ function itemStatus(item: ThreadItem): "running" | "success" | "failed" {
 
 function extractContextUsageFromTokenCount(
   info: CodexTokenCountInfo | null,
+  fallbackMaxTokens?: number,
 ): ProviderContextUsage | undefined {
   if (!info) return undefined;
 
-  const maxTokens = getNumber(info.model_context_window);
+  const maxTokens = getNumber(info.model_context_window) || fallbackMaxTokens;
   if (!maxTokens) return undefined;
 
-  const usage = info.total_token_usage || info.last_token_usage;
+  // total_token_usage 是每次请求用量的累加（计费口径），当前上下文占用只能取最近一次请求
+  const usage = info.last_token_usage;
   if (!usage) return undefined;
 
   const inputTokens = getUsageNumber(usage, "input_tokens");
   const outputTokens = getUsageNumber(usage, "output_tokens");
-  const usedTokens = calculateCodexUsedTokens(inputTokens, outputTokens);
+  const usedTokens =
+    getUsageNumber(usage, "total_tokens") || calculateCodexUsedTokens(inputTokens, outputTokens);
   if (!usedTokens) return undefined;
 
   return buildContextUsage(usedTokens, maxTokens, {
@@ -636,24 +642,12 @@ function extractContextUsageFromTokenCount(
   });
 }
 
+// SDK turn.completed 的 usage 是整条线程的累计值，不能用来估算上下文占用
 function extractContextUsage(
-  usage: Usage | null,
   tokenCountInfo: CodexTokenCountInfo | null,
   model?: string,
 ): ProviderContextUsage | undefined {
-  const tokenCountUsage = extractContextUsageFromTokenCount(tokenCountInfo);
-  if (tokenCountUsage) return tokenCountUsage;
-
-  if (!usage) return undefined;
-  return buildContextUsage(
-    calculateCodexUsedTokens(usage.input_tokens, usage.output_tokens),
-    getCodexContextWindowForModel(model),
-    {
-      inputTokens: usage.input_tokens,
-      outputTokens: usage.output_tokens,
-      cacheReadInputTokens: usage.cached_input_tokens,
-    },
-  );
+  return extractContextUsageFromTokenCount(tokenCountInfo, getCodexContextWindowForModel(model));
 }
 
 export async function readLatestCodexContextUsage(
@@ -757,9 +751,11 @@ export class CodexProvider implements IProvider {
   private buildCompatCodexOptions(): Pick<CodexOptions, "env" | "apiKey" | "baseUrl"> {
     const env = this.buildIsolatedCodexEnv();
     if (this.codexUpstreamFormat === "responses") {
+      const apiKey = this.codexApiKey || "anybot-codex-responses";
+      env[CODEX_UPSTREAM_API_KEY_ENV] = apiKey;
       return {
         env,
-        apiKey: this.codexApiKey || "anybot-codex-responses",
+        apiKey,
         baseUrl: this.codexAnthropicBaseUrl,
       };
     }
@@ -870,7 +866,7 @@ export class CodexProvider implements IProvider {
     const contextModel = this.resolveContextModel(model);
 
     const buildCurrentContextUsage = (): ProviderContextUsage | undefined =>
-      extractContextUsage(usage, tokenCountInfo, contextModel);
+      extractContextUsage(tokenCountInfo, contextModel);
 
     const emitCodexAnswerDone = async (): Promise<ProviderContextUsage | undefined> => {
       if (!emitEvent || answerDoneEmitted) return undefined;
@@ -979,6 +975,10 @@ export class CodexProvider implements IProvider {
             });
           } else if (event.type === "turn.completed") {
             usage = event.usage;
+            if (emitEvent) {
+              tokenCountInfo =
+                (await readLatestCodexTokenCountInfo(providerSessionId, this.codexHome)) || tokenCountInfo;
+            }
             earlyContextUsage = (await emitCodexAnswerDone()) || earlyContextUsage;
           } else if (event.type === "turn.failed") {
             throw new ProviderProcessError(1, event.error.message);
@@ -1022,7 +1022,7 @@ export class CodexProvider implements IProvider {
       }
 
       let contextUsage = earlyContextUsage;
-      tokenCountInfo = tokenCountInfo || (await readLatestCodexTokenCountInfo(providerSessionId, this.codexHome));
+      tokenCountInfo = (await readLatestCodexTokenCountInfo(providerSessionId, this.codexHome)) || tokenCountInfo;
       const finalContextUsage = buildCurrentContextUsage();
       if (onEvent) {
         contextUsage = finalContextUsage || contextUsage;
@@ -1139,6 +1139,7 @@ export class CodexProvider implements IProvider {
           name: "AnyBot Codex Adapter",
           base_url: baseUrl,
           wire_api: "responses",
+          ...(this.codexUpstreamFormat === "responses" ? { env_key: CODEX_UPSTREAM_API_KEY_ENV } : {}),
         },
       };
       // responses 直连时请求上游返回推理摘要，否则 reasoning item 的 text 为空、前端看不到思考过程

@@ -98,6 +98,8 @@ type AnthropicResponse = {
     input_tokens?: number;
     output_tokens?: number;
     cache_read_input_tokens?: number;
+    /** 本次请求写入提示词缓存的输入 token 数，不计入 input_tokens */
+    cache_creation_input_tokens?: number;
   };
 };
 
@@ -596,9 +598,11 @@ function outputText(output: ResponsesOutputItem[]): string {
 }
 
 function usageFromAnthropic(usage: AnthropicResponse["usage"]): ResponsesUsage {
-  const inputTokens = usage?.input_tokens || 0;
-  const outputTokens = usage?.output_tokens || 0;
   const cachedTokens = usage?.cache_read_input_tokens || 0;
+  // Anthropic 的 input_tokens 不含缓存读写部分，Responses 的 input_tokens 需包含，Codex 据此统计上下文占用
+  const inputTokens =
+    (usage?.input_tokens || 0) + cachedTokens + (usage?.cache_creation_input_tokens || 0);
+  const outputTokens = usage?.output_tokens || 0;
   return {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
@@ -812,8 +816,22 @@ async function streamAnthropicResponse(
   const output = response.output as ResponsesOutputItem[];
   const blocks = new Map<number, StreamBlockState>();
   const adapterRunId = getString(req.params.runId).trim();
-  let inputTokens = 0;
-  let outputTokens = 0;
+  /** 上游流式事件中累积的 usage，结束时统一转换为 Responses 口径 */
+  const streamUsage: NonNullable<AnthropicResponse["usage"]> = {};
+  /** message_delta 的计数是累计值，只用正数覆盖，避免上游补发 0 冲掉 message_start 的数据 */
+  const mergeStreamUsage = (source: unknown) => {
+    if (!source || typeof source !== "object") return;
+    const record = source as JsonObject;
+    for (const key of [
+      "input_tokens",
+      "output_tokens",
+      "cache_read_input_tokens",
+      "cache_creation_input_tokens",
+    ] as const) {
+      const value = getNumber(record[key]);
+      if (value) streamUsage[key] = value;
+    }
+  };
 
   const sendCreated = () => {
     writeSse(res, "response.created", makeLifecycle("response.created", nextSeq(), response));
@@ -827,8 +845,7 @@ async function streamAnthropicResponse(
       const message = payload.message as JsonObject | undefined;
       response.id = getString(message?.id) || response.id;
       response.model = requestedModel || getString(message?.model) || response.model;
-      const usage = message?.usage as JsonObject | undefined;
-      inputTokens = getNumber(usage?.input_tokens) || 0;
+      mergeStreamUsage(message?.usage);
       if (!createdSent) {
         createdSent = true;
         sendCreated();
@@ -857,8 +874,7 @@ async function streamAnthropicResponse(
     }
 
     if (type === "message_delta") {
-      const usage = payload.usage as JsonObject | undefined;
-      outputTokens = getNumber(usage?.output_tokens) || outputTokens;
+      mergeStreamUsage(payload.usage);
     }
   };
 
@@ -869,12 +885,7 @@ async function streamAnthropicResponse(
 
     response.status = "completed";
     response.output_text = outputText(output);
-    response.usage = {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      total_tokens: inputTokens + outputTokens,
-      input_tokens_details: { cached_tokens: 0 },
-    };
+    response.usage = usageFromAnthropic(streamUsage);
     rememberThinking(req, outputToAnthropicContent(output, toolConversion));
     writeSse(res, "response.completed", makeLifecycle("response.completed", nextSeq(), response));
     res.end();

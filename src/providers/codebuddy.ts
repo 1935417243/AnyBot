@@ -1,4 +1,5 @@
 import {
+    type AssistantMessage,
     type Message,
     type Options,
     type PermissionMode,
@@ -12,6 +13,7 @@ import type {
 import type {
     IProvider,
     ProviderCapabilities,
+    ProviderContextUsage,
     ProviderModel,
     ProviderStreamEvent,
     RunOptions,
@@ -134,6 +136,80 @@ function mergeStreamedAndFinalResponse(streamed: string, finalResult: string): s
     if (finalText.endsWith(streamedText) || finalText.includes(streamedText)) return finalText;
     if (streamedText.includes(finalText)) return streamedText;
     return `${streamedText}\n\n${finalText}`;
+}
+
+/** CLI 写入 result._meta 的当前上下文占用（最近一次请求的输入 token，已含缓存命中） */
+const CONTEXT_USED_META_KEY = "codebuddy.ai/contextUsed";
+/** CLI 写入 result._meta 的有效上下文窗口；仅在 CBC_SESSION_CONFIG_SYNC=1 时下发，默认需用 modelUsage 兜底 */
+const CONTEXT_WINDOW_META_KEY = "codebuddy.ai/contextWindow";
+
+/** CLI 运行时附加在 result 消息上、但 SDK d.ts 未声明的用量字段 */
+interface CodeBuddyResultUsageExtras {
+    /** 按模型聚合的整轮 token 用量（计费口径），contextWindow 取自模型配置的 maxInputTokens */
+    modelUsage?: Record<string, {contextWindow?: number} | undefined>;
+    /** ACP 扩展元数据，含 codebuddy.ai/contextUsed、codebuddy.ai/contextWindow 等字段 */
+    _meta?: Record<string, unknown>;
+}
+
+/** 判断是否为 SDK 的 assistant 消息 */
+function isSdkAssistantMessage(message: Message): message is AssistantMessage {
+    return message.type === "assistant";
+}
+
+/** 读取有限正数，缺失或非法值统一返回 0 */
+function getPositiveNumber(value: unknown): number {
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** 组装上下文占用；已用或窗口大小缺失时返回 undefined，前端保持空态 */
+function buildContextUsage(
+    usedTokens: number,
+    maxTokens: number,
+    tokenBreakdown?: Partial<Pick<ProviderContextUsage, "inputTokens" | "outputTokens" | "cacheReadInputTokens">>,
+): ProviderContextUsage | undefined {
+    if (usedTokens <= 0 || maxTokens <= 0) return undefined;
+
+    const usedPercentage = Math.min(100, Math.round((usedTokens / maxTokens) * 1000) / 10);
+    return {
+        usedTokens,
+        maxTokens,
+        usedPercentage,
+        remainingPercentage: Math.max(0, Math.round((100 - usedPercentage) * 10) / 10),
+        ...tokenBreakdown,
+        source: "codebuddy",
+    };
+}
+
+/**
+ * 解析本轮结束时的上下文占用。
+ * 窗口大小：优先 _meta 下发值，否则按最后一条主代理回复的模型取 modelUsage[model].contextWindow。
+ * 已用：优先 CLI 计算的 contextUsed；续聊且未显式指定模型时 CLI 会跳过该字段，此时用最后一次请求的 usage。
+ * CodeBuddy 的 input_tokens 已包含缓存命中，不能再叠加 cache_read_input_tokens；
+ * modelUsage 的 token 是整轮累加值，不能用来估算当前占用。
+ */
+function extractContextUsage(
+    result: ResultMessage,
+    lastAssistantMessage: AssistantMessage | null,
+): ProviderContextUsage | undefined {
+    const extras = result as unknown as CodeBuddyResultUsageExtras;
+    const modelUsage = extras.modelUsage || {};
+    const assistantModel = lastAssistantMessage?.message.model;
+    const maxTokens = getPositiveNumber(extras._meta?.[CONTEXT_WINDOW_META_KEY])
+        || (assistantModel ? getPositiveNumber(modelUsage[assistantModel]?.contextWindow) : 0)
+        || Object.values(modelUsage).map((entry) => getPositiveNumber(entry?.contextWindow)).find((value) => value > 0)
+        || 0;
+
+    const contextUsed = getPositiveNumber(extras._meta?.[CONTEXT_USED_META_KEY]);
+    if (contextUsed) return buildContextUsage(contextUsed, maxTokens);
+
+    const usage = lastAssistantMessage?.message.usage;
+    const inputTokens = getPositiveNumber(usage?.input_tokens);
+    const outputTokens = getPositiveNumber(usage?.output_tokens);
+    return buildContextUsage(inputTokens + outputTokens, maxTokens, {
+        inputTokens,
+        outputTokens,
+        cacheReadInputTokens: getPositiveNumber(usage?.cache_read_input_tokens),
+    });
 }
 
 /** 模型清单兜底（尚未从 CLI 实时拉取成功前仅暴露 Auto） */
@@ -368,6 +444,8 @@ export class CodeBuddyProvider implements IProvider {
 
         try {
             let resultMessage: ResultMessage | null = null;
+            /** 最后一条带用量的主代理回复，用于兜底计算上下文占用与匹配模型窗口 */
+            let lastAssistantMessage: AssistantMessage | null = null;
             let streamedResponseText = "";
             const env: NodeJS.ProcessEnv = {...process.env};
             env.CODEBUDDY_INTERNET_ENVIRONMENT = CODEBUDDY_ENVIRONMENT;
@@ -509,17 +587,27 @@ export class CodeBuddyProvider implements IProvider {
                         }
                     }
 
+                    // 子代理回复的用量反映的是子代理自己的上下文，不计入主会话
+                    if (
+                        isSdkAssistantMessage(message)
+                        && !message.parent_tool_use_id
+                        && getPositiveNumber(message.message?.usage?.input_tokens) > 0
+                    ) {
+                        lastAssistantMessage = message;
+                    }
+
                     if (isSdkResultMessage(message)) {
                         resultMessage = message;
                     }
                 }
                 // 返回值用于把闭包内的赋值带回主流程，保持后续控制流收窄有效
-                return {resultMessage, streamedResponseText};
+                return {resultMessage, lastAssistantMessage, streamedResponseText};
             })();
             // SDK 忽略 abort 时 for-await 可能永不结束；硬 deadline 强制 reject，由后台残留的 consuming 自行收尾
             consuming.catch(() => {});
             const consumed = await Promise.race([consuming, hardDeadline]);
             resultMessage = consumed.resultMessage;
+            lastAssistantMessage = consumed.lastAssistantMessage;
             streamedResponseText = consumed.streamedResponseText;
 
             clearTimeout(timer);
@@ -553,6 +641,7 @@ export class CodeBuddyProvider implements IProvider {
             }
 
             const responseText = mergeStreamedAndFinalResponse(streamedResponseText, resultMessage.result);
+            const contextUsage = extractContextUsage(resultMessage, lastAssistantMessage);
 
             if (!responseText && !opts.rawProviderCommand) {
                 logger.error("provider.exec.empty_response", {
@@ -585,6 +674,7 @@ export class CodeBuddyProvider implements IProvider {
             return {
                 text: responseText,
                 sessionId: resultMessage.session_id,
+                contextUsage,
             };
         } catch (err) {
             clearTimeout(timer);

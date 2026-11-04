@@ -28,7 +28,7 @@ export interface CliTargetSpec {
   binRelPath: string;
 }
 
-const CODEX_CLI_VERSION = "0.148.0";
+const CODEX_CLI_VERSION = "0.166.0";
 const CLAUDE_CODE_PACKAGE_VERSION = "0.3.237";
 // CodeBuddy 是单一通用 npm 包（不按平台拆分），bin/codebuddy 为 node 脚本入口
 const CODEBUDDY_PACKAGE_VERSION = "2.179.2";
@@ -46,21 +46,21 @@ const CODEX_PLATFORM_SUFFIX_BY_TRIPLE: Record<string, string> = {
 };
 
 const CODEX_INTEGRITY_BY_SUFFIX: Record<string, string> = {
-  "darwin-arm64": "sha512-xgBPFiF1fHUlRS7HE6wGB56LjBJh16kGD7b4TTbwdVBZNB4QDkTok+vdkAGrfpVkfKcwGNhPSKDgCw+KMZOVug==",
-  "darwin-x64": "sha512-qepQolhJutfOp+e9i7L3xsi8aoWeCUiiRq274WMWqRj50rKTrXxsuAgkAwDbqEfT3G5VynhYZuQvDsW37JgdNQ==",
-  "linux-x64": "sha512-uDT9s7AfMr9xLuJX3ZLVWHgHkUpCnZ33CZjZEdVQhrYCIErkDHsCW5TG290nNjaKngK0WxGt5uCcxeUHv9MWWA==",
-  "linux-arm64": "sha512-51DCd+izzk6n4mMh4w2utWj3lTLhSTnCOEJQfRh0LS9nBDkcYZcK3iSKOST6fByRIlLSXuLO33LlYYA1VPot6A==",
-  "win32-x64": "sha512-/Jg8eYw0BqTGNUpnrzzWlK2kbu29NWg7t6pnUDEfxqpTUf+mK8r3okXQn60Zjbk9InYZ4d8SwSjrtOa+i5hSPw==",
-  "win32-arm64": "sha512-a8iOwLzs8UdnlWDHjgK3W/YSBBsUImG8X5XLBjengp3XGJRruhiIsQtUDUOYimCmotKPM4aX7Ub6zjl/KPxMQQ==",
+  "darwin-arm64": "sha512-5fWH6qqUInACcRADIewjlnRxDb4QLe0uriwehiZz0+viuAAB8I+WWefqw4xwHvyKaxeiGX4uK56+vrgfvFk3FQ==",
+  "darwin-x64": "sha512-Vj5wXJPizKmrzNtnRNQf9PP6FJkG3iJU/UO3NE4WvkENZGoQfmImdwf4MVRI5NgwjSuC6LT0HbBRHPVVnwGHuw==",
+  "linux-x64": "sha512-CxDm3+D1cpbGJeHrdzINoG+3wn9BVncP4qpZaaNYkxe8iPtRJOYyCJnnPoVjWRIBvI9vPKbRoifsMSA5xDaUpw==",
+  "linux-arm64": "sha512-w0ScAsBr9aZKtIFrh6HN6KU2yjKKeSCzYfbb7DB0Ccj4BYPzeZtUeQprbycLCwuX3AFQdbdjapmLho2iot74jQ==",
+  "win32-x64": "sha512-NS8Ps5oG5r19pCrMCUXwUqOui6odnUIoBlQkrjCJ+h1k6KiwCzC/+mI9d3nSZCqFoVONPBTmqyq8NYq3YaFGyA==",
+  "win32-arm64": "sha512-LWO1cyGlxbKgeUM7QJ1a6QMSsJi++3PqgIi6BmIUBoj/kzZqRIR69UDMQgeU/9izzJFYMSbwt++lHnUFyjQXlA==",
 };
 
 const CODEX_SIZE_BY_SUFFIX: Record<string, number> = {
-  "darwin-arm64": 109_621_985,
-  "darwin-x64": 117_035_333,
-  "linux-x64": 120_485_045,
-  "linux-arm64": 113_658_035,
-  "win32-x64": 130_052_468,
-  "win32-arm64": 121_817_787,
+  "darwin-arm64": 147_077_955,
+  "darwin-x64": 156_633_428,
+  "linux-x64": 172_325_449,
+  "linux-arm64": 164_402_913,
+  "win32-x64": 180_706_795,
+  "win32-arm64": 168_971_160,
 };
 
 const CLAUDE_INTEGRITY_BY_TARGET: Record<string, string> = {
