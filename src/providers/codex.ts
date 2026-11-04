@@ -43,6 +43,7 @@ import { getCliExecutablePath } from "../cli-runtime/installer.js";
 import { resolveExecutable } from "../utils/process.js";
 import { getCodexHome, getCodexSkillsDir, getIsolatedCodexHome } from "../codex-config.js";
 import { getCodexMcpServersConfig } from "../mcp-config.js";
+import { getCodexNativeModels } from "./codex-models.js";
 
 export class ProviderTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -774,6 +775,9 @@ export class CodexProvider implements IProvider {
         { id: "gpt-codex", name: this.codexCodeModel || this.codexDefaultModel || "gpt-codex", description: "编程模型" },
       ];
     }
+
+    const nativeModels = getCodexNativeModels(this.executablePath);
+    if (nativeModels.length > 0) return nativeModels;
 
     return [
       { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", description: "最新通用模型" },
