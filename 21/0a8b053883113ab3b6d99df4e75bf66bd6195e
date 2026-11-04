@@ -1,0 +1,81 @@
+src/web/routes/data.ts
+  s_9ba63b10b440eb::t_a271bb86c9c27e 70,72
+  s_9ba63b10b440eb::t_3cb0f4be0d5902 17
+src/web/services/projects.ts
+  s_9ba63b10b440eb::t_c77229077958c4 735-736,739
+  s_9ba63b10b440eb::t_d87fdadb17ffef 11
+src/web/routes/projects.ts
+  s_9ba63b10b440eb::t_613b773d9a31e0 140
+  s_9ba63b10b440eb::t_e6f95a0ed75441 159
+src/web/public/scripts/app/sidebar/sidebar-controller.js
+  s_025d528ead3331::t_f6dbf42363e96e 1574-1586
+  s_025d528ead3331::t_5d65c3c7993609 365
+  s_025d528ead3331::t_a7d65981a44ee3 1-2
+  s_025d528ead3331::t_f6f2ec9933539b 1147
+src/chat-runner.ts
+  s_720671b0af6c2d::t_c5d7ea1f1f7992 531-533
+  s_720671b0af6c2d::t_36a6e9f0445913 467-469,473,481
+  s_720671b0af6c2d::t_a8b8351c40e059 444
+  s_720671b0af6c2d::t_d1a07b1e6aa72c 410-411
+  s_720671b0af6c2d::t_8097ee26ffcf38 607
+src/web/agent-stream.ts
+  s_720671b0af6c2d::t_52cd8484d4d409 20-23
+src/web/change-review.ts
+  s_9ba63b10b440eb::t_0e2026a92bc6e3 48-67
+  s_720671b0af6c2d::t_82a34419ae9ddd 99-121
+  s_720671b0af6c2d::t_17e020d46e451d 787-943
+  s_720671b0af6c2d::t_1b9fefd5070789 344-347,349-351,362-368,372,379-381,386-392,396-403,405-409,415-417
+  s_9ba63b10b440eb::t_d7c2a12bf2979c 944-1102
+  s_9ba63b10b440eb::t_7659a5b6d8e59f 581-584,588-592
+  s_9ba63b10b440eb::t_6d4c46a1061430 544
+  s_720671b0af6c2d::t_a12f15f141e5bf 507-510,512-515,518-519,521-523,528,530
+  s_720671b0af6c2d::t_2f2adcb8b02505 8
+  s_720671b0af6c2d::t_63a538b2d94f89 130-139
+  s_720671b0af6c2d::t_3926aa5563ccd5 318,321
+  s_720671b0af6c2d::t_850240eef31fbe 68-74,77-79,84-85,89-92
+  s_720671b0af6c2d::t_057f43a975e083 603-611,613-618,623,625-626,640-650,652-653,657-664
+  s_9ba63b10b440eb::t_f44310574cff87 685
+  s_720671b0af6c2d::t_f8e79cfea1e21a 665
+src/web/services/messages.ts
+  s_9ba63b10b440eb::t_3358c5cb09d41f 6-11
+  s_9ba63b10b440eb::t_af232c5723cb7b 195-207
+src/web/db.ts
+  s_9ba63b10b440eb::t_ae0e8c41cb1a3a 480,487
+  s_9ba63b10b440eb::t_77fc9ffe1291a1 477-479,481-486,488
+  s_9ba63b10b440eb::t_18b40459157c9d 761-772
+src/web/routes/sessions.ts
+  s_9ba63b10b440eb::t_8dbc96ae012438 177,187
+  s_9ba63b10b440eb::t_dd935be27c9e4f 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "210a8b053883113ab3b6d99df4e75bf66bd6195e",
+  "prompts": {},
+  "sessions": {
+    "s_025d528ead3331": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6f86861e-4185-4c54-86de-aab20915cca7",
+        "model": "grok-4.7"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_720671b0af6c2d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c1a5fffb-cf02-47b8-bd1d-864ce9737863",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_9ba63b10b440eb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f1e66964-645f-41c5-8260-080856c82d3f",
+        "model": "grok-4.7"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
