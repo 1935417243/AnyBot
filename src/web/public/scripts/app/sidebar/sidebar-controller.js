@@ -1,3 +1,5 @@
+import { showConfirmDialog } from "../ui/confirm-dialog.js";
+
 function getSessionSortTime(session) {
     return Number(session.updatedAt || session.createdAt || 0);
 }
@@ -360,7 +362,7 @@ export function createSidebarController(options) {
         del.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
         del.addEventListener("click", function (e) {
             e.stopPropagation();
-            options.deleteSession(session.id);
+            confirmAndDeleteSession(session);
         });
 
         item.appendChild(text);
@@ -1142,7 +1144,7 @@ export function createSidebarController(options) {
             btn.querySelector(".project-session-age").textContent = formatRelativeAge(session.updatedAt || session.createdAt);
             btn.querySelector(".project-session-delete").addEventListener("click", function (e) {
                 e.stopPropagation();
-                options.deleteSession(session.id);
+                confirmAndDeleteSession(session);
             });
             btn.addEventListener("click", function (e) {
                 e.stopPropagation();
@@ -1567,6 +1569,19 @@ export function createSidebarController(options) {
             return;
         }
         openAddProjectMenu();
+    }
+
+    /** 删除会话前弹出确认框，避免侧边栏叉号误触。 */
+    async function confirmAndDeleteSession(session) {
+        if (!session || !session.id) return;
+        var title = session.title || "未命名对话";
+        var confirmed = await showConfirmDialog({
+            title: "删除对话",
+            message: "将删除对话“" + title + "”，此操作不可撤销。",
+            confirmText: "删除对话",
+        });
+        if (!confirmed) return;
+        options.deleteSession(session.id);
     }
 
     return {

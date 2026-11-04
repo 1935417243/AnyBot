@@ -474,6 +474,18 @@ const stmts = {
         LIMIT ?
       )
   `),
+
+  listSessionMessageMetadata: db.prepare(`
+    SELECT metadata FROM messages
+    WHERE session_id = ? AND metadata IS NOT NULL AND instr(metadata, '"changeReview"') > 0
+  `),
+
+  listProjectSessionMessageMetadata: db.prepare(`
+    SELECT messages.metadata AS metadata
+    FROM messages
+    INNER JOIN sessions ON sessions.id = messages.session_id
+    WHERE sessions.project_id = ? AND messages.metadata IS NOT NULL AND instr(messages.metadata, '"changeReview"') > 0
+  `),
 };
 
 export function listProjects(): Project[] {
@@ -745,4 +757,16 @@ export function markRunningAutomationRunRowsInterrupted(finishedAt: number, erro
 
 export function deleteOldAutomationRunRows(automationId: string, keep = 100): void {
   stmts.deleteOldAutomationRuns.run(automationId, automationId, Math.max(1, Math.floor(keep)));
+}
+
+/** 读取会话消息的 metadata，供删除会话时找出变更审核文件 */
+export function listSessionMessageMetadata(sessionId: string): string[] {
+  const rows = stmts.listSessionMessageMetadata.all(sessionId) as Array<{ metadata: string }>;
+  return rows.map((row) => row.metadata);
+}
+
+/** 读取项目下会话消息的 metadata，供删除项目时找出变更审核文件 */
+export function listProjectSessionMessageMetadata(projectId: string): string[] {
+  const rows = stmts.listProjectSessionMessageMetadata.all(projectId) as Array<{ metadata: string }>;
+  return rows.map((row) => row.metadata);
 }

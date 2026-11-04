@@ -17,7 +17,10 @@ const MAX_TODO_CONTENT_TEXT = 200;
 
 export type AgentStreamEvent =
   | ClaudeAgentStreamEvent
-  | CodexAnswerDoneEvent
+  | (CodexAnswerDoneEvent & {
+      /** Codex 提前落库时随完成事件推送的变更审查 */
+      changeReview?: PublicChangeReview | null;
+    })
   | {
       type: "result";
       content: string;

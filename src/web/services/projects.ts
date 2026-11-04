@@ -8,6 +8,7 @@ import { logger } from "../../logger.js";
 import { generateId, getWorkdir } from "../../shared.js";
 import { spawnCommand } from "../../utils/process.js";
 import * as db from "../db.js";
+import { collectChangeReviewIdsFromMetadata, deleteChangeReviewFiles } from "../change-review.js";
 import { emitProjectsChanged, emitSessionsChanged } from "../events.js";
 
 const execFile = promisify(execFileCallback);
@@ -731,9 +732,11 @@ export async function cloneProjectFromGit(options: CloneProjectOptions): Promise
   }
 }
 
-export function deleteProject(projectId: string): boolean {
+export async function deleteProject(projectId: string): Promise<boolean> {
+  const metadata = db.listProjectSessionMessageMetadata(projectId);
   const deleted = db.deleteProject(projectId);
   if (!deleted) return false;
+  await deleteChangeReviewFiles(collectChangeReviewIdsFromMetadata(metadata));
   emitProjectsChanged(projectId, "project_deleted");
   emitSessionsChanged(undefined, "project_deleted");
   return true;

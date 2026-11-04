@@ -3,7 +3,12 @@ import type { ClaudeAgentStreamEvent } from "../../providers/claude-code-agent-e
 import { readLatestCodexContextUsage } from "../../providers/codex.js";
 import type { ProviderContextUsage } from "../../providers/types.js";
 import { compactAgentEvents } from "../agent-stream.js";
-import { getChangeReview } from "../change-review.js";
+import {
+  collectChangeReviewIdsFromMetadata,
+  deleteAllChangeReviewFiles,
+  deleteChangeReviewFiles,
+  getChangeReview,
+} from "../change-review.js";
 import * as db from "../db.js";
 
 const DEFAULT_SESSION_MESSAGE_LIMIT = 40;
@@ -186,4 +191,17 @@ async function hydrateChangeReviewMetadata(
       }
     }),
   );
+}
+
+/** 删除会话，并清掉该会话消息引用的变更审核文件 */
+export async function deleteSessionWithChangeReviews(sessionId: string): Promise<void> {
+  const metadata = db.listSessionMessageMetadata(sessionId);
+  db.deleteSession(sessionId);
+  await deleteChangeReviewFiles(collectChangeReviewIdsFromMetadata(metadata));
+}
+
+/** 清空全部会话，并删除变更审核目录 */
+export async function clearAllSessionsWithChangeReviews(): Promise<void> {
+  db.deleteAllSessions();
+  await deleteAllChangeReviewFiles();
 }

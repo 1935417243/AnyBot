@@ -407,6 +407,8 @@ export async function runPreparedChatTurn(
   let assistantContent = "";
   let assistantProviderSessionId = prepared.providerSessionId;
   let assistantContextUsage: RunResult["contextUsage"] | undefined;
+  /** 助手消息落库时附带的变更审查；Codex 提前落库后，最终 result 事件和返回值复用这份结果 */
+  let assistantChangeReview: PublicChangeReview | null = null;
 
   const persistAssistantMessage = (message: {
     content: string;
@@ -439,6 +441,7 @@ export async function runPreparedChatTurn(
     assistantContent = message.content;
     assistantProviderSessionId = message.providerSessionId;
     assistantContextUsage = message.contextUsage;
+    assistantChangeReview = message.changeReview;
     emitSessionsChanged(prepared.session.id, "assistant_message_added");
     return true;
   };
@@ -461,10 +464,13 @@ export async function runPreparedChatTurn(
         sessionId: providerSessionId || undefined,
         durationMs: event.durationMs,
       });
+      const changeReview = assistantMessageAdded
+        ? assistantChangeReview
+        : await safeCollectChangeReview(changeSnapshot);
       persistAssistantMessage({
         content: event.content,
         providerSessionId,
-        changeReview: null,
+        changeReview,
         contextUsage: event.contextUsage,
       });
       streamEvent = {
@@ -472,6 +478,7 @@ export async function runPreparedChatTurn(
         title: prepared.session.title,
         sessionId: providerSessionId,
         provider: "codex",
+        changeReview,
       };
     }
 
@@ -521,7 +528,9 @@ export async function runPreparedChatTurn(
 
     const providerSessionId = result.sessionId || assistantProviderSessionId || prepared.providerSessionId;
     const contextUsage = result.contextUsage || assistantContextUsage;
-    const changeReview = assistantMessageAdded ? null : await safeCollectChangeReview(changeSnapshot);
+    const changeReview = assistantMessageAdded
+      ? assistantChangeReview
+      : await safeCollectChangeReview(changeSnapshot);
     if (contextUsage && !assistantMessageAdded) {
       await emitStream({
         type: "context_usage",
@@ -595,7 +604,7 @@ export async function runPreparedChatTurn(
         title: prepared.session.title,
         sessionId: assistantProviderSessionId,
         provider: prepared.provider.type,
-        changeReview: null,
+        changeReview: assistantChangeReview,
         contextUsage: assistantContextUsage,
       };
     }

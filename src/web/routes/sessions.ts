@@ -6,7 +6,7 @@ import { getActiveRunInfo, hasActiveRun } from "../active-runs.js";
 import { getActiveAgentStreamInfo, hasActiveAgentStream } from "../agent-stream.js";
 import * as db from "../db.js";
 import { emitSessionsChanged } from "../events.js";
-import { prepareMessagesForClient, readMessagePageQuery } from "../services/messages.js";
+import { deleteSessionWithChangeReviews, prepareMessagesForClient, readMessagePageQuery } from "../services/messages.js";
 
 const DEFAULT_SESSION_LIST_LIMIT = 40;
 
@@ -174,7 +174,7 @@ export function createSessionsRouter(): Router {
     res.json({ content });
   });
 
-  router.delete("/sessions/:id", (req: Request, res: Response) => {
+  router.delete("/sessions/:id", async (req: Request, res: Response) => {
     const id = req.params.id as string;
     if (!db.getSessionMetadata(id)) {
       res.status(404).json({ error: "会话不存在" });
@@ -184,7 +184,7 @@ export function createSessionsRouter(): Router {
       res.status(423).json({ error: "当前会话正在处理中，请先停止后再删除" });
       return;
     }
-    db.deleteSession(id);
+    await deleteSessionWithChangeReviews(id);
     emitSessionsChanged(id, "session_deleted");
     res.json({ ok: true });
   });

@@ -10,11 +10,11 @@ import { logger, getLogDir } from "../../logger.js";
 import { applyProxy, isProxyFeatureEnabled } from "../../proxy.js";
 import { readSandboxConfig, setDefaultSandbox } from "../../sandbox-config.js";
 import { openDirectory } from "../../utils/open-directory.js";
-import * as db from "../db.js";
 import { emitHistoryCleared } from "../events.js";
 import { readModelConfig, writeModelConfig } from "../model-config.js";
 import { readProxyConfig, writeProxyConfig, type ProxyConfig } from "../proxy-config.js";
 import { getUploadDir } from "../services/files.js";
+import { clearAllSessionsWithChangeReviews } from "../services/messages.js";
 import {
   maskAppSettingsSecrets,
   maskChannelsConfig,
@@ -67,9 +67,9 @@ export function createDataRouter(): Router {
     }
   });
 
-  router.delete("/data/history", (_req: Request, res: Response) => {
+  router.delete("/data/history", async (_req: Request, res: Response) => {
     try {
-      db.deleteAllSessions();
+      await clearAllSessionsWithChangeReviews();
       emitHistoryCleared();
       logger.info("history.cleared");
       res.json({ ok: true });

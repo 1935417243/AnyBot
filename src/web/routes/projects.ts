@@ -137,7 +137,7 @@ export function createProjectsRouter(): Router {
     res.json({ found: true, ...credential });
   });
 
-  router.delete("/projects/:id", (req: Request, res: Response) => {
+  router.delete("/projects/:id", async (req: Request, res: Response) => {
     const projectId = req.params.id as string;
     if (!db.getProject(projectId)) {
       res.status(404).json({ error: "项目不存在" });
@@ -156,7 +156,7 @@ export function createProjectsRouter(): Router {
       return;
     }
 
-    if (!deleteProject(projectId)) {
+    if (!(await deleteProject(projectId))) {
       res.status(500).json({ error: "删除项目失败" });
       return;
     }
