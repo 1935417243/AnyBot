@@ -1,0 +1,65 @@
+src/providers/codebuddy.ts
+  s_ec50942cbc3a0e::t_f59027af46351a 644
+  s_ec50942cbc3a0e::t_2bf966e8a44d00 677
+  s_ec50942cbc3a0e::t_5c31965c181f13 141-214
+  s_ec50942cbc3a0e::t_a3002a7ca00aec 16
+  s_ec50942cbc3a0e::t_b0cd372edfaecb 447-448
+  s_ec50942cbc3a0e::t_16242867e57cfc 2
+  s_ec50942cbc3a0e::t_746b949a535a00 590-598,604,610
+src/web/services/codex-openai-adapter.ts
+  s_a52b8eb7507693::t_37d4ab942b7aa2 877
+  s_a52b8eb7507693::t_cec02b86c1d415 819-834
+  s_a52b8eb7507693::t_1c8391d16d32a1 101-102
+  s_a52b8eb7507693::t_22124c61b06cec 888
+  s_a52b8eb7507693::t_b41c58bcda1f36 848
+  s_a52b8eb7507693::t_222064c929d876 602-605
+src/providers/codex.ts
+  s_a52b8eb7507693::t_b6090dfe850637 567-569
+  s_a7894cd6fc883c::t_493e449bcaa3a9 93-94
+  s_a52b8eb7507693::t_a389de45082178 645,650
+  s_a7894cd6fc883c::t_9b3c73cdcacfbf 1142
+  s_a52b8eb7507693::t_6c0d56f7058dc3 621,625,628-629,634-635
+  s_a52b8eb7507693::t_af7d95286d8740 869
+  s_a52b8eb7507693::t_23436658966460 1025
+  s_a7894cd6fc883c::t_e4f7b883b82064 754-755,758
+  s_a52b8eb7507693::t_c4eb53313a888d 978-981
+src/cli-runtime/manifest.ts
+  s_a7894cd6fc883c::t_1a89f25841bd27 49-54,58-63
+  s_a7894cd6fc883c::t_0f78c484a087cd 31
+package.json
+  s_a7894cd6fc883c::t_51a38f1c2dd772 28
+package-lock.json
+  s_a7894cd6fc883c::t_ac2fcef6b99681 15,1311-1313,1322-1327,1332-1334,1349-1351,1366-1368,1383-1385,1399-1401,1404,1412-1414,1429-1431
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d3477ad6ac3a37f817e2705edabf1531d052c35d",
+  "prompts": {},
+  "sessions": {
+    "s_a52b8eb7507693": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3c2ff137-6bec-4530-b198-a3c21fb981d2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_a7894cd6fc883c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ea290467-2969-4710-9c25-4cc48f1ec5ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_ec50942cbc3a0e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a10f6be1-49cd-4aca-a7b3-8f5939e8364c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
