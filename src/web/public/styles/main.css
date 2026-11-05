@@ -184,8 +184,9 @@
             padding-top: 44px;
         }
 
-        /* Web 浏览器端：侧边栏收起后 Toggle 悬浮在会话头部左上角，为标题让出左侧空间 */
-        body.sidebar-collapsed:not(.platform-macos-desktop):not(.platform-windows-desktop) .conversation-header {
+        /* Windows 桌面端与 Web 浏览器端：侧边栏收起后 Toggle 悬浮在会话头部左上角，为标题让出左侧空间
+           （macOS 需额外避让红黄绿按钮，单独使用 116px） */
+        body.sidebar-collapsed:not(.platform-macos-desktop) .conversation-header {
             padding-left: 48px;
         }
 
