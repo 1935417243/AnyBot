@@ -1,0 +1,71 @@
+src/web/public/scripts/app/utils/platform.js
+  s_410c7377f24b8e::t_08b52481617704 1-7
+src/web/public/scripts/app/chat/session-controller.js
+  s_410c7377f24b8e::t_02b268f5435ef3 340-344
+  s_410c7377f24b8e::t_59ca6eb2c7eb95 48
+  s_410c7377f24b8e::t_967ff0a55f544f 112
+  s_410c7377f24b8e::t_0cfbd21c7e8995 79
+  s_410c7377f24b8e::t_bbff655f1764b9 378
+src/web/public/scripts/app/app/create-app.js
+  s_410c7377f24b8e::t_f50cebd8a564f7 746
+  s_410c7377f24b8e::t_59815d46f9d410 990-1014
+  s_410c7377f24b8e::t_d8e603c9d3645e 177-179
+  s_410c7377f24b8e::t_207a3b030abe18 457
+  s_410c7377f24b8e::t_aabc7d2fbe274c 28
+  s_410c7377f24b8e::t_926eb7ad32cbb5 791-793
+  s_410c7377f24b8e::t_3c6d69bfea959d 1202-1250
+  s_410c7377f24b8e::t_9c618a8c6e2007 35
+  s_410c7377f24b8e::t_55b5bff52c3d3b 651
+  s_410c7377f24b8e::t_6c82874cb34bb9 206-209
+  s_410c7377f24b8e::t_4bd853fce05fd8 1164-1165
+src/web/db.ts
+  s_410c7377f24b8e::t_7f86326321f21a 507-535
+  s_410c7377f24b8e::t_55e45c8adbd169 820-837
+  s_410c7377f24b8e::t_6ee6cc1a7d998e 44-61
+src/web/public/styles/session-search.css
+  s_410c7377f24b8e::t_0405456b9f7c8d 1-160
+src/web/public/index.html
+  s_410c7377f24b8e::t_7c5abea4361261 42,45
+  s_410c7377f24b8e::t_2d175bda571241 38
+  s_410c7377f24b8e::t_0b070786d2ce4e 46-57
+  s_410c7377f24b8e::t_b85a1624996b5d 58-76
+src/web/public/styles/sidebar.css
+  s_410c7377f24b8e::t_0ac68128622a8b 30-31,38,40-65,69-94
+src/web/public/scripts/app/app/dom.js
+  s_410c7377f24b8e::t_d9a2f0eb72eedc 138-142
+src/web/public/scripts/app/app/view-router.js
+  s_410c7377f24b8e::t_2074b8fe2f0c7b 51
+  s_410c7377f24b8e::t_2b1d80f3048aba 42
+  s_410c7377f24b8e::t_a603dbb9732137 60,67
+  s_410c7377f24b8e::t_d31ccaeb901145 125-127
+src/web/public/styles/main.css
+  s_410c7377f24b8e::t_e2f691ec237a60 189-190,192
+  s_410c7377f24b8e::t_f486f2ed520d8b 146-148,150,153-155,159,161,165,171
+src/web/public/scripts/app/app/navigation-history.js
+  s_410c7377f24b8e::t_6f9e1e14ee0eee 1-72,74-85,95-161,164,173-182
+  s_410c7377f24b8e::t_a5cf4f21c371ad 73,86-94
+  s_410c7377f24b8e::t_f8edf261c7540b 162-163,165-172
+src/web/services/session-search.ts
+  s_410c7377f24b8e::t_927003c4e81439 1-54
+src/web/routes/sessions.ts
+  s_410c7377f24b8e::t_099072bf5756d2 119-129
+  s_410c7377f24b8e::t_30e5e44388a591 10,13-14
+src/web/public/scripts/app/sidebar/session-search.js
+  s_410c7377f24b8e::t_9504d12c0eec2f 1-303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "e909451c243a7e85c575e94c0a2a6f7d505ba9bd",
+  "prompts": {},
+  "sessions": {
+    "s_410c7377f24b8e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "cc44a0c4-edd0-4450-a010-c9bdc077992f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
