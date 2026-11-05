@@ -33,6 +33,12 @@ import {
   type ChatPromptProject,
   type ChatPromptSkill,
 } from "../services/web-chat-input.js";
+import {
+  submitUserQuestionReply,
+  UserQuestionReplyError,
+  waitForUserQuestionReply,
+  type UserQuestionReplyBody,
+} from "../services/user-questions.js";
 
 function cleanProviderCommand(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -308,6 +314,7 @@ export function createMessagesRouter(): Router {
           stream: { emit },
           logPrefix: "web.chat.stream",
           logFields: { fileCount: input.fileCount, fileReferenceCount: input.fileReferenceCount, skillCount: input.skillCount, projectCount: input.projectCount },
+          waitForUserQuestionReply: (questionRequest, signal) => waitForUserQuestionReply(id, questionRequest, signal),
         });
       } catch {
         // runPreparedChatTurn 已记录日志并推送 error 事件，这里只负责收尾。
@@ -388,6 +395,23 @@ export function createMessagesRouter(): Router {
       const errorMessage =
         error instanceof Error ? error.message : "处理消息时出错了，请稍后再试。";
       res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  router.post("/sessions/:id/questions/:questionId/reply", (req: Request, res: Response) => {
+    try {
+      submitUserQuestionReply(
+        req.params.id as string,
+        req.params.questionId as string,
+        (req.body || {}) as UserQuestionReplyBody,
+      );
+      res.json({ ok: true });
+    } catch (error) {
+      if (error instanceof UserQuestionReplyError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+      res.status(500).json({ error: error instanceof Error ? error.message : "提交回答失败" });
     }
   });
 

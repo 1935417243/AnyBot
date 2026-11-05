@@ -8,7 +8,15 @@ import {
 } from "./providers/index.js";
 import type { IProvider, RunResult } from "./providers/index.js";
 import type { ClaudeAgentStreamEvent } from "./providers/claude-code-agent-events.js";
-import { ProviderCancelledError, EFFORT_LEVELS, CODEX_EFFORT_LEVELS, CODEBUDDY_EFFORT_LEVELS, type EffortLevel } from "./providers/types.js";
+import {
+  ProviderCancelledError,
+  EFFORT_LEVELS,
+  CODEX_EFFORT_LEVELS,
+  CODEBUDDY_EFFORT_LEVELS,
+  type EffortLevel,
+  type ProviderUserQuestionReply,
+  type ProviderUserQuestionRequest,
+} from "./providers/types.js";
 import {
   includeContentInLogs,
   includePromptInLogs,
@@ -98,6 +106,11 @@ export type RunPreparedChatTurnOptions = {
   };
   logPrefix: string;
   logFields?: Record<string, unknown>;
+  /** 等待用户回复 Agent 提问；仅 WebUI 流式对话提供，未提供时 Provider 不接管提问 */
+  waitForUserQuestionReply?: (
+    request: ProviderUserQuestionRequest,
+    signal: AbortSignal,
+  ) => Promise<ProviderUserQuestionReply>;
 };
 
 export type ChatTurnResult = {
@@ -485,6 +498,37 @@ export async function runPreparedChatTurn(
     await opts.stream?.emit(streamEvent);
   };
 
+  const waitForUserQuestionReply = opts.waitForUserQuestionReply;
+  /** 把 Agent 提问推送给 WebUI 并等待回复；结束时补发 user_question_resolved，供前端和历史记录收起问题卡片 */
+  const askUserQuestion = waitForUserQuestionReply
+    ? async (
+        request: ProviderUserQuestionRequest,
+        signal: AbortSignal,
+      ): Promise<ProviderUserQuestionReply> => {
+        await emitStream({
+          type: "user_question",
+          question: { ...request, createdAt: Date.now() },
+        });
+        try {
+          const reply = await waitForUserQuestionReply(request, signal);
+          await emitStream({
+            type: "user_question_resolved",
+            questionId: request.id,
+            status: reply.action === "skip" ? "skipped" : "answered",
+            answers: reply.action === "answer" ? reply.answers : undefined,
+          });
+          return reply;
+        } catch (error) {
+          await emitStream({
+            type: "user_question_resolved",
+            questionId: request.id,
+            status: "cancelled",
+          });
+          throw error;
+        }
+      }
+    : undefined;
+
   db.addMessage(
     prepared.session.id,
     "user",
@@ -518,6 +562,7 @@ export async function runPreparedChatTurn(
       newSessionId: prepared.providerSessionId ? undefined : randomUUID(),
       rawProviderCommand: prepared.rawProviderCommand,
       signal: opts.signal,
+      askUserQuestion,
     };
     const result = opts.stream && isStreamingProvider(prepared.provider)
       ? await prepared.provider.runWithEvents({

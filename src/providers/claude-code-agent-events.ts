@@ -10,7 +10,7 @@ import type {
   SDKTaskUpdatedMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { hasBinaryDiffFileType, shouldSuppressDiffFile } from "../diff-file-types.js";
-import type { ProviderContextUsage } from "./types.js";
+import type { ProviderContextUsage, ProviderUserQuestionRequest } from "./types.js";
 
 export type ClaudeAgentToolStatus = "running" | "success" | "failed";
 
@@ -127,7 +127,23 @@ export type ClaudeAgentStreamEvent =
       type: "todo_update";
       todos: ClaudeAgentTodoItem[];
     }
-  | { type: "context_usage"; usage: ProviderContextUsage };
+  | { type: "context_usage"; usage: ProviderContextUsage }
+  | {
+      /** Agent 向用户提问，WebUI 展示问题卡片并等待回复 */
+      type: "user_question";
+      question: ProviderUserQuestionRequest & {
+        /** 提问时间 */
+        createdAt: number;
+      };
+    }
+  | {
+      /** 提问结束：用户已回答、已跳过，或本轮结束时被取消 */
+      type: "user_question_resolved";
+      questionId: string;
+      status: "answered" | "skipped" | "cancelled";
+      /** 用户回答的「问题全文 → 答案」映射，仅 answered 时有值 */
+      answers?: Record<string, string>;
+    };
 
 const SECRET_PATTERNS: RegExp[] = [
   /\b(sk-[A-Za-z0-9_-]{12,})\b/g,

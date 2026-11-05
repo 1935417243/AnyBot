@@ -16,6 +16,8 @@ import type {
     ProviderContextUsage,
     ProviderModel,
     ProviderStreamEvent,
+    ProviderUserQuestionItem,
+    ProviderUserQuestionRequest,
     RunOptions,
     RunResult,
 } from "./types.js";
@@ -82,6 +84,58 @@ const WORKSPACE_WRITE_TOOLS = [
     "Write",
     "NotebookEdit",
 ];
+
+/** CodeBuddy 向用户提问的内置工具名 */
+const ASK_USER_QUESTION_TOOL = "AskUserQuestion";
+/** 非提问工具的审批沿用 SDK 未提供处理器时的拒绝文案，保持原有权限行为不变 */
+const NO_PERMISSION_HANDLER_MESSAGE = "No permission handler provided";
+/** CLI 识别的「用户跳过全部问题」答案标记，CLI 要求 answers 非空，跳过时也必须回传 */
+const SKIP_QUESTION_ANSWERS = {_action: "skip_question"};
+
+/** 把 AskUserQuestion 工具入参整理为提问请求；没有有效问题时返回 null */
+function parseAskUserQuestionInput(
+    toolUseId: string,
+    input: Record<string, unknown>,
+): ProviderUserQuestionRequest | null {
+    let rawQuestions: unknown = input.questions;
+    if (typeof rawQuestions === "string") {
+        try {
+            rawQuestions = JSON.parse(rawQuestions);
+        } catch {
+            return null;
+        }
+    }
+    if (!Array.isArray(rawQuestions)) return null;
+
+    const questions = rawQuestions.flatMap((rawItem): ProviderUserQuestionItem[] => {
+        if (!rawItem || typeof rawItem !== "object") return [];
+        const item = rawItem as Record<string, unknown>;
+        const question = typeof item.question === "string" ? item.question : "";
+        if (!question.trim()) return [];
+        const rawOptions = Array.isArray(item.options) ? item.options : [];
+        const options = rawOptions.flatMap((rawOption) => {
+            if (typeof rawOption === "string") {
+                return rawOption.trim() ? [{label: rawOption.trim(), description: ""}] : [];
+            }
+            if (!rawOption || typeof rawOption !== "object") return [];
+            const option = rawOption as Record<string, unknown>;
+            const label = typeof option.label === "string" ? option.label.trim() : "";
+            if (!label) return [];
+            return [{
+                label,
+                description: typeof option.description === "string" ? option.description : "",
+            }];
+        });
+        return [{
+            question,
+            header: typeof item.header === "string" ? item.header : "",
+            options,
+            multiSelect: item.multiSelect === true,
+        }];
+    });
+
+    return questions.length > 0 ? {id: toolUseId, questions} : null;
+}
 
 function isSdkResultMessage(message: Message): message is ResultMessage {
     return message.type === "result";
@@ -410,7 +464,8 @@ export class CodeBuddyProvider implements IProvider {
         const emitEvent: typeof onEvent = onEvent
             ? (event) => (hardExpired ? undefined : onEvent(event))
             : undefined;
-        const timer = setTimeout(() => {
+        /** 本轮执行超时：请求 SDK 停止，并启动硬超时兜底 */
+        const handleTurnTimeout = () => {
             timedOut = true;
             abortController.abort();
             // abort 只是请求 SDK 停止；若事件流迟迟不结束，强制让本次 turn 失败返回
@@ -418,7 +473,66 @@ export class CodeBuddyProvider implements IProvider {
                 hardExpired = true;
                 rejectHardDeadline(new ProviderTimeoutError(timeoutMs));
             }, PROVIDER_HARD_ABORT_GRACE_MS);
-        }, timeoutMs);
+        };
+        /** 本轮剩余的超时预算，等待用户回复提问期间暂停扣减 */
+        let timeoutRemainingMs = timeoutMs;
+        /** 当前这段超时计时的起点 */
+        let timeoutStartedAt = Date.now();
+        /** 正在等待用户回复的提问数，大于 0 时暂停超时计时 */
+        let pendingQuestionCount = 0;
+        /** 本轮是否已结束，结束后不再恢复超时计时 */
+        let turnSettled = false;
+        let timer: NodeJS.Timeout | undefined = setTimeout(handleTurnTimeout, timeoutMs);
+        /** 开始等待用户回复：暂停超时计时，用户思考时间不计入执行超时 */
+        const pauseTurnTimeout = () => {
+            pendingQuestionCount += 1;
+            if (pendingQuestionCount > 1 || !timer) return;
+            clearTimeout(timer);
+            timer = undefined;
+            timeoutRemainingMs = Math.max(0, timeoutRemainingMs - (Date.now() - timeoutStartedAt));
+        };
+        /** 用户回复结束：按剩余预算恢复超时计时 */
+        const resumeTurnTimeout = () => {
+            pendingQuestionCount = Math.max(0, pendingQuestionCount - 1);
+            if (pendingQuestionCount > 0 || timer || timedOut || turnSettled) return;
+            timeoutStartedAt = Date.now();
+            timer = setTimeout(handleTurnTimeout, timeoutRemainingMs);
+        };
+        /** 提问等待的中断信号：本轮被中断或结束时释放仍在等待的提问 */
+        const questionAbortController = new AbortController();
+        abortController.signal.addEventListener("abort", () => questionAbortController.abort(), {once: true});
+        const askUserQuestion = opts.askUserQuestion;
+        /** 只接管 AskUserQuestion 的审批，其它工具按 SDK 未提供处理器时的方式拒绝 */
+        const canUseTool: Options["canUseTool"] | undefined = askUserQuestion
+            ? async (toolName, input, {toolUseID}) => {
+                if (toolName !== ASK_USER_QUESTION_TOOL) {
+                    return {behavior: "deny", message: NO_PERMISSION_HANDLER_MESSAGE};
+                }
+                const request = parseAskUserQuestionInput(toolUseID, input);
+                if (!request) {
+                    return {behavior: "deny", message: "AskUserQuestion 参数无效"};
+                }
+                logger.info("provider.exec.ask_user_question", {
+                    provider: this.type,
+                    workdir,
+                    questionId: toolUseID,
+                    questionCount: request.questions.length,
+                });
+                pauseTurnTimeout();
+                try {
+                    const reply = await askUserQuestion(request, questionAbortController.signal);
+                    return {
+                        behavior: "allow",
+                        updatedInput: {
+                            ...input,
+                            answers: reply.action === "skip" ? SKIP_QUESTION_ANSWERS : reply.answers,
+                        },
+                    };
+                } finally {
+                    resumeTurnTimeout();
+                }
+            }
+            : undefined;
         const abortFromSignal = () => abortController.abort(signal?.reason);
         if (signal?.aborted) {
             abortFromSignal();
@@ -528,6 +642,7 @@ export class CodeBuddyProvider implements IProvider {
                     sandbox: buildSandboxOptions(sandbox),
                     includePartialMessages: !!onEvent,
                     hooks,
+                    canUseTool,
                     env,
                     // 捕获 CLI 自身 stderr 诊断输出，用于排查 CLI 内部取消工具调用的原因
                     stderr: (data) => {
@@ -726,9 +841,11 @@ export class CodeBuddyProvider implements IProvider {
             });
             throw displayErr;
         } finally {
+            turnSettled = true;
             clearTimeout(timer);
             if (hardTimer) clearTimeout(hardTimer);
             signal?.removeEventListener("abort", abortFromSignal);
+            questionAbortController.abort();
         }
     }
 

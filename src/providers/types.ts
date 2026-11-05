@@ -34,6 +34,11 @@ export interface RunOptions {
   sandbox?: SandboxMode;
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** Agent 调用提问工具时由调用方展示问题并等待用户回复；未提供时 Provider 不接管提问，沿用原有权限策略 */
+  askUserQuestion?: (
+    request: ProviderUserQuestionRequest,
+    signal: AbortSignal,
+  ) => Promise<ProviderUserQuestionReply>;
 }
 
 export interface RunResult {
@@ -108,3 +113,36 @@ export class ProviderCancelledError extends Error {
     this.name = "ProviderCancelledError";
   }
 }
+
+/** Agent 提问中的单个选项 */
+export interface ProviderUserQuestionOption {
+  /** 选项文本，用户选中后作为答案回传 */
+  label: string;
+  /** 选项说明 */
+  description: string;
+}
+
+/** Agent 提问中的单个问题 */
+export interface ProviderUserQuestionItem {
+  /** 问题全文，同时作为回答映射的键 */
+  question: string;
+  /** 问题的简短标签 */
+  header: string;
+  /** 预设选项，用户也可以填写自定义答案 */
+  options: ProviderUserQuestionOption[];
+  /** 是否允许多选 */
+  multiSelect: boolean;
+}
+
+/** Agent 的一次提问，可包含多个问题 */
+export interface ProviderUserQuestionRequest {
+  /** 提问 ID，取自提问工具的调用 ID */
+  id: string;
+  /** 本次提出的问题 */
+  questions: ProviderUserQuestionItem[];
+}
+
+/** 用户对提问的回复：answer 携带「问题全文 → 答案」映射，skip 表示跳过全部问题 */
+export type ProviderUserQuestionReply =
+  | { action: "answer"; answers: Record<string, string> }
+  | { action: "skip" };

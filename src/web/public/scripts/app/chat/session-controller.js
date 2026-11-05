@@ -124,6 +124,7 @@ export function createSessionController(config) {
             activeStreamAbortController = null;
         }
         activeStreamSessionId = null;
+        if (window.UserQuestionDock) window.UserQuestionDock.reset();
         clearActiveCompact();
         isTyping = false;
         isCancellingResponse = false;
@@ -403,6 +404,7 @@ export function createSessionController(config) {
                 currentSessionUpdatedAt = 0;
                 currentNewestMessageId = 0;
                 if (window.TaskDock) window.TaskDock.reset();
+                if (window.UserQuestionDock) window.UserQuestionDock.reset();
                 if (config.refreshBranchSwitcher) config.refreshBranchSwitcher();
                 config.updateConversationHeaderTitle('新对话');
                 config.resetInputHistoryFromMessages([], false);

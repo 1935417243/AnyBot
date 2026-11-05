@@ -5,12 +5,16 @@ import { createTaskDock } from './chat/task-dock.js';
 import { initSidebarToggle } from './sidebar/sidebar-toggle.js';
 import { renderMarkdown, configureMarkdown } from './markdown.js';
 import { enhanceCodeBlocks } from './chat/code-block-preview.js';
+import { createUserQuestionCard } from './chat/user-question-card.js';
+import { createUserQuestionDock } from './chat/user-question-dock.js';
 
 configureMarkdown();
 window.AnyBotMarkdown = { render: renderMarkdown };
 window.AnyBotLocalFiles = { enhance: enhanceLocalFileLinks };
 window.AnyBotCodePreview = { enhance: enhanceCodeBlocks };
+window.AnyBotUserQuestion = { create: createUserQuestionCard };
 window.TaskDock = createTaskDock({ inputArea: document.getElementById('input-area') });
+window.UserQuestionDock = createUserQuestionDock({ inputArea: document.getElementById('input-area') });
 initSidebarToggle(document.getElementById('sidebar-toggle'));
 
 const dom = getAppDom(document);

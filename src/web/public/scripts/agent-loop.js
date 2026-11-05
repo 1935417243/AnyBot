@@ -132,6 +132,10 @@
         };
         var startedAt = opts.startedAt || Date.now();
         var isPersisted = !!opts.persisted;
+        // 回答 Agent 提问时需要会话 ID，由 stream/resume 在建立连接前写入
+        var sessionId = opts.sessionId || null;
+        // 本条消息内的提问卡片，按提问 ID 索引
+        var questionCards = new Map();
 
         var state = {
             answerText: '',
@@ -243,7 +247,76 @@
         function updateProcessTitle() {
             var title = processSummary.querySelector('[data-role="title"]');
             var duration = formatDuration(state.durationMs || (Date.now() - startedAt));
-            title.textContent = (state.status === 'running' ? '处理中 ' : '已处理 ') + duration;
+            var runningText = hasPendingQuestion() ? '等待回答 ' : '处理中 ';
+            title.textContent = (state.status === 'running' ? runningText : '已处理 ') + duration;
+        }
+
+        // 是否有提问仍在等待用户回答，用于把标题切换为「等待回答」
+        function hasPendingQuestion() {
+            var pending = false;
+            questionCards.forEach(function (card) {
+                if (card.isPending()) pending = true;
+            });
+            return pending;
+        }
+
+        // 展示提问卡片：等待回答时固定在输入框上方、消息流留占位；历史或已结束的提问直接内联摘要。断线重连回放同一提问时不重复创建
+        function showUserQuestion(question) {
+            if (!question || !question.id || questionCards.has(question.id)) return;
+            if (!window.AnyBotUserQuestion || typeof window.AnyBotUserQuestion.create !== 'function') return;
+            var entry = { card: null, placeholder: null };
+            var card = window.AnyBotUserQuestion.create({
+                question: question,
+                sessionId: sessionId,
+                readOnly: isPersisted,
+                scrollBottom: scrollBottom,
+                onResolved: function () {
+                    settleDockedQuestion(entry);
+                    updateProcessTitle();
+                },
+            });
+            entry.card = card;
+            questionCards.set(question.id, card);
+            var dock = window.UserQuestionDock;
+            if (card.isPending() && dock) {
+                var placeholder = document.createElement('div');
+                placeholder.className = 'claude-question-placeholder';
+                placeholder.textContent = '正在向你提问…';
+                content.insertBefore(placeholder, finalEl);
+                entry.placeholder = placeholder;
+                dock.mount(card.el);
+            } else {
+                content.insertBefore(card.el, finalEl);
+            }
+            updateProcessTitle();
+            scrollBottom(true);
+        }
+
+        // 提问结束后把卡片从输入框上方移回消息流占位处，作为问答摘要保留
+        function settleDockedQuestion(entry) {
+            var placeholder = entry.placeholder;
+            if (!placeholder || !entry.card) return;
+            entry.placeholder = null;
+            if (window.UserQuestionDock) window.UserQuestionDock.unmount(entry.card.el);
+            if (placeholder.parentNode) {
+                placeholder.parentNode.replaceChild(entry.card.el, placeholder);
+            }
+        }
+
+        // 服务端确认提问结束（含其它标签页作答）后收起对应卡片
+        function resolveUserQuestion(event) {
+            var card = questionCards.get(event.questionId);
+            if (card) {
+                card.resolve({ status: event.status, answers: event.answers });
+            }
+            updateProcessTitle();
+        }
+
+        // 本轮结束（完成、出错、中断）时把仍未回答的卡片标记为未回答
+        function finishPendingQuestions() {
+            questionCards.forEach(function (card) {
+                card.finish();
+            });
         }
 
         function hasProcessDetails() {
@@ -654,6 +727,9 @@
             if (name === 'TodoWrite') {
                 return '更新待办列表';
             }
+            if (name === 'AskUserQuestion') {
+                return '向你提问';
+            }
             return name + (summary ? ' ' + summary : '');
         }
 
@@ -789,6 +865,7 @@
                 state.durationMs = Date.now() - startedAt;
             }
             state.status = 'completed';
+            finishPendingQuestions();
             finalizeSegmentRenders();
             renderAnswer();
             attachCompletionMeta();
@@ -849,6 +926,16 @@
                 return;
             }
 
+            if (event.type === 'user_question') {
+                showUserQuestion(event.question);
+                return;
+            }
+
+            if (event.type === 'user_question_resolved') {
+                resolveUserQuestion(event);
+                return;
+            }
+
             if (event.type === 'result') {
                 completeAnswer(event);
                 return;
@@ -862,6 +949,7 @@
             if (event.type === 'error') {
                 state.answerText = state.answerText || ('处理失败：' + (event.error || '未知错误'));
                 state.status = 'completed';
+                finishPendingQuestions();
                 finalizeSegmentRenders();
                 renderAnswer();
                 attachCompletionMeta();
@@ -875,6 +963,7 @@
             if (event.type === 'cancelled') {
                 state.answerText = event.message || '已中断';
                 state.status = 'completed';
+                finishPendingQuestions();
                 finalizeSegmentRenders();
                 renderAnswer();
                 attachCompletionMeta();
@@ -915,6 +1004,10 @@
         return {
             row: row,
             handleEvent: handleEvent,
+            // 绑定当前会话 ID，提问卡片提交回答时使用
+            setSessionId: function (id) {
+                sessionId = id || null;
+            },
         };
     }
 
@@ -983,6 +1076,7 @@
     }
 
     async function stream(opts) {
+        if (opts.view && opts.view.setSessionId) opts.view.setSessionId(opts.sessionId);
         var res = await fetch('/api/sessions/' + opts.sessionId + '/messages/stream', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -994,6 +1088,7 @@
 
     async function resume(opts) {
         opts.allowInactive = true;
+        if (opts.view && opts.view.setSessionId) opts.view.setSessionId(opts.sessionId);
         var res = await fetch('/api/sessions/' + opts.sessionId + '/messages/stream', {
             method: 'GET',
             signal: opts.signal,
