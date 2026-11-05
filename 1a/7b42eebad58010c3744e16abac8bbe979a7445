@@ -1,0 +1,19 @@
+src/web/public/styles/main.css
+  s_5c841bc74277e3::t_bf6389dc832c2a 187-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "1a7b42eebad58010c3744e16abac8bbe979a7445",
+  "prompts": {},
+  "sessions": {
+    "s_5c841bc74277e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "793f0f70-c3f4-4dd5-b757-85e020bac43f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
