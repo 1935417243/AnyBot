@@ -39,6 +39,7 @@ export function createViewRouter(options) {
         options.channelView.style.display = 'flex';
         renderHistory();
         if (options.renderChannelsPage) options.renderChannelsPage();
+        if (options.onNavigate) options.onNavigate();
     }
 
     function showPluginsPage() {
@@ -47,6 +48,7 @@ export function createViewRouter(options) {
         options.pluginsView.style.display = 'flex';
         renderHistory();
         if (options.renderPluginsPage) options.renderPluginsPage();
+        if (options.onNavigate) options.onNavigate();
     }
 
     function showAutomationsPage() {
@@ -55,12 +57,14 @@ export function createViewRouter(options) {
         options.automationView.style.display = 'flex';
         renderHistory();
         if (options.renderAutomationsPage) options.renderAutomationsPage();
+        if (options.onNavigate) options.onNavigate();
     }
 
     function showSettingsView() {
         hideAllViews();
         currentView = 'settings';
         options.settingsView.style.display = 'flex';
+        if (options.onNavigate) options.onNavigate();
     }
 
     async function openChannelsPage() {
@@ -118,5 +122,8 @@ export function createViewRouter(options) {
         showAutomationsPage: showAutomationsPage,
         showSettingsView: showSettingsView,
         showPluginsPage: showPluginsPage,
+        openChannelsPage: openChannelsPage,
+        openPluginsPage: openPluginsPage,
+        openAutomationsPage: openAutomationsPage,
     };
 }

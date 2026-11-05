@@ -27,18 +27,71 @@
             border-right-color: transparent;
         }
 
-        /* 窗口左上角标题条：承载侧边栏折叠/展开开关，折叠后仍然保留。
+        /* 窗口左上角标题条：承载侧边栏折叠/展开开关、会话搜索与前进/后退，折叠后仍然保留。
+           展开时横跨侧边栏顶部（侧边栏 256px - left 4px - 右侧留白 8px），前进/后退靠右；
            macOS 桌面端该容器整体从窗口拖拽区排除（见 main.css），保证按钮可点击 */
         #titlebar-strip {
             position: absolute;
             top: 6px;
             left: 4px;
             z-index: 300;
-            width: 36px;
+            width: 244px;
             height: 32px;
+            padding: 0 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* 标题条按钮分组：左组为折叠开关与搜索，右组为前进/后退 */
+        .titlebar-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* 侧边栏收起后标题条收拢为内容宽度，前进/后退紧跟在搜索按钮后。
+           收拢后宽度：Windows/Web 为 120px，macOS 为 124px（左右 padding 8px），
+           main.css 中会话头部与首页拖拽带的左侧避让值依赖该宽度 */
+        body.sidebar-collapsed #titlebar-strip {
+            width: auto;
+            justify-content: flex-start;
+            gap: 4px;
+        }
+
+        /* 标题条中的搜索、前进/后退按钮，外观与折叠开关一致 */
+        .titlebar-btn {
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
+            background: transparent;
+            border: 0;
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+            transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+        }
+
+        .titlebar-btn:hover:not(:disabled) {
+            background: var(--sidebar-hover);
+            color: var(--text);
+        }
+
+        /* 没有可前进/后退的记录时置灰 */
+        .titlebar-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        /* 侧边栏收起后标题条悬浮在页面左上角，插件/频道/自动化/设置页头部下移避让 */
+        body.sidebar-collapsed .plugins-header,
+        body.sidebar-collapsed .channel-page-header,
+        body.sidebar-collapsed .automation-header,
+        body.sidebar-collapsed .settings-page-header {
+            padding-top: 48px;
         }
 
         /* 侧边栏折叠/展开开关按钮 */

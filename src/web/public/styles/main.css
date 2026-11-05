@@ -143,30 +143,32 @@
             pointer-events: none;
         }
 
-        /* 侧边栏收起后红黄绿按钮与折叠 Toggle 悬浮在主区左上角，
-           首页拖拽带与会话页 header 一样让出左侧 116px，
-           否则拖拽命中会吞掉 Toggle 点击，折叠后无法再展开 */
+        /* 侧边栏收起后红黄绿按钮与标题条悬浮在主区左上角（标题条收拢后右边缘约 196px），
+           首页拖拽带与会话页 header 一样让出左侧 204px，
+           否则拖拽命中会吞掉标题条按钮点击，折叠后无法再展开 */
         body.platform-macos-desktop.sidebar-collapsed #chat-view.chat-view--home::before {
-            left: 116px;
+            left: 204px;
         }
 
-        /* 红黄绿按钮位于 (14, 16) 宽约 52px；标题条紧跟其右、垂直居中对齐。
-           整个标题条从窗口拖拽区排除，避免 macOS 原生标题栏命中吞掉 Toggle 的点击事件 */
+        /* 红黄绿按钮位于 (14, 16) 宽约 52px；标题条紧跟其右、垂直居中对齐，
+           展开时宽度为侧边栏 256px - left 72px - 右侧留白 8px。
+           整个标题条从窗口拖拽区排除，避免 macOS 原生标题栏命中吞掉按钮的点击事件 */
         body.platform-macos-desktop #titlebar-strip {
             left: 72px;
             top: 7px;
-            width: 40px;
+            width: 176px;
             height: 36px;
+            padding: 0 8px;
             -webkit-app-region: no-drag;
         }
 
-        /* 侧边栏收起后红黄绿按钮与 Toggle 悬浮在会话头部上方，为标题腾出左侧空间 */
+        /* 侧边栏收起后红黄绿按钮与标题条悬浮在会话头部上方，为标题腾出左侧空间 */
         body.platform-macos-desktop .conversation-header {
             transition: padding-left 0.2s ease;
         }
 
         body.platform-macos-desktop.sidebar-collapsed .conversation-header {
-            padding-left: 116px;
+            padding-left: 204px;
         }
 
         /* Windows：侧边栏顶部下移，为左上角固定 Toggle 按钮腾出空间 */
@@ -184,10 +186,10 @@
             padding-top: 44px;
         }
 
-        /* Windows 桌面端与 Web 浏览器端：侧边栏收起后 Toggle 悬浮在会话头部左上角，为标题让出左侧空间
-           （macOS 需额外避让红黄绿按钮，单独使用 116px） */
+        /* Windows 桌面端与 Web 浏览器端：侧边栏收起后标题条悬浮在会话头部左上角（右边缘约 124px），为标题让出左侧空间
+           （macOS 需额外避让红黄绿按钮，单独使用 204px） */
         body.sidebar-collapsed:not(.platform-macos-desktop) .conversation-header {
-            padding-left: 48px;
+            padding-left: 132px;
         }
 
         body.platform-macos-desktop .sidebar-top button,

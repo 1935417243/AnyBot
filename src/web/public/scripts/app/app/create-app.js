@@ -25,12 +25,14 @@ import {
 import { getChannelMeta } from '../channels/channel-meta.js';
 import { createChannelsPageController } from '../channels/channels-page.js';
 import { createSidebarController } from '../sidebar/sidebar-controller.js';
+import { createSessionSearchController } from '../sidebar/session-search.js';
 import { createSettingsController } from '../settings/settings-controller.js';
 import { createPluginsPageController } from '../plugins/plugins-page.js';
 import { copyCode } from '../ui/code-copy.js';
 import { openImageModal } from '../ui/image-modal.js';
 import { createToastController } from '../ui/toast.js';
 import { createCliRuntimeStore } from './cli-runtime-store.js';
+import { createNavigationHistory } from './navigation-history.js';
 import { createViewRouter } from './view-router.js';
 
 const SESSION_MESSAGE_PAGE_SIZE = 40;
@@ -172,6 +174,9 @@ export function createAnyBotApp(dom, deps) {
         pluginsMcpAddBtn,
         pluginsMcpAddMenu,
         pluginsMcpServerList,
+        sessionSearchBtn,
+        navBackBtn,
+        navForwardBtn,
     } = dom;
 
     let contextUsageController = null;
@@ -198,6 +203,10 @@ export function createAnyBotApp(dom, deps) {
     let appEventsBound = false;
     let pendingAttachments = [];
     let cliRuntimeBar = null;
+    // 左上角前进/后退的导航历史
+    let navigationHistory = null;
+    // 左上角会话搜索弹窗
+    let sessionSearchController = null;
     const toastController = createToastController({ documentRef: documentRef });
     // 内置 CLI 组件下载状态共享 store（设置页状态条 / 聊天页提示条 / 发送拦截共用）
     const cliRuntimeStore = createCliRuntimeStore({
@@ -445,7 +454,7 @@ export function createAnyBotApp(dom, deps) {
         settingsWorkdirOpenBtn: settingsWorkdirOpenBtn,
         settingsWorkdirPickBtn: settingsWorkdirPickBtn,
         settingsWorkdirClearBtn: settingsWorkdirClearBtn,
-        showChatView: showChatView,
+        showChatView: showChatViewAndRecord,
         showError: showError,
         showSettingsView: showSettingsView,
         updateContextUsage: updateContextUsage,
@@ -639,7 +648,7 @@ export function createAnyBotApp(dom, deps) {
         setCurrentSessionUpdatedAt: function (value) {
             if (sessionController) sessionController.setCurrentSessionUpdatedAt(value);
         },
-        showChatView: showChatView,
+        showChatView: showChatViewAndRecord,
         showError: showError,
         sessionPageSize: SESSION_LIST_PAGE_SIZE,
         sidebar: sidebar,
@@ -734,6 +743,7 @@ export function createAnyBotApp(dom, deps) {
         },
         removeSessionSummary: function (id) {
             requireSidebarController().removeSessionSummary(id);
+            if (navigationHistory) navigationHistory.removeSession(id);
         },
         refreshBranchSwitcher: function () {
             if (branchSwitcherController) branchSwitcherController.refresh();
@@ -777,6 +787,9 @@ export function createAnyBotApp(dom, deps) {
         updateSendBtnState: updateSendBtnState,
         updateSidebarSelection: function () {
             requireSidebarController().updateSelection();
+        },
+        onNavigate: function (navigationOptions) {
+            recordNavigation(navigationOptions);
         },
     });
 
@@ -974,6 +987,31 @@ export function createAnyBotApp(dom, deps) {
         settingsView: settingsView,
         pluginsBtn: pluginsBtn,
         pluginsView: pluginsView,
+        onNavigate: function () {
+            recordNavigation();
+        },
+    });
+
+    navigationHistory = createNavigationHistory({
+        backBtn: navBackBtn,
+        documentRef: documentRef,
+        forwardBtn: navForwardBtn,
+        getLocation: getNavigationLocation,
+        navigate: navigateToHistoryEntry,
+    });
+
+    sessionSearchController = createSessionSearchController({
+        documentRef: documentRef,
+        getProjects: function () {
+            return sidebarController ? sidebarController.getProjects() : [];
+        },
+        getRecentSessions: function () {
+            return sidebarController ? sidebarController.getSessions() : [];
+        },
+        openSession: function (sessionId) {
+            return requireSessionController().loadSession(sessionId, { force: true });
+        },
+        triggerBtn: sessionSearchBtn,
     });
 
     function getCurrentView() {
@@ -1123,6 +1161,8 @@ export function createAnyBotApp(dom, deps) {
 
         requireViewRouter().bindNavigation();
         requireSidebarController().bindRealtimeLifecycle();
+        if (navigationHistory) navigationHistory.bind();
+        if (sessionSearchController) sessionSearchController.bind();
     }
 
     async function init() {
@@ -1157,6 +1197,55 @@ export function createAnyBotApp(dom, deps) {
         }
         sidebar.startRealtimeEvents();
         inputEl.focus();
+    }
+
+    // 读取当前所在位置，供前进/后退记录：会话页记录会话 ID，未发送的新对话记录所属项目，其它页面只记录视图名
+    function getNavigationLocation() {
+        var view = getCurrentView();
+        if (view !== 'chat') return { view: view };
+        var sessionId = sessionController ? sessionController.getCurrentSessionId() : null;
+        if (sessionId) return { view: 'chat', sessionId: sessionId };
+        return {
+            view: 'chat',
+            sessionId: null,
+            projectId: sessionController ? sessionController.getCurrentSessionProjectId() : null,
+        };
+    }
+
+    // 把当前位置写入前进/后退历史
+    function recordNavigation(navigationOptions) {
+        if (navigationHistory) navigationHistory.record(navigationOptions);
+    }
+
+    // 侧边栏切项目、关闭设置页等直接切回聊天视图的入口：切换后补记一次位置（会话切换由 session-controller 自行记录）
+    function showChatViewAndRecord() {
+        showChatView();
+        recordNavigation();
+    }
+
+    // 按历史记录回放位置，返回是否到达目标位置；会话已被删除等失败情况返回 false
+    async function navigateToHistoryEntry(entry) {
+        var session = requireSessionController();
+        if (entry.view === 'chat') {
+            if (!entry.sessionId) {
+                await session.createNewChat(entry.projectId || null);
+                return true;
+            }
+            // 目标就是当前会话（如从插件页后退回来），直接切回聊天视图，避免流式输出中的会话被重新加载
+            if (session.getCurrentSessionId() === entry.sessionId) {
+                showChatView();
+                return true;
+            }
+            await session.loadSession(entry.sessionId, { force: true, silent: true });
+            return session.getCurrentSessionId() === entry.sessionId && getCurrentView() === 'chat';
+        }
+        var router = requireViewRouter();
+        if (entry.view === 'plugins') await router.openPluginsPage();
+        else if (entry.view === 'channels') await router.openChannelsPage();
+        else if (entry.view === 'automations') await router.openAutomationsPage();
+        else if (entry.view === 'settings') requireSettingsController().openSettingsPanel();
+        else return false;
+        return getCurrentView() === entry.view;
     }
 
     return {

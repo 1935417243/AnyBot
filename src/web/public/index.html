@@ -35,24 +35,45 @@
     <link rel="stylesheet" href="styles/claude-agent-loop.css">
     <link rel="stylesheet" href="styles/change-review.css">
     <link rel="stylesheet" href="styles/confirm-dialog.css">
+    <link rel="stylesheet" href="styles/session-search.css">
 </head>
 <body>
 
-<!-- 窗口左上角标题条：承载侧边栏折叠/展开开关，折叠后仍保留。
+<!-- 窗口左上角标题条：承载侧边栏折叠/展开开关、会话搜索与前进/后退，折叠后仍保留。
      macOS 桌面端该容器本身是窗口拖拽区，按钮作为其 no-drag 子元素保证可点击 -->
 <div id="titlebar-strip">
-    <button id="sidebar-toggle" type="button" aria-expanded="true" aria-label="收起侧边栏" title="收起侧边栏">
-        <svg class="sidebar-toggle-icon-collapse" width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-            <rect x="1.4" y="2" width="12.2" height="11" rx="2.2" stroke="currentColor" stroke-width="1.2"/>
-            <path d="M5.8 2v11" stroke="currentColor" stroke-width="1.2"/>
-            <path d="M10.8 5.4 8.9 7.5l1.9 2.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <svg class="sidebar-toggle-icon-expand" width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-            <rect x="1.4" y="2" width="12.2" height="11" rx="2.2" stroke="currentColor" stroke-width="1.2"/>
-            <path d="M5.8 2v11" stroke="currentColor" stroke-width="1.2"/>
-            <path d="M8.6 5.4l1.9 2.1-1.9 2.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-    </button>
+    <div class="titlebar-group">
+        <button id="sidebar-toggle" type="button" aria-expanded="true" aria-label="收起侧边栏" title="收起侧边栏">
+            <svg class="sidebar-toggle-icon-collapse" width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                <rect x="1.4" y="2" width="12.2" height="11" rx="2.2" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M5.8 2v11" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M10.8 5.4 8.9 7.5l1.9 2.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg class="sidebar-toggle-icon-expand" width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                <rect x="1.4" y="2" width="12.2" height="11" rx="2.2" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M5.8 2v11" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M8.6 5.4l1.9 2.1-1.9 2.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button id="session-search-btn" class="titlebar-btn" type="button" aria-label="搜索会话" title="搜索会话">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                <circle cx="6.6" cy="6.6" r="4.6" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M10 10l3.2 3.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+        </button>
+    </div>
+    <div class="titlebar-group">
+        <button id="nav-back-btn" class="titlebar-btn" type="button" aria-label="后退" title="后退" disabled>
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                <path d="M12.5 7.5h-10M6.5 3.5l-4 4 4 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button id="nav-forward-btn" class="titlebar-btn" type="button" aria-label="前进" title="前进" disabled>
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                <path d="M2.5 7.5h10M8.5 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
 </div>
 
 <aside id="sidebar">

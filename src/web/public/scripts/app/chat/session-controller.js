@@ -45,6 +45,7 @@ export function createSessionController(config) {
             config.renderHistory();
             config.renderProjects();
             config.updateSidebarSelection();
+            if (config.onNavigate) config.onNavigate();
             await config.fetchModelConfig(currentSessionProvider);
             config.inputEl.focus();
             return;
@@ -75,6 +76,7 @@ export function createSessionController(config) {
         if (config.refreshBranchSwitcher) config.refreshBranchSwitcher();
         config.revealSessionContainer(currentSessionProjectId, { defer: options.deferSidebarReveal });
         config.showChatView();
+        if (config.onNavigate) config.onNavigate();
         config.updateContextUsage(null);
         config.resetInputHistoryFromMessages([], false);
         config.showEmptyState();
@@ -107,6 +109,7 @@ export function createSessionController(config) {
                 currentSessionProvider = data.provider || null;
                 currentSessionUpdatedAt = Number(data.updatedAt || Date.now());
                 currentNewestMessageId = 0;
+                if (config.onNavigate) config.onNavigate({ replaceDraft: true });
                 config.revealSessionContainer(currentSessionProjectId);
                 config.updateSidebarSelection();
                 await config.fetchSessions();
@@ -334,6 +337,11 @@ export function createSessionController(config) {
     async function loadSession(id, options) {
         options = options || {};
         if (id === currentSessionId && (activeStreamSessionId === id || activeCompactSessionId === id)) {
+            // 流式/压缩中的会话不重新加载，但从插件、频道等页面进入时仍要切回聊天视图
+            if (config.getCurrentView() !== 'chat') {
+                config.showChatView();
+                if (config.onNavigate) config.onNavigate();
+            }
             config.inputEl.focus();
             return;
         }
@@ -367,6 +375,7 @@ export function createSessionController(config) {
             var didExpandProject = config.expandProject(data.projectId || null);
 
             if (!wasChatView) config.showChatView();
+            if (config.onNavigate) config.onNavigate();
 
             // 同会话静默重载保留 dock 实时状态（比落库回放更全）；切会话才清空重建
             if (window.TaskDock && !isSameSession) window.TaskDock.reset();

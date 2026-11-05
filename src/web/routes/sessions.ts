@@ -7,8 +7,11 @@ import { getActiveAgentStreamInfo, hasActiveAgentStream } from "../agent-stream.
 import * as db from "../db.js";
 import { emitSessionsChanged } from "../events.js";
 import { deleteSessionWithChangeReviews, prepareMessagesForClient, readMessagePageQuery } from "../services/messages.js";
+import { searchSessions } from "../services/session-search.js";
 
 const DEFAULT_SESSION_LIST_LIMIT = 40;
+/** 会话搜索默认返回条数 */
+const DEFAULT_SESSION_SEARCH_LIMIT = 20;
 
 function readStringQuery(value: Request["query"][string]): string {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -111,6 +114,17 @@ export function createSessionsRouter(): Router {
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
     });
+  });
+
+  // 必须注册在 /sessions/:id 之前，否则 "search" 会被当成会话 ID
+  router.get("/sessions/search", (req: Request, res: Response) => {
+    const limitRaw = readStringQuery(req.query.limit);
+    const limit = limitRaw ? Number(limitRaw) : DEFAULT_SESSION_SEARCH_LIMIT;
+    if (!Number.isFinite(limit) || limit <= 0) {
+      res.status(400).json({ error: "结果数量无效" });
+      return;
+    }
+    res.json({ items: searchSessions(readStringQuery(req.query.q), limit) });
   });
 
   router.get("/sessions/:id", async (req: Request, res: Response) => {

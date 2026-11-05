@@ -135,5 +135,10 @@ export function getAppDom(documentRef) {
         pluginsMcpAddBtn: byId(documentRef, 'plugins-mcp-add-btn'),
         pluginsMcpAddMenu: byId(documentRef, 'plugins-mcp-add-menu'),
         pluginsMcpServerList: byId(documentRef, 'plugins-mcp-server-list'),
+
+        // 左上角标题条：会话搜索与前进/后退按钮
+        sessionSearchBtn: byId(documentRef, 'session-search-btn'),
+        navBackBtn: byId(documentRef, 'nav-back-btn'),
+        navForwardBtn: byId(documentRef, 'nav-forward-btn'),
     };
 }

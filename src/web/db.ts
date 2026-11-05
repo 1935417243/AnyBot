@@ -41,6 +41,24 @@ export type SessionListPageOptions = {
   projectId?: string | null;
 };
 
+/** 会话搜索命中的原始行：会话摘要 + 标题是否命中 + 最近一条命中消息 ID */
+export type SessionSearchRow = SessionSummary & {
+  /** 标题命中关键词时为 1，否则为 0 */
+  titleMatched: number;
+  /** 最近一条内容命中关键词的消息 ID，没有命中消息时为 null */
+  matchedMessageId: number | null;
+};
+
+/** 消息内容中关键词附近的片段 */
+export type MessageSearchSnippet = {
+  /** 关键词在消息内容中的位置（从 1 开始，未找到为 0） */
+  position: number;
+  /** 截取的原始片段 */
+  snippet: string;
+  /** 消息内容总字符数 */
+  contentLength: number;
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -486,6 +504,35 @@ const stmts = {
     INNER JOIN sessions ON sessions.id = messages.session_id
     WHERE sessions.project_id = ? AND messages.metadata IS NOT NULL AND instr(messages.metadata, '"changeReview"') > 0
   `),
+
+  searchSessions: db.prepare(`
+    SELECT id, title, provider, source, projectId, messageCount, createdAt, updatedAt,
+           titleMatched, matchedMessageId
+    FROM (
+      SELECT s.id AS id, s.title AS title, s.provider AS provider, s.source AS source,
+             s.project_id AS projectId, s.message_count AS messageCount,
+             s.created_at AS createdAt, s.updated_at AS updatedAt,
+             (s.title LIKE @pattern ESCAPE '\\') AS titleMatched,
+             (
+               SELECT m.id FROM messages m
+               WHERE m.session_id = s.id AND m.content LIKE @pattern ESCAPE '\\'
+               ORDER BY m.id DESC
+               LIMIT 1
+             ) AS matchedMessageId
+      FROM sessions s
+    )
+    WHERE titleMatched = 1 OR matchedMessageId IS NOT NULL
+    ORDER BY titleMatched DESC, updatedAt DESC, createdAt DESC, id DESC
+    LIMIT @limit
+  `),
+
+  getMessageSearchSnippet: db.prepare(`
+    SELECT instr(lower(content), @needle) AS position,
+           substr(content, max(1, instr(lower(content), @needle) - @before), @length) AS snippet,
+           length(content) AS contentLength
+    FROM messages
+    WHERE id = @id
+  `),
 };
 
 export function listProjects(): Project[] {
@@ -769,4 +816,22 @@ export function listSessionMessageMetadata(sessionId: string): string[] {
 export function listProjectSessionMessageMetadata(projectId: string): string[] {
   const rows = stmts.listProjectSessionMessageMetadata.all(projectId) as Array<{ metadata: string }>;
   return rows.map((row) => row.metadata);
+}
+
+/** 按标题或消息内容模糊搜索会话；pattern 为已转义通配符的 LIKE 模式，标题命中优先，其余按最近更新排序 */
+export function searchSessionRows(pattern: string, limit: number): SessionSearchRow[] {
+  return stmts.searchSessions.all({ pattern, limit }) as SessionSearchRow[];
+}
+
+/** 读取消息内容中关键词附近的片段；needle 需为 ASCII 小写化后的关键词，before/length 按字符计 */
+export function getMessageSearchSnippet(
+  messageId: number,
+  needle: string,
+  before: number,
+  length: number,
+): MessageSearchSnippet | null {
+  const row = stmts.getMessageSearchSnippet.get({ id: messageId, needle, before, length }) as
+    | MessageSearchSnippet
+    | undefined;
+  return row || null;
 }
