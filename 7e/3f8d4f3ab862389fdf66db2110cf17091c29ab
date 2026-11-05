@@ -1,0 +1,110 @@
+src/web/public/scripts/agent-loop.js
+  s_0f784626c2ad11::t_e9c9e0ae154483 1091
+  s_0f784626c2ad11::t_4cb34a61cb29b4 929-938
+  s_0f784626c2ad11::t_c1bdd2688273d1 1008-1010
+  s_0f784626c2ad11::t_c9516b9c36425e 315
+  s_0f784626c2ad11::t_1e24219c2813db 254
+  s_0f784626c2ad11::t_7d8b5d7be652f4 730-732
+  s_0f784626c2ad11::t_35def16f39bb15 1007
+  s_0f784626c2ad11::t_a1e9a32808c349 966
+  s_0f784626c2ad11::t_5b407f74f6b10e 135-138
+  s_0f784626c2ad11::t_206780dbea632a 952
+  s_4e51dbae6e0005::t_63bbb8341156f2 263,267,273-276,278,280-290,293-303
+  s_0f784626c2ad11::t_846a470f73381a 868
+  s_0f784626c2ad11::t_d9e25300b71924 250-253,255-262,264-266,268-272,277,279,291-292,304-305,307-314,316-319
+  s_0f784626c2ad11::t_00aa8d3fc3acd6 1079
+  s_0f784626c2ad11::t_3445fd9ddd71d0 306
+src/web/public/styles/claude-agent-loop.css
+  s_0f784626c2ad11::t_6b2e81cec56493 500-782,787-796,798-804,806
+  s_4e51dbae6e0005::t_cd669528d3e184 807-861
+  s_33f5bc7e23af49::t_221a477e3667dc 783-786
+  s_33f5bc7e23af49::t_461f80c47bb33d 797,805
+src/providers/codebuddy.ts
+  s_0f784626c2ad11::t_f6749502aee374 88-139
+  s_0f784626c2ad11::t_405cbdcb4b4465 468,476-535
+  s_0f784626c2ad11::t_f8cbeb72a2000c 19-20
+  s_0f784626c2ad11::t_c44a30904a485c 467
+  s_0f784626c2ad11::t_f2bdb3a12f9490 645
+  s_0f784626c2ad11::t_293129b8f799d6 844,848
+src/chat-runner.ts
+  s_0f784626c2ad11::t_7d8a1b4427da62 11-19
+  s_0f784626c2ad11::t_4503554fcff156 565
+  s_0f784626c2ad11::t_2bc0737810168f 109-113
+  s_0f784626c2ad11::t_3d6b358c448bee 501-531
+src/web/public/scripts/app/chat/user-question-card.js
+  s_0f784626c2ad11::t_57be2e01caef41 83
+  s_0f784626c2ad11::t_7b2fa14bbaee6b 99,106
+  s_0f784626c2ad11::t_26089bddf21f5e 72,77,82,87
+  s_0f784626c2ad11::t_149464e40dd99e 213
+  s_0f784626c2ad11::t_edf485b29d37c3 216
+  s_0f784626c2ad11::t_972f5edc16ee65 143
+  s_0f784626c2ad11::t_f8fcc0b19b01a3 51,55,57,59,61,63,65
+  s_0f784626c2ad11::t_e50048d5fb4888 225
+  s_0f784626c2ad11::t_13eed26f50281f 256
+  s_0f784626c2ad11::t_daf3d49e465a62 266
+  s_0f784626c2ad11::t_35d9adf5f56e2b 300
+  s_0f784626c2ad11::t_eb11d8be62875e 303
+  s_0f784626c2ad11::t_a2c7ba1ba24865 10,15
+  s_0f784626c2ad11::t_8d8ea1ee70517c 359-363,366
+  s_33f5bc7e23af49::t_8ee14a36b2f0f6 167,171-177
+  s_0f784626c2ad11::t_04a370157aa961 189
+  s_0f784626c2ad11::t_a49177dad0b9f4 312
+  s_0f784626c2ad11::t_01b207dc643205 23
+  s_0f784626c2ad11::t_a330f97ae134e4 273
+  s_0f784626c2ad11::t_d2cd9d20fc93dc 1
+  s_0f784626c2ad11::t_b458954e940bca 2-9,11-14,16-22,24-50,52-54,56,58,60,62,64,66-71,73-76,78-81,84-86,88-98,100-105,107-142,144-158,160-166,168-170,178-188,190-212,214-215,217-224,226-255,257-265,267-272,274-299,301-302,304-311,313-358,364-365,367-412
+  s_0f784626c2ad11::t_9edcd4122806b1 159
+src/web/public/scripts/app/main.js
+  s_4e51dbae6e0005::t_e2ab0900821c19 9
+  s_4e51dbae6e0005::t_e30b52b502e385 17
+  s_0f784626c2ad11::t_ed49e80899b74e 8,15
+src/web/public/scripts/app/chat/user-question-dock.js
+  s_4e51dbae6e0005::t_1c3cf2b4390755 1-48
+src/web/public/scripts/app/chat/session-controller.js
+  s_4e51dbae6e0005::t_0d9ad6b631f172 127
+  s_4e51dbae6e0005::t_ac0d8814d96e27 407
+src/web/routes/messages.ts
+  s_0f784626c2ad11::t_1384bd6eac5e56 317
+  s_0f784626c2ad11::t_a9df83e3f8bae6 401-417
+  s_0f784626c2ad11::t_ce7c1f2c4cd71c 36-41
+src/web/services/user-questions.ts
+  s_0f784626c2ad11::t_948d5ffc4da091 1-115
+src/providers/claude-code-agent-events.ts
+  s_0f784626c2ad11::t_2c9a74a4fdcf7b 13
+  s_0f784626c2ad11::t_559bc7b5fac92f 130-146
+src/providers/types.ts
+  s_0f784626c2ad11::t_1ca3d6f39c4de0 37-41
+  s_0f784626c2ad11::t_cb0c6275b23591 116-148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "7e3f8d4f3ab862389fdf66db2110cf17091c29ab",
+  "prompts": {},
+  "sessions": {
+    "s_0f784626c2ad11": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3911058f-ce0c-47c0-9d70-11168f740033",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_33f5bc7e23af49": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "64e1d80d-f77b-4490-9d6e-64a2878f8d75",
+        "model": "grok-4.7"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_4e51dbae6e0005": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "76694751-4a1e-4eb8-b7a3-9926fdd5bcdb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
