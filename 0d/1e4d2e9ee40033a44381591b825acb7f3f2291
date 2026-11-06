@@ -1,0 +1,25 @@
+src/chat-runner.ts
+  s_4bb814566f9510::t_06e0157c6c578b 441-448
+  s_4bb814566f9510::t_0bcdd5bc5c41b5 675-682
+  s_4bb814566f9510::t_0488c30aff0bbf 793-804
+  s_4bb814566f9510::t_2d3ed0a0d4ec80 538-549
+src/web/db.ts
+  s_4bb814566f9510::t_56849a8455d549 106-107
+  s_4bb814566f9510::t_1e54c77988211f 727-736,738-750
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "0d1e4d2e9ee40033a44381591b825acb7f3f2291",
+  "prompts": {},
+  "sessions": {
+    "s_4bb814566f9510": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84552e80-97f0-4c33-8474-e718778cc25c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
