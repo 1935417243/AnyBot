@@ -1,0 +1,90 @@
+src/web/public/scripts/app/automations/automations-page.js
+  s_83e9a466547f15::t_1a051c05b3e59c 89,111-127,131-134,327-328,797,880-882,912-917
+  s_83e9a466547f15::t_805a329feacdda 2,94,157-160,798,883-886,918
+src/providers/types.ts
+  s_83e9a466547f15::t_a1ecd3b165a15f 42-51
+src/web/public/scripts/app/automations/cron-schedule.js
+  s_81821e7398930b::t_fb652324c43e58 39-40
+  s_81821e7398930b::t_ec3f526c758a70 22,24-25,27,30,34-37,41-42
+  s_81821e7398930b::t_57fc97d711db13 8-13
+  s_83e9a466547f15::t_9f4ac62928b78e 1-7,14-21,23,26,28-29,31-33,38,43-88
+src/providers/claude-code.ts
+  s_83e9a466547f15::t_343cad190184a7 15
+  s_83e9a466547f15::t_3a256b2cd202b2 147,152-154,458,646
+  s_83e9a466547f15::t_d8ee46db95a6a1 648
+  s_83e9a466547f15::t_7ecdc789b0bbde 45,647
+src/web/services/automations.ts
+  s_81821e7398930b::t_88bad017fca7a9 289-290
+  s_81821e7398930b::t_5c7ea3c1d0383f 271-275,277,280,284-287,291-292
+  s_83e9a466547f15::t_e5d24f299de1c3 421-423
+  s_83e9a466547f15::t_53f724236ff105 1-2,6,11-14,28-29,99,123-124,343-345,380-420,424-446,494-506,511
+  s_81821e7398930b::t_71453e34428dcc 15-18
+  s_83e9a466547f15::t_bfd79d44ce28b0 507-510
+  s_83e9a466547f15::t_e87a8cdcc29c3b 512
+src/automation-scheduler.ts
+  s_81821e7398930b::t_9fec11a502bd75 17-18
+  s_81821e7398930b::t_e7e0cca5fd6b6c 101-109
+  s_83e9a466547f15::t_54771d613513e2 8,100,110-116
+src/web/routes/automations.ts
+  s_83e9a466547f15::t_e5d24f299de1c3 29-30
+  s_83e9a466547f15::t_40f9af13a8ebe7 12-13,27-28,31
+src/web/services/automation-runner.ts
+  s_83e9a466547f15::t_54771d613513e2 25,157-158,187-191
+src/mcp-config.ts
+  s_83e9a466547f15::t_d8ee46db95a6a1 72-74
+  s_83e9a466547f15::t_bfa468cf4f6195 3,6-17,54-56,60-62,77-82,87-89,101-108
+  s_83e9a466547f15::t_7ecdc789b0bbde 66-71,75-76
+src/web/services/agent-mcp.ts
+  s_83e9a466547f15::t_5df00abdfb8604 1-40,43-59,62-66,71-183,188-272,274-445
+  s_83e9a466547f15::t_e5d24f299de1c3 41-42,60-61,67-70,184-187,273
+src/providers/codebuddy.ts
+  s_83e9a466547f15::t_343cad190184a7 14
+  s_83e9a466547f15::t_3a256b2cd202b2 176,181-183,455,642
+  s_83e9a466547f15::t_7ecdc789b0bbde 40,643
+  s_83e9a466547f15::t_d8ee46db95a6a1 644
+src/chat-runner.ts
+  s_83e9a466547f15::t_37ffee0f8412e2 44-48,119-120,560-569,583,723-724
+src/providers/codex.ts
+  s_83e9a466547f15::t_7383617e076a90 844,957,1138-1139,1159,1167-1168,1183
+  s_83e9a466547f15::t_3a5f3f1550a059 29
+src/web/routes/agent-mcp.ts
+  s_83e9a466547f15::t_cfcb9e537fbbf0 1-65
+src/web/public/styles/automations.css
+  s_e234efa2b2949c::t_12c1c5dc50fb77 693
+src/web/services/agent-mcp-grants.ts
+  s_83e9a466547f15::t_b6009720013bc2 1-54
+src/web/api.ts
+  s_83e9a466547f15::t_ee3cf55b9bdcd8 2,29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "1c6c15e93c9e02b932d46f6546807c0c656b411e",
+  "prompts": {},
+  "sessions": {
+    "s_81821e7398930b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71900738-2fb5-464b-a063-5e4b8a0b690d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_83e9a466547f15": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "34225875-20e5-480a-b2a5-5ed17dadbeda",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    },
+    "s_e234efa2b2949c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e914e10-7aeb-4d0c-8cd1-65d3deb84edb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
