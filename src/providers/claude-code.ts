@@ -12,6 +12,7 @@ import {
     type SDKStatusMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type {
+    AppMcpServerConnection,
     IProvider,
     ProviderCapabilities,
     ProviderContextUsage,
@@ -41,7 +42,7 @@ import {logger} from "../logger.js";
 import {DEFAULT_SANDBOX} from "../sandbox-config.js";
 import type {SandboxMode} from "../types.js";
 import {getClaudeConfigDir, getClaudeSkillsDir, getIsolatedClaudeConfigDir} from "../claude-config.js";
-import {getClaudeMcpServersConfig} from "../mcp-config.js";
+import {getAppMcpAllowedTools, getAppMcpDisallowedTools, getClaudeMcpServersConfig} from "../mcp-config.js";
 import {getCliExecutablePath} from "../cli-runtime/installer.js";
 
 const DEFAULT_TIMEOUT_MS = DEFAULT_PROVIDER_TIMEOUT_MS;
@@ -143,12 +144,14 @@ function buildSandboxOptions(sandbox: SandboxMode, workdir: string): Options["sa
     };
 }
 
-function buildAllowedTools(sandbox: SandboxMode): string[] | undefined {
+function buildAllowedTools(sandbox: SandboxMode, appMcpServer?: AppMcpServerConnection): string[] | undefined {
     if (sandbox === "danger-full-access") {
         return undefined;
     }
 
-    return sandbox === "workspace-write" ? WORKSPACE_WRITE_TOOLS : READ_ONLY_TOOLS;
+    const baseTools = sandbox === "workspace-write" ? WORKSPACE_WRITE_TOOLS : READ_ONLY_TOOLS;
+    // 内置 MCP 工具只操作 AnyBot 自身配置，不受沙箱档位限制，注入时一并放行
+    return [...baseTools, ...getAppMcpAllowedTools(appMcpServer)];
 }
 
 type ClaudeSkillsMapping = {
@@ -452,7 +455,7 @@ export class ClaudeCodeProvider implements IProvider {
             || this.defaultModel;
         // ultracode 是 AnyBot 的 UI 档位，SDK 侧没有对应取值，等价于 xhigh
         const sdkEffort = effort === "ultracode" ? "xhigh" : effort;
-        const mcpServers = getClaudeMcpServersConfig() as Options["mcpServers"] | undefined;
+        const mcpServers = getClaudeMcpServersConfig(opts.appMcpServer) as Options["mcpServers"] | undefined;
         // 执行时实时解析 CLI 路径，组件后下载完成也能立即生效
         const cliExecutable = this.resolveCliExecutable();
 
@@ -640,7 +643,9 @@ export class ClaudeCodeProvider implements IProvider {
                     maxTurns: this.maxTurns,
                     permissionMode,
                     allowDangerouslySkipPermissions: permissionMode === "bypassPermissions",
-                    allowedTools: buildAllowedTools(sandbox),
+                    allowedTools: buildAllowedTools(sandbox, opts.appMcpServer),
+                    // 注入内置 MCP 时禁用自带的会话级定时工具，定时需求统一走 AnyBot 自动化
+                    disallowedTools: getAppMcpDisallowedTools(opts.appMcpServer),
                     tools: {type: "preset", preset: "claude_code"},
                     systemPrompt: {type: "preset", preset: "claude_code"},
                     settingSources: ["user", "project", "local"],

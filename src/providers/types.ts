@@ -39,6 +39,16 @@ export interface RunOptions {
     request: ProviderUserQuestionRequest,
     signal: AbortSignal,
   ) => Promise<ProviderUserQuestionReply>;
+  /** AnyBot 内置 MCP Server 的本次运行连接信息；由 ChatRunner 按运行签发，未提供时不注入内置工具 */
+  appMcpServer?: AppMcpServerConnection;
+}
+
+/** AnyBot 内置 MCP Server（自动化管理等工具）的单次运行连接信息，Provider 只负责按自身格式注入 */
+export interface AppMcpServerConnection {
+  /** 内置 MCP Server 的 Streamable HTTP 地址 */
+  url: string;
+  /** 访问内置 MCP Server 需携带的请求头（API token 与本次运行凭证） */
+  headers: Record<string, string>;
 }
 
 export interface RunResult {

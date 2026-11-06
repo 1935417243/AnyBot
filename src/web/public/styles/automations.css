@@ -690,7 +690,7 @@
             margin-top: 10px;
         }
 
-        .automation-field:first-of-type {
+        .automation-form-title + .automation-field {
             margin-top: 0;
         }
 

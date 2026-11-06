@@ -1,9 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { getRegisteredChannelTypes, readChannelsConfig } from "../../channels/index.js";
 import { logger } from "../../logger.js";
-import { getRegisteredProviderTypes } from "../../providers/index.js";
-import * as db from "../db.js";
 import {
   createAutomation,
   deleteAutomation,
@@ -12,11 +9,12 @@ import {
   listAutomations,
   listAutomationRuns,
   updateAutomation,
+  validateAutomationInput as validateAutomationBaseInput,
+  validateAutomationSchedule,
   type AutomationInput,
 } from "../services/automations.js";
 import { triggerAutomationRun } from "../services/automation-runner.js";
 
-const LOCAL_CHANNEL_TYPE = "local";
 const RUN_PAGE_SIZE = 10;
 
 function readPageParam(value: unknown): number {
@@ -26,19 +24,12 @@ function readPageParam(value: unknown): number {
 }
 
 function validateAutomationInput(input: AutomationInput): string | null {
-  if (!input.name || typeof input.name !== "string" || !input.name.trim()) return "缺少任务名称";
-  if (!input.prompt || typeof input.prompt !== "string" || !input.prompt.trim()) return "缺少执行内容";
-  if (!input.provider || typeof input.provider !== "string") return "缺少提供商";
-  if (!getRegisteredProviderTypes().includes(input.provider)) return `不支持的提供商: ${input.provider}`;
-  if (!input.channelType || typeof input.channelType !== "string") return "缺少交付方式";
-  if (input.channelType !== LOCAL_CHANNEL_TYPE && !getRegisteredChannelTypes().includes(input.channelType)) {
-    return `不支持的交付方式: ${input.channelType}`;
+  const baseError = validateAutomationBaseInput(input);
+  if (baseError) return baseError;
+  // 其它触发类型沿用 normalizeSchedule 的兜底；一次性任务时间和 cron 表达式无法兜底（非法值会导致永不执行），必须严格校验
+  if (input.schedule?.type === "once" || input.schedule?.type === "cron") {
+    return validateAutomationSchedule(input.schedule, { enabled: input.enabled !== false });
   }
-  if (input.channelType !== LOCAL_CHANNEL_TYPE && input.enabled !== false) {
-    const channelsConfig = readChannelsConfig();
-    if (!channelsConfig[input.channelType]?.enabled) return "交付方式未开启";
-  }
-  if (input.projectId && !db.getProject(input.projectId)) return "项目不存在";
   return null;
 }
 

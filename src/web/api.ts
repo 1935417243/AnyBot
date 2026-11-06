@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { createAgentMcpRouter } from "./routes/agent-mcp.js";
 import { createAutomationsRouter } from "./routes/automations.js";
 import { createChangeReviewsRouter } from "./routes/change-reviews.js";
 import { createChannelsRouter } from "./routes/channels.js";
@@ -25,6 +26,7 @@ export function createApiRouter(): Router {
 
   router.use(createEventsRouter());
   router.use(createAutomationsRouter());
+  router.use(createAgentMcpRouter());
   router.use(createProjectsRouter());
   router.use(createSessionsRouter());
   router.use(createSettingsRouter());

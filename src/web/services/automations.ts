@@ -1,11 +1,21 @@
+import { getRegisteredChannelTypes, readChannelsConfig } from "../../channels/index.js";
+import { getRegisteredProviderTypes } from "../../providers/index.js";
 import { generateId } from "../../shared.js";
 import * as db from "../db.js";
 
-export type AutomationScheduleType = "minutes" | "hourly" | "daily" | "weekly" | "cron";
+export type AutomationScheduleType = "once" | "minutes" | "hourly" | "daily" | "weekly" | "cron";
 export type AutomationRunStatus = "pending" | "running" | "success" | "failed";
 export type AutomationDeliveryStatus = "none" | "local" | "delivered" | "delivery_failed";
 
 const INTERRUPTED_RUN_ERROR = "服务重启，运行状态已中断";
+/** 本地交付方式：结果只保存在 AnyBot，不推送到频道 */
+export const LOCAL_AUTOMATION_CHANNEL_TYPE = "local";
+/** HH:mm 时间格式 */
+const SCHEDULE_TIME_PATTERN = /^\d{2}:\d{2}$/;
+/** cron 字段中的单个非负整数（取值或步长） */
+const CRON_NUMBER_PATTERN = /^\d+$/;
+/** cron 字段中的 a-b 范围 */
+const CRON_RANGE_PATTERN = /^(\d+)-(\d+)$/;
 
 export interface AutomationSkillConfig {
   id: string;
@@ -15,6 +25,8 @@ export interface AutomationSkillConfig {
 
 export interface AutomationScheduleConfig {
   type: AutomationScheduleType;
+  /** 一次性任务的执行时间（毫秒时间戳），仅 type=once 使用 */
+  runAt?: number;
   intervalMinutes?: number;
   time?: string;
   weekday?: number;
@@ -84,7 +96,7 @@ function cleanId(value: unknown): string {
 }
 
 function isScheduleType(value: unknown): value is AutomationScheduleType {
-  return value === "minutes" || value === "hourly" || value === "daily" || value === "weekly" || value === "cron";
+  return value === "once" || value === "minutes" || value === "hourly" || value === "daily" || value === "weekly" || value === "cron";
 }
 
 function normalizePositiveInt(value: unknown, fallback: number): number {
@@ -108,6 +120,8 @@ function normalizeSchedule(value: unknown): AutomationScheduleConfig {
   const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const type = isScheduleType(raw.type) ? raw.type : "minutes";
   const schedule: AutomationScheduleConfig = { type };
+  // 一次性任务缺少有效时间时记为 0，computeNextRunAt 得到 null，不会被调度
+  if (type === "once") schedule.runAt = normalizePositiveInt(raw.runAt, 0);
   if (type === "minutes") schedule.intervalMinutes = normalizePositiveInt(raw.intervalMinutes, 30);
   if (type === "daily" || type === "weekly") schedule.time = normalizeTime(raw.time);
   if (type === "weekly") schedule.weekday = normalizeWeekday(raw.weekday);
@@ -254,21 +268,28 @@ function parseCronPart(part: string, min: number, max: number, opts: { sunday7?:
   for (const rawSegment of part.split(",")) {
     const segment = rawSegment.trim();
     if (!segment) return null;
-    const [rangePart, stepPart] = segment.split("/");
+    const pieces = segment.split("/");
+    if (pieces.length > 2) return null;
+    const [rangePart, stepPart] = pieces;
+    // 取值和步长只接受纯数字，避免 Number() 把空串、十六进制、科学计数法等非法写法静默转成数字
+    if (stepPart != null && !CRON_NUMBER_PATTERN.test(stepPart)) return null;
     const step = stepPart == null ? 1 : Number(stepPart);
-    if (!Number.isInteger(step) || step <= 0) return null;
+    if (step <= 0) return null;
     let start: number;
     let end: number;
+    const rangeMatch = CRON_RANGE_PATTERN.exec(rangePart);
     if (rangePart === "*") {
       start = min;
       end = max;
-    } else if (rangePart.includes("-")) {
-      const [rawStart, rawEnd] = rangePart.split("-").map(Number);
-      start = rawStart;
-      end = rawEnd;
-    } else {
+    } else if (rangeMatch) {
+      start = Number(rangeMatch[1]);
+      end = Number(rangeMatch[2]);
+    } else if (CRON_NUMBER_PATTERN.test(rangePart)) {
       start = Number(rangePart);
-      end = start;
+      // 单个数字带步长（如 0/5）按常见约定视为从该值到字段上限，等价于 0-59/5
+      end = stepPart == null ? start : max;
+    } else {
+      return null;
     }
     if (opts.sunday7) {
       if (start === 7) start = 0;
@@ -319,6 +340,9 @@ function computeCronNextRunAt(cron: string, from = Date.now()): number | null {
 export function computeNextRunAt(schedule: AutomationScheduleConfig, from = Date.now()): number | null {
   const normalized = normalizeSchedule(schedule);
   const now = new Date(from);
+  if (normalized.type === "once") {
+    return normalized.runAt && normalized.runAt > from ? normalized.runAt : null;
+  }
   if (normalized.type === "minutes") {
     const next = new Date(from);
     next.setSeconds(0, 0);
@@ -350,6 +374,73 @@ export function computeNextRunAt(schedule: AutomationScheduleConfig, from = Date
   if (normalized.type === "cron") {
     return computeCronNextRunAt(normalized.cron || "0 9 * * 1", from);
   }
+  return null;
+}
+
+/** 判断 HH:mm 时间是否合法 */
+function isValidScheduleTime(value: unknown): boolean {
+  if (typeof value !== "string" || !SCHEDULE_TIME_PATTERN.test(value)) return false;
+  const [hour, minute] = value.split(":").map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
+/**
+ * 严格校验调度配置，返回错误文案，合法时返回 null。
+ * 与 normalizeSchedule 的静默兜底不同，这里不会替换非法值，供 Agent 工具和一次性任务校验使用。
+ * 启用状态下一次性任务的执行时间必须晚于 now。
+ */
+export function validateAutomationSchedule(
+  value: unknown,
+  opts: { enabled: boolean; now?: number },
+): string | null {
+  if (!value || typeof value !== "object") return "缺少触发配置";
+  const raw = value as Record<string, unknown>;
+  if (!isScheduleType(raw.type)) return `不支持的触发类型: ${String(raw.type)}`;
+  if (raw.type === "once") {
+    const runAt = raw.runAt;
+    if (typeof runAt !== "number" || !Number.isFinite(runAt) || runAt <= 0) return "一次性任务缺少有效的执行时间";
+    if (opts.enabled && runAt <= (opts.now ?? Date.now())) return "一次性任务的执行时间已过，请设置一个未来的时间";
+    return null;
+  }
+  if (raw.type === "minutes") {
+    const interval = raw.intervalMinutes;
+    if (typeof interval !== "number" || !Number.isInteger(interval) || interval < 1) return "间隔分钟必须是大于 0 的整数";
+    return null;
+  }
+  if (raw.type === "daily" || raw.type === "weekly") {
+    if (!isValidScheduleTime(raw.time)) return "执行时间格式应为 HH:mm（24 小时制）";
+    if (raw.type === "weekly") {
+      const weekday = raw.weekday;
+      if (typeof weekday !== "number" || !Number.isInteger(weekday) || weekday < 0 || weekday > 6) {
+        return "执行星期应为 0-6 的整数（0 表示周日）";
+      }
+    }
+    return null;
+  }
+  if (raw.type === "cron") {
+    if (typeof raw.cron !== "string" || computeCronNextRunAt(raw.cron) === null) {
+      return "cron 表达式无效或一年内不会触发，格式为「分 时 日 月 周」，只支持数字、*、a-b、逗号和 /步长";
+    }
+    return null;
+  }
+  return null;
+}
+
+/** 校验自动化基础字段（名称、内容、提供商、交付方式、项目），返回错误文案，合法时返回 null */
+export function validateAutomationInput(input: AutomationInput): string | null {
+  if (!input.name || typeof input.name !== "string" || !input.name.trim()) return "缺少任务名称";
+  if (!input.prompt || typeof input.prompt !== "string" || !input.prompt.trim()) return "缺少执行内容";
+  if (!input.provider || typeof input.provider !== "string") return "缺少提供商";
+  if (!getRegisteredProviderTypes().includes(input.provider)) return `不支持的提供商: ${input.provider}`;
+  if (!input.channelType || typeof input.channelType !== "string") return "缺少交付方式";
+  if (input.channelType !== LOCAL_AUTOMATION_CHANNEL_TYPE && !getRegisteredChannelTypes().includes(input.channelType)) {
+    return `不支持的交付方式: ${input.channelType}`;
+  }
+  if (input.channelType !== LOCAL_AUTOMATION_CHANNEL_TYPE && input.enabled !== false) {
+    const channelsConfig = readChannelsConfig();
+    if (!channelsConfig[input.channelType]?.enabled) return "交付方式未开启";
+  }
+  if (input.projectId && !db.getProject(input.projectId)) return "项目不存在";
   return null;
 }
 
@@ -394,6 +485,25 @@ export function updateAutomationNextRunAt(id: string, nextRunAt: number | null):
     ...existing,
     nextRunAt,
     updatedAt: existing.updatedAt,
+  };
+  db.updateAutomationRow(automationToRow(automation));
+  emitAutomationsChanged();
+  return automation;
+}
+
+/**
+ * 一次性任务到点执行（或错过执行时间）后自动停用。
+ * 重新读取最新配置，仅当它仍是已到期的一次性任务时才停用，避免覆盖执行期间被改到未来的新时间。
+ */
+export function markOnceAutomationFinished(id: string, now = Date.now()): AutomationConfig | null {
+  const existing = getAutomation(id);
+  if (!existing || existing.schedule.type !== "once") return null;
+  if (existing.schedule.runAt && existing.schedule.runAt > now) return null;
+  const automation: AutomationConfig = {
+    ...existing,
+    enabled: false,
+    nextRunAt: null,
+    updatedAt: now,
   };
   db.updateAutomationRow(automationToRow(automation));
   emitAutomationsChanged();

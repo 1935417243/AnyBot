@@ -41,6 +41,11 @@ import {
   type PublicChangeReview,
 } from "./web/change-review.js";
 import { emitSessionsChanged } from "./web/events.js";
+import {
+  buildAppMcpServerConnection,
+  issueAgentMcpGrant,
+  revokeAgentMcpGrant,
+} from "./web/services/agent-mcp-grants.js";
 
 export type ChatSessionRecord = db.ChatSessionMetadata & {
   messages?: db.ChatMessage[];
@@ -111,6 +116,8 @@ export type RunPreparedChatTurnOptions = {
     request: ProviderUserQuestionRequest,
     signal: AbortSignal,
   ) => Promise<ProviderUserQuestionReply>;
+  /** 是否向 Agent 注入 AnyBot 内置工具（自动化管理等）；默认开启，自动化触发的运行传 false 避免任务再创建任务 */
+  appTools?: boolean;
 };
 
 export type ChatTurnResult = {
@@ -550,6 +557,16 @@ export async function runPreparedChatTurn(
 
   logger.info(`${opts.logPrefix}.start`, buildLogFields(prepared, opts));
 
+  /** 本次运行的内置 MCP 凭证，运行结束后撤销 */
+  const appMcpGrant = opts.appTools === false
+    ? null
+    : issueAgentMcpGrant({
+        sessionId: prepared.session.id,
+        source: prepared.source,
+        provider: prepared.provider.type,
+        projectId: prepared.session.projectId ?? null,
+      });
+
   try {
     const runOptions = {
       workdir: prepared.workdir,
@@ -563,6 +580,7 @@ export async function runPreparedChatTurn(
       rawProviderCommand: prepared.rawProviderCommand,
       signal: opts.signal,
       askUserQuestion,
+      appMcpServer: appMcpGrant ? buildAppMcpServerConnection(appMcpGrant) : undefined,
     };
     const result = opts.stream && isStreamingProvider(prepared.provider)
       ? await prepared.provider.runWithEvents({
@@ -702,6 +720,8 @@ export async function runPreparedChatTurn(
       error: error instanceof Error ? error.message : "处理消息时出错了，请稍后再试。",
     });
     throw error;
+  } finally {
+    if (appMcpGrant) revokeAgentMcpGrant(appMcpGrant);
   }
 }
 

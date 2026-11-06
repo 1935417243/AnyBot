@@ -22,6 +22,7 @@ import { emitSessionsChanged } from "../events.js";
 import {
   computeNextRunAt,
   createAutomationRun,
+  markOnceAutomationFinished,
   pruneAutomationRuns,
   updateAutomationNextRunAt,
   updateAutomationRun,
@@ -153,6 +154,8 @@ async function executeAutomationRun(
       stream: emit ? { emit } : undefined,
       logPrefix: "automation.run",
       logFields: { automationId: automation.id, runId: run.id },
+      // 自动化执行时不暴露内置自动化工具，避免定时任务再创建或修改定时任务
+      appTools: false,
     }).finally(() => {
       clearActiveRun(session.id, activeRun.controller);
       if (active) finishAgentStream(session.id, active);
@@ -181,7 +184,11 @@ async function executeAutomationRun(
     });
   } finally {
     if (options.updateNextRunAt) {
-      updateAutomationNextRunAt(automation.id, computeNextRunAt(automation.schedule, Date.now()));
+      if (automation.schedule.type === "once") {
+        markOnceAutomationFinished(automation.id);
+      } else {
+        updateAutomationNextRunAt(automation.id, computeNextRunAt(automation.schedule, Date.now()));
+      }
     }
     pruneAutomationRuns(automation.id, RUN_HISTORY_KEEP);
   }

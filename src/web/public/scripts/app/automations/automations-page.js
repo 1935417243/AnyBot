@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/html.js';
+import { computeCronNextRunAt } from './cron-schedule.js';
 
 const WEEKDAY_LABELS = {
     1: '周一',
@@ -85,10 +86,12 @@ export function createAutomationsPageController(options) {
 
     function scheduleLabel(schedule) {
         if (!schedule) return '未配置';
+        if (schedule.type === 'once') return schedule.runAt ? '仅一次 ' + formatDateTime(new Date(schedule.runAt)) : '仅一次';
         if (schedule.type === 'minutes') return '每 ' + (schedule.intervalMinutes || 30) + ' 分钟';
         if (schedule.type === 'hourly') return '每小时';
         if (schedule.type === 'daily') return '每天 ' + (schedule.time || '09:00');
         if (schedule.type === 'weekly') return '每' + (WEEKDAY_LABELS[schedule.weekday] || '周一') + ' ' + (schedule.time || '09:00');
+        if (schedule.type === 'cron') return schedule.cron ? 'Cron ' + schedule.cron : 'Cron 未配置';
         return '未配置';
     }
 
@@ -105,9 +108,30 @@ export function createAutomationsPageController(options) {
         return formatDateTime(new Date(value));
     }
 
+    // 把时间转换为 datetime-local 输入框需要的本地时间格式 YYYY-MM-DDTHH:mm
+    function toDateTimeLocalValue(date) {
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        var hour = String(date.getHours()).padStart(2, '0');
+        var minute = String(date.getMinutes()).padStart(2, '0');
+        return year + '-' + month + '-' + day + 'T' + hour + ':' + minute;
+    }
+
+    // 新建一次性任务时的默认执行时间：一小时后的整分钟
+    function defaultOnceRunAt() {
+        var date = new Date(Date.now() + 60 * 60 * 1000);
+        date.setSeconds(0, 0);
+        return date.getTime();
+    }
+
     function nextRunLabel(schedule) {
         if (!schedule) return '未配置';
         var now = new Date();
+        if (schedule.type === 'once') {
+            if (!schedule.runAt) return '未设置执行时间';
+            return schedule.runAt > now.getTime() ? formatDateTime(new Date(schedule.runAt)) : '时间已过，请选择未来的时间';
+        }
         if (schedule.type === 'minutes') {
             var minutes = Number(schedule.intervalMinutes || 30);
             var nextMinutes = new Date(now.getTime() + Math.max(1, minutes) * 60 * 1000);
@@ -129,6 +153,10 @@ export function createAutomationsPageController(options) {
             if (daysAhead === 0 && next <= now) daysAhead = 7;
             next.setDate(next.getDate() + daysAhead);
             return formatDateTime(next);
+        }
+        if (schedule.type === 'cron') {
+            var nextCron = computeCronNextRunAt(schedule.cron, now.getTime());
+            return nextCron ? formatDateTime(new Date(nextCron)) : '表达式无效或一年内不会触发';
         }
         return '未配置';
     }
@@ -296,6 +324,8 @@ export function createAutomationsPageController(options) {
         document.getElementById('automation-drawer-overlay').addEventListener('click', closeDrawers);
 
         renderList();
+        // 对话中 Agent 可能新建或修改了自动化，一次性任务执行后也会自动停用，每次进入页面都重新拉取列表
+        fetchAutomations().then(renderList);
     }
 
     function getFilteredAutomations() {
@@ -647,7 +677,6 @@ export function createAutomationsPageController(options) {
     function renderEditor(automation) {
         var editor = document.getElementById('automation-editor');
         var schedule = automation && automation.schedule ? automation.schedule : { type: 'minutes', intervalMinutes: 30 };
-        if (schedule.type === 'cron') schedule = { type: 'minutes', intervalMinutes: 30 };
         selectedScheduleType = schedule.type || 'minutes';
         selectedWeekday = Number(schedule.weekday ?? 1);
         editor.innerHTML =
@@ -765,6 +794,8 @@ export function createAutomationsPageController(options) {
             { value: 'hourly', label: '每小时' },
             { value: 'daily', label: '每天' },
             { value: 'weekly', label: '每周' },
+            { value: 'once', label: '仅一次' },
+            { value: 'cron', label: 'Cron 表达式' },
         ];
     }
 
@@ -846,6 +877,13 @@ export function createAutomationsPageController(options) {
         var html = '';
         if (type === 'minutes') {
             html = formField('间隔分钟', '<input class="automation-input" id="automation-minute-input" type="number" min="1" step="1" value="' + escapeHtml(current.intervalMinutes || 30) + '">');
+        } else if (type === 'once') {
+            var onceValue = toDateTimeLocalValue(new Date(current.runAt || defaultOnceRunAt()));
+            html = formField('执行时间', '<input class="automation-input" id="automation-once-input" type="datetime-local" value="' + escapeHtml(onceValue) + '">');
+        } else if (type === 'cron') {
+            html = formField('Cron 表达式',
+                '<input class="automation-input mono" id="automation-cron-input" type="text" spellcheck="false" autocomplete="off" placeholder="0 9 * * 1-5" value="' + escapeHtml(current.cron || '0 9 * * 1-5') + '">' +
+                '<span class="automation-hint">格式：分 时 日 月 周（本机时区），支持 *、数字、a-b、逗号和 /步长，周 0 或 7 为周日；日和周同时填写时需同时满足。例：0 9 * * 1-5 表示工作日 9:00</span>');
         } else if (type === 'daily') {
             html = formField('执行时间', '<input class="automation-input" id="automation-time-input" type="time" value="' + escapeHtml(current.time || '09:00') + '">');
         } else if (type === 'weekly') {
@@ -871,6 +909,13 @@ export function createAutomationsPageController(options) {
         var type = selectedScheduleType || 'minutes';
         var schedule = { type: type };
         if (type === 'minutes') schedule.intervalMinutes = Number(document.getElementById('automation-minute-input').value || 30);
+        if (type === 'once') {
+            // datetime-local 的值不带时区，按浏览器本地时间解析，与服务端本机时区一致
+            var onceInput = document.getElementById('automation-once-input').value;
+            var runAt = onceInput ? new Date(onceInput).getTime() : NaN;
+            schedule.runAt = Number.isFinite(runAt) ? runAt : 0;
+        }
+        if (type === 'cron') schedule.cron = document.getElementById('automation-cron-input').value.trim();
         if (type === 'daily' || type === 'weekly') schedule.time = document.getElementById('automation-time-input').value || '09:00';
         if (type === 'weekly') schedule.weekday = Number(selectedWeekday ?? 1);
         return schedule;

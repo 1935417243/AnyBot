@@ -5,6 +5,7 @@ import {
   updateAutomationNextRunAt,
   onAutomationsChanged,
   markInterruptedAutomationRuns,
+  markOnceAutomationFinished,
 } from "./web/services/automations.js";
 import { runAutomation } from "./web/services/automation-runner.js";
 import { logger } from "./logger.js";
@@ -13,6 +14,8 @@ const MAX_TIMEOUT_MS = 2_147_000_000;
 const MIN_DELAY_MS = 1_000;
 const MIN_ERROR_RETRY_MS = 5_000;
 const MAX_ERROR_RETRY_MS = 5 * 60_000;
+/** 启动时一次性任务的补跑宽限窗口：错过执行时间不超过该时长仍补跑一次，超过则直接停用 */
+const ONCE_MISSED_GRACE_MS = 5 * 60_000;
 
 export class AutomationScheduler {
   private timer: NodeJS.Timeout | null = null;
@@ -94,6 +97,23 @@ export class AutomationScheduler {
     const now = Date.now();
     const due = listDueAutomations(now);
     for (const automation of due) {
+      if (automation.schedule.type === "once") {
+        // 一次性任务只有这一次机会：错过不超过宽限窗口时保留到期状态，由随后的 tick 补跑一次
+        if (automation.nextRunAt !== null && now - automation.nextRunAt <= ONCE_MISSED_GRACE_MS) {
+          logger.info("automation.scheduler.once_catch_up", {
+            automationId: automation.id,
+            missedRunAt: automation.nextRunAt,
+          });
+          continue;
+        }
+        // 超过宽限窗口的一次性任务跳过执行并直接停用
+        markOnceAutomationFinished(automation.id, now);
+        logger.info("automation.scheduler.once_missed", {
+          automationId: automation.id,
+          missedRunAt: automation.nextRunAt,
+        });
+        continue;
+      }
       const nextRunAt = computeNextRunAt(automation.schedule, now);
       updateAutomationNextRunAt(automation.id, nextRunAt);
       logger.info("automation.scheduler.missed_skipped", {

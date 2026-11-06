@@ -26,6 +26,7 @@ import os from "os";
 import path from "path";
 import { ProviderCancelledError } from "./types.js";
 import type {
+  AppMcpServerConnection,
   IProvider,
   ProviderCapabilities,
   ProviderModel,
@@ -840,7 +841,7 @@ export class CodexProvider implements IProvider {
     const codexSkillsMapping = this.codexHome
       ? ensureCodexSkillsAvailableInHome(this.codexHome)
       : null;
-    const mcpServers = getCodexMcpServersConfig();
+    const mcpServers = getCodexMcpServersConfig(opts.appMcpServer);
     let hardExpired = false;
     // 硬超时兜底触发后丢弃后台残留事件，避免 turn 已失败返回后仍向会话推流
     const emitEvent: typeof onEvent = onEvent
@@ -953,7 +954,7 @@ export class CodexProvider implements IProvider {
         model: this.resolveThreadModel(model),
         modelReasoningEffort: codexEffort as ThreadOptions["modelReasoningEffort"],
       };
-      const codex = this.createCodexForRun(adapterRunId);
+      const codex = this.createCodexForRun(adapterRunId, opts.appMcpServer);
       const thread = sessionId
         ? codex.resumeThread(sessionId, threadOptions)
         : codex.startThread(threadOptions);
@@ -1134,6 +1135,8 @@ export class CodexProvider implements IProvider {
   private buildCodexConfig(
     baseUrl: string | undefined,
     includeMcpServers: boolean,
+    /** 本次运行的 AnyBot 内置 MCP Server，仅 includeMcpServers 时注入 */
+    appMcpServer?: AppMcpServerConnection,
   ): CodexOptions["config"] | undefined {
     const config: Record<string, unknown> = {};
     if (this.codexCompatEnabled && baseUrl) {
@@ -1153,7 +1156,7 @@ export class CodexProvider implements IProvider {
     }
 
     if (includeMcpServers) {
-      const mcpServers = getCodexMcpServersConfig();
+      const mcpServers = getCodexMcpServersConfig(appMcpServer);
       if (mcpServers) config.mcp_servers = mcpServers;
     }
 
@@ -1161,8 +1164,8 @@ export class CodexProvider implements IProvider {
   }
 
   /** 构造本次运行的 Codex 实例：仅 anthropic 格式有 per-run 适配层地址；无 per-run 地址且无 MCP 配置时复用共享实例 */
-  private createCodexForRun(runId: string | undefined): Codex {
-    const mcpServers = getCodexMcpServersConfig();
+  private createCodexForRun(runId: string | undefined, appMcpServer?: AppMcpServerConnection): Codex {
+    const mcpServers = getCodexMcpServersConfig(appMcpServer);
     const runBaseUrl =
       runId && this.codexCompatEnabled && this.codexUpstreamFormat === "anthropic" && this.codexAdapterBaseUrl
         ? buildCodexAdapterRunBaseUrl(this.codexAdapterBaseUrl, runId)
@@ -1177,7 +1180,7 @@ export class CodexProvider implements IProvider {
       Object.assign(codexOptions, this.buildCompatCodexOptions());
       if (runBaseUrl) codexOptions.baseUrl = runBaseUrl;
     }
-    codexOptions.config = this.buildCodexConfig(runBaseUrl || activeBaseUrl, true);
+    codexOptions.config = this.buildCodexConfig(runBaseUrl || activeBaseUrl, true, appMcpServer);
     return new Codex(codexOptions);
   }
 
