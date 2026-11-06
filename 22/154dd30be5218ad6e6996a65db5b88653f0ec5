@@ -1,0 +1,20 @@
+src/web/public/scripts/app/markdown.js
+  s_fe729a393ab7b7::t_e9860dbbde3747 85-96
+  s_fe729a393ab7b7::t_ff5422aafe6cf0 123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "22154dd30be5218ad6e6996a65db5b88653f0ec5",
+  "prompts": {},
+  "sessions": {
+    "s_fe729a393ab7b7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "63b1355c-d313-4186-9739-20d597fca459",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
