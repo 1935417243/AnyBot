@@ -584,6 +584,12 @@ async function saveReview(review: StoredChangeReview): Promise<void> {
   await fs.promises.rm(reviewPath(review.id), { force: true });
 }
 
+/** 只重写审核摘要；修改前后的完整内容创建后不再变化，状态或错误变更无需重写 payload */
+async function saveReviewSummary(review: StoredChangeReviewSummary): Promise<void> {
+  review.updatedAt = Date.now();
+  await writeChangeReviewSummary(toChangeReviewSummary(review));
+}
+
 async function loadStoredReview(id: string): Promise<StoredChangeReview | null> {
   const summary = await loadChangeReviewSummary(id);
   if (!summary) return null;
@@ -726,12 +732,13 @@ export async function getChangeReviewFileDiff(
 }
 
 export async function approveChangeReview(id: string): Promise<PublicChangeReview> {
-  const review = await loadStoredReview(id);
+  // 通过只改状态，读写摘要即可，不加载完整内容
+  const review = await loadChangeReviewSummary(id);
   if (!review) throw new Error("变更审查不存在");
   if (review.status === "pending") {
     review.status = "approved";
     delete review.error;
-    await saveReview(review);
+    await saveReviewSummary(review);
   }
   return getPublicReview(review);
 }
@@ -748,7 +755,7 @@ export async function revertChangeReview(id: string): Promise<PublicChangeReview
     const absolutePath = path.resolve(root, file.path);
     if (!absolutePath.startsWith(root + path.sep) && absolutePath !== root) {
       review.error = `无法安全撤销：文件路径越界 ${file.path}`;
-      await saveReview(review);
+      await saveReviewSummary(review);
       return getPublicReview(review);
     }
 
@@ -761,7 +768,7 @@ export async function revertChangeReview(id: string): Promise<PublicChangeReview
 
     if (!bufferEqualsBase64(current, file.afterContentBase64)) {
       review.error = `无法安全撤销：${file.path} 已被后续修改，请先手动处理该文件。`;
-      await saveReview(review);
+      await saveReviewSummary(review);
       return getPublicReview(review);
     }
   }
@@ -781,7 +788,7 @@ export async function revertChangeReview(id: string): Promise<PublicChangeReview
 
   review.status = "reverted";
   delete review.error;
-  await saveReview(review);
+  await saveReviewSummary(review);
   return getPublicReview(review);
 }
 
@@ -957,7 +964,7 @@ function payloadPath(id: string): string {
 }
 
 /** 去掉完整内容，留下打开会话需要的摘要 */
-function toChangeReviewSummary(review: StoredChangeReview): StoredChangeReviewSummary {
+function toChangeReviewSummary(review: StoredChangeReviewSummary): StoredChangeReviewSummary {
   return {
     ...review,
     files: review.files.map((file) => ({

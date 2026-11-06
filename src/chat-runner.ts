@@ -422,7 +422,10 @@ export async function runPreparedChatTurn(
   opts: RunPreparedChatTurnOptions,
 ): Promise<ChatTurnResult> {
   const agentEvents: ClaudeAgentStreamEvent[] = [];
-  const changeSnapshot = await safeCreateChangeSnapshotForWorkdir(prepared.workdir);
+  // 只读沙箱下 Agent 无法写入文件，跳过变更审核快照，避免每轮扫描工作区和预读文件内容
+  const changeSnapshot = prepared.sandbox === "read-only"
+    ? null
+    : await safeCreateChangeSnapshotForWorkdir(prepared.workdir);
   let assistantMessageAdded = false;
   let assistantContent = "";
   let assistantProviderSessionId = prepared.providerSessionId;

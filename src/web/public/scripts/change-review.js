@@ -182,11 +182,11 @@
             '</div>';
     }
 
-    function renderFile(file, openPaths) {
+    // 文件默认折叠且只渲染标题行，diff 内容在首次展开时由 render() 惰性生成
+    function renderFile(file) {
         var status = file.status || 'modified';
-        var open = openPaths && openPaths.has(file.path) ? ' open' : '';
         return '' +
-            '<details class="change-review-file" data-file-path="' + escapeAttr(file.path) + '"' + open + '>' +
+            '<details class="change-review-file" data-file-path="' + escapeAttr(file.path) + '">' +
             '<summary class="change-review-file-header">' +
             '<span class="change-review-file-main">' +
             '<span class="change-review-file-path" title="' + escapeAttr(file.path) + '">' + escapeHtml(file.path) + '</span>' +
@@ -201,11 +201,10 @@
             '</span>' +
             '</span>' +
             '</summary>' +
-            renderFileBody(file) +
             '</details>';
     }
 
-    function renderInner(review, openPaths) {
+    function renderInner(review) {
         var disabled = review.status !== 'pending' ? ' disabled' : '';
         var files = Array.isArray(review.files) ? review.files : [];
         return '' +
@@ -218,7 +217,7 @@
             renderReviewCounts(review, files) +
             '</div>' +
             '</div>' +
-            '<div class="change-review-files">' + files.map(function (file) { return renderFile(file, openPaths); }).join('') + '</div>' +
+            '<div class="change-review-files">' + files.map(function (file) { return renderFile(file); }).join('') + '</div>' +
             (review.error ? '<div class="change-review-error">' + escapeHtml(review.error) + '</div>' : '') +
             '<div class="change-review-actions">' +
             '<button class="change-review-btn secondary" data-action="revert"' + disabled + '>撤销</button>' +
@@ -254,47 +253,109 @@
         if (!review || !review.id || !Array.isArray(review.files) || review.files.length === 0) return null;
 
         var container = document.createElement('div');
-        var openPaths = new Set();
         container.className = 'change-review-card';
         container.dataset.reviewId = review.id;
-        container.innerHTML = renderInner(review, openPaths);
+        container.innerHTML = renderInner(review);
 
-        function update(nextReview) {
-            review = nextReview || review;
-            container.innerHTML = renderInner(review, openPaths);
-            bindActions();
-            bindFileState();
-            bindDiffLoaders();
+        /** 按路径查找当前审核数据中的文件 */
+        function findReviewFile(filePath) {
+            var files = Array.isArray(review.files) ? review.files : [];
+            for (var i = 0; i < files.length; i += 1) {
+                if (files[i].path === filePath) return files[i];
+            }
+            return null;
+        }
+
+        /** 按路径查找文件对应的 details 元素；路径可能含特殊字符，不拼 CSS 选择器 */
+        function findFileElement(filePath) {
+            var items = container.querySelectorAll('.change-review-file[data-file-path]');
+            for (var i = 0; i < items.length; i += 1) {
+                if (items[i].getAttribute('data-file-path') === filePath) return items[i];
+            }
+            return null;
+        }
+
+        /** 只重建单个文件 details 内的 diff 区域，保留标题行和其它文件节点 */
+        function renderFileBodyInto(el, file) {
+            Array.prototype.slice.call(el.children).forEach(function (child) {
+                if (child.tagName !== 'SUMMARY') child.remove();
+            });
+            el.insertAdjacentHTML('beforeend', renderFileBody(file));
+            el.setAttribute('data-body-rendered', '1');
+            bindDiffLoaders(el);
+        }
+
+        /** 文件首次展开时才生成 diff 节点，折叠态不创建逐行 DOM */
+        function ensureFileBody(el) {
+            if (el.hasAttribute('data-body-rendered')) return;
+            var file = findReviewFile(el.getAttribute('data-file-path') || '');
+            if (file) renderFileBodyInto(el, file);
+        }
+
+        /** 根据 review.error 新增、更新或移除错误提示 */
+        function updateErrorNotice() {
+            var errorEl = container.querySelector('.change-review-error');
+            if (!review.error) {
+                if (errorEl) errorEl.remove();
+                return;
+            }
+            if (!errorEl) {
+                errorEl = document.createElement('div');
+                errorEl.className = 'change-review-error';
+                container.insertBefore(errorEl, container.querySelector('.change-review-actions'));
+            }
+            errorEl.textContent = review.error;
+        }
+
+        /** 按审核状态恢复操作按钮的文案和禁用状态 */
+        function updateActionButtons() {
+            var disabled = review.status !== 'pending';
+            container.querySelectorAll('[data-action]').forEach(function (btn) {
+                btn.disabled = disabled;
+                btn.textContent = btn.getAttribute('data-action') === 'revert' ? '撤销' : '通过';
+            });
+        }
+
+        /** 审核状态变化后只刷新状态文案、错误提示和按钮，不重建文件列表 */
+        function updateReviewState(nextReview) {
+            if (nextReview) {
+                // 文件列表沿用本地数据，避免已加载的完整 diff 被服务端摘要覆盖
+                review = Object.assign({}, nextReview, { files: review.files });
+            }
+            var stateEl = container.querySelector('.change-review-state');
+            if (stateEl) stateEl.textContent = statusText(review.status);
+            updateErrorNotice();
+            updateActionButtons();
             if (opts.scrollBottom) opts.scrollBottom();
         }
 
         function replaceReviewFile(nextFile) {
+            var mergedFile = null;
             var files = (Array.isArray(review.files) ? review.files : []).map(function (file) {
                 if (file.path !== nextFile.path) return file;
-                return Object.assign({}, file, nextFile, {
+                mergedFile = Object.assign({}, file, nextFile, {
                     diffTruncated: false,
                     fullDiffAvailable: false,
                 });
+                return mergedFile;
             });
-            update(Object.assign({}, review, { files: files }));
+            review = Object.assign({}, review, { files: files });
+            var el = mergedFile ? findFileElement(mergedFile.path) : null;
+            if (el) renderFileBodyInto(el, mergedFile);
+            if (opts.scrollBottom) opts.scrollBottom();
         }
 
         function bindFileState() {
             container.querySelectorAll('.change-review-file[data-file-path]').forEach(function (el) {
                 el.addEventListener('toggle', function () {
-                    var filePath = el.getAttribute('data-file-path') || '';
-                    if (!filePath) return;
-                    if (el.open) {
-                        openPaths.add(filePath);
-                    } else {
-                        openPaths.delete(filePath);
-                    }
+                    if (el.open) ensureFileBody(el);
                 });
             });
         }
 
-        function bindDiffLoaders() {
-            container.querySelectorAll('[data-load-full-diff]').forEach(function (btn) {
+        /** 为指定范围内的「查看完整 diff」按钮绑定加载逻辑 */
+        function bindDiffLoaders(root) {
+            root.querySelectorAll('[data-load-full-diff]').forEach(function (btn) {
                 btn.addEventListener('click', async function (event) {
                     event.preventDefault();
                     event.stopPropagation();
@@ -304,7 +365,6 @@
                     btn.textContent = '加载中…';
                     try {
                         var file = await loadFullDiff(review.id, filePath);
-                        openPaths.add(filePath);
                         replaceReviewFile(file);
                     } catch (error) {
                         btn.disabled = false;
@@ -323,9 +383,9 @@
                     btn.textContent = action === 'revert' ? '撤销中…' : '通过中…';
                     try {
                         var nextReview = await runAction(review.id, action === 'revert' ? 'revert' : 'approve');
-                        update(nextReview);
+                        updateReviewState(nextReview);
                     } catch (error) {
-                        update(Object.assign({}, review, {
+                        updateReviewState(Object.assign({}, review, {
                             error: error.message || '操作失败',
                         }));
                     }
@@ -335,7 +395,6 @@
 
         bindActions();
         bindFileState();
-        bindDiffLoaders();
         return container;
     }
 
