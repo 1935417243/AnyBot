@@ -103,6 +103,8 @@ const dbPath = path.join(dataDir, "chat.db");
 const db = new Database(dbPath);
 
 db.pragma("journal_mode = WAL");
+// WAL 模式下 NORMAL 只在 checkpoint 时 fsync，提交不再逐次刷盘；进程崩溃不丢数据，仅系统掉电可能丢最近几次提交且不会损坏库
+db.pragma("synchronous = NORMAL");
 db.pragma("foreign_keys = ON");
 
 db.exec(`
@@ -722,10 +724,30 @@ export function deleteAllSessions(): void {
   stmts.deleteAllSessions.run();
 }
 
-export function addMessage(sessionId: string, role: "user" | "assistant", content: string, metadata?: string | null): number {
-  const result = stmts.insertMessage.run(sessionId, role, content, metadata || null);
-  stmts.incrementSessionMessageCount.run(sessionId);
+/** 写入消息、自增会话消息数与更新会话三步合并的事务，保证原子性且只提交一次 */
+const addMessageAndUpdateSessionTx = db.transaction((
+  session: Parameters<typeof updateSession>[0],
+  role: "user" | "assistant",
+  content: string,
+  metadata: string | null,
+): number => {
+  const result = stmts.insertMessage.run(session.id, role, content, metadata);
+  stmts.incrementSessionMessageCount.run(session.id);
+  updateSession(session);
   return Number(result.lastInsertRowid);
+});
+
+/**
+ * 向 session.id 对应会话追加一条消息，并在同一事务内更新会话的标题、Provider 会话 ID 与更新时间。
+ * 返回新消息 ID。
+ */
+export function addMessageAndUpdateSession(
+  session: Parameters<typeof updateSession>[0],
+  role: "user" | "assistant",
+  content: string,
+  metadata?: string | null,
+): number {
+  return addMessageAndUpdateSessionTx(session, role, content, metadata || null);
 }
 
 export function detachChatId(source: string, chatId: string): void {

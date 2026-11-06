@@ -438,8 +438,14 @@ export async function runPreparedChatTurn(
   }): boolean => {
     if (assistantMessageAdded) return false;
 
-    db.addMessage(
-      prepared.session.id,
+    db.addMessageAndUpdateSession(
+      {
+        id: prepared.session.id,
+        title: prepared.session.title,
+        sessionId: message.providerSessionId,
+        provider: prepared.session.provider,
+        updatedAt: Date.now(),
+      },
       "assistant",
       message.content,
       buildAssistantMetadata({
@@ -449,13 +455,6 @@ export async function runPreparedChatTurn(
         contextUsage: message.contextUsage,
       }),
     );
-    db.updateSession({
-      id: prepared.session.id,
-      title: prepared.session.title,
-      sessionId: message.providerSessionId,
-      provider: prepared.session.provider,
-      updatedAt: Date.now(),
-    });
     prepared.session.sessionId = message.providerSessionId;
     assistantMessageAdded = true;
     assistantContent = message.content;
@@ -536,23 +535,22 @@ export async function runPreparedChatTurn(
       }
     : undefined;
 
-  db.addMessage(
-    prepared.session.id,
+  // 写入前判断是否为会话首条消息以生成标题，使消息写入与会话更新能合并到同一事务
+  if (db.countMessages(prepared.session.id) === 0) {
+    prepared.session.title = generateTitle(prepared.titleText);
+  }
+  db.addMessageAndUpdateSession(
+    {
+      id: prepared.session.id,
+      title: prepared.session.title,
+      sessionId: prepared.session.sessionId,
+      provider: prepared.session.provider,
+      updatedAt: Date.now(),
+    },
     "user",
     prepared.storedUserContent,
     prepared.userMetadata,
   );
-
-  if (db.countMessages(prepared.session.id) <= 1) {
-    prepared.session.title = generateTitle(prepared.titleText);
-  }
-  db.updateSession({
-    id: prepared.session.id,
-    title: prepared.session.title,
-    sessionId: prepared.session.sessionId,
-    provider: prepared.session.provider,
-    updatedAt: Date.now(),
-  });
   emitSessionsChanged(prepared.session.id, "user_message_added");
 
   logger.info(`${opts.logPrefix}.start`, buildLogFields(prepared, opts));
@@ -674,8 +672,14 @@ export async function runPreparedChatTurn(
 
     if (error instanceof ProviderCancelledError) {
       const changeReview = await safeCollectChangeReview(changeSnapshot);
-      db.addMessage(
-        prepared.session.id,
+      db.addMessageAndUpdateSession(
+        {
+          id: prepared.session.id,
+          title: prepared.session.title,
+          sessionId: prepared.providerSessionId,
+          provider: prepared.session.provider,
+          updatedAt: Date.now(),
+        },
         "assistant",
         "已中断",
         buildAssistantMetadata({
@@ -684,13 +688,6 @@ export async function runPreparedChatTurn(
           changeReview,
         }),
       );
-      db.updateSession({
-        id: prepared.session.id,
-        title: prepared.session.title,
-        sessionId: prepared.providerSessionId,
-        provider: prepared.session.provider,
-        updatedAt: Date.now(),
-      });
       emitSessionsChanged(prepared.session.id, "assistant_message_cancelled");
       logger.info(`${opts.logPrefix}.cancelled`, {
         sessionId: prepared.session.id,
@@ -793,15 +790,18 @@ export async function compactChatSession(opts: {
         contextUsage: result.contextUsage || null,
       },
     });
-    const messageId = db.addMessage(opts.session.id, "assistant", content, metadata);
-
-    db.updateSession({
-      id: opts.session.id,
-      title: opts.session.title,
-      sessionId: providerSessionId,
-      provider: opts.session.provider,
-      updatedAt: createdAt,
-    });
+    const messageId = db.addMessageAndUpdateSession(
+      {
+        id: opts.session.id,
+        title: opts.session.title,
+        sessionId: providerSessionId,
+        provider: opts.session.provider,
+        updatedAt: createdAt,
+      },
+      "assistant",
+      content,
+      metadata,
+    );
     opts.session.sessionId = providerSessionId;
     opts.session.updatedAt = createdAt;
     emitSessionsChanged(opts.session.id, "context_compacted");
