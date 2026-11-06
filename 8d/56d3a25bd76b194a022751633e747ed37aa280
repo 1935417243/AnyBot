@@ -1,0 +1,22 @@
+src/web/public/scripts/app/app/cli-runtime-store.js
+  h_7a561dec792e5b 8-10,118-119,121-122
+src/web/public/scripts/app/app/create-app.js
+  h_7a561dec792e5b 37,212-213,216,366,648,1197-1198
+src/web/public/scripts/app/app/web-ui-events.js
+  h_7a561dec792e5b 1-386
+src/web/public/scripts/app/settings/settings-controller.js
+  h_7a561dec792e5b 100-103,490-491
+src/web/public/scripts/app/sidebar/sidebar-controller.js
+  h_7a561dec792e5b 78-79,96-97,1487-1491,1495-1496,1498,1502,1504-1510,1514-1517,1531-1532
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "8d56d3a25bd76b194a022751633e747ed37aa280",
+  "prompts": {},
+  "humans": {
+    "h_7a561dec792e5b": {
+      "author": "二虎 <1935417243@qq.com>"
+    }
+  }
+}
