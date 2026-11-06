@@ -3,6 +3,8 @@ import { getFileIconHtml, normalizeMessageFileReferences } from './message-selec
 
 const MAX_VISIBLE_FILES = 120;
 const NO_MATCH = Number.POSITIVE_INFINITY;
+// 加载超过该时长才显示"正在加载文件..."，避免请求很快返回时弹窗闪烁
+const LOADING_HINT_DELAY_MS = 150;
 
 function normalizeSearchValue(value) {
     return String(value || '').toLowerCase().replace(/\\/g, '/');
@@ -77,6 +79,12 @@ export function createFileReferencePickerController(config) {
     var loading = false;
     var requestId = 0;
     var pendingFileDeleteIndex = null;
+    // 后端返回的文件列表是否不完整（文件过多或目录范围过大）
+    var truncated = false;
+    // 延迟显示加载提示的定时器
+    var loadingTimer = null;
+    // 加载提示是否已经显示
+    var loadingVisible = false;
 
     function getSelection() {
         return selectedFiles.slice();
@@ -120,6 +128,8 @@ export function createFileReferencePickerController(config) {
         activeIndex = 0;
         visualActive = false;
         loading = false;
+        truncated = false;
+        clearLoadingHint();
         if (config.filePickerEl) {
             config.filePickerEl.hidden = true;
             config.filePickerEl.innerHTML = '';
@@ -212,10 +222,13 @@ export function createFileReferencePickerController(config) {
             var res = await fetch(url);
             if (!res.ok) throw new Error('HTTP ' + res.status);
             var data = await res.json();
-            return normalizeFiles(data && data.files);
+            return {
+                files: normalizeFiles(data && data.files),
+                truncated: !!(data && data.truncated),
+            };
         } catch (error) {
             console.warn('Failed to fetch @ file list:', error);
-            return [];
+            return { files: [], truncated: false };
         }
     }
 
@@ -232,26 +245,25 @@ export function createFileReferencePickerController(config) {
         pickerQuery = startingTrigger.query;
         pickerFiles = [];
         filteredFiles = [];
+        truncated = false;
         activeIndex = 0;
         visualActive = false;
         loading = true;
-        renderPicker();
+        scheduleLoadingHint(currentRequestId);
 
-        var files = await fetchFiles();
+        var result = await fetchFiles();
         if (requestId !== currentRequestId) return;
 
         loading = false;
+        clearLoadingHint();
         var trigger = getActiveTrigger();
         if (!isValidTrigger(trigger)) {
             close();
             return;
         }
 
-        pickerFiles = files;
-        if (pickerFiles.length === 0) {
-            close();
-            return;
-        }
+        pickerFiles = result.files;
+        truncated = result.truncated;
 
         pickerTokenStart = trigger.start;
         pickerTokenEnd = trigger.end;
@@ -352,6 +364,7 @@ export function createFileReferencePickerController(config) {
 
     function renderPicker() {
         if (!config.filePickerEl || !pickerOpen) return;
+        if (loading && !loadingVisible) return;
 
         config.filePickerEl.hidden = false;
         config.filePickerEl.innerHTML = '';
@@ -373,6 +386,14 @@ export function createFileReferencePickerController(config) {
             list.appendChild(empty);
         } else {
             renderFileList(list);
+        }
+
+        if (!loading && truncated) {
+            var note = document.createElement('div');
+            note.className = 'file-picker-note';
+            note.setAttribute('role', 'presentation');
+            note.textContent = '文件较多，仅列出了部分文件';
+            list.appendChild(note);
         }
 
         config.filePickerEl.appendChild(list);
@@ -467,12 +488,36 @@ export function createFileReferencePickerController(config) {
             return true;
         }
         if (event.key === 'Enter' || event.key === 'Tab') {
+            if (!loading && filteredFiles.length === 0) {
+                close();
+                return false;
+            }
             var activeItem = loading ? null : filteredFiles[activeIndex];
             event.preventDefault();
             if (activeItem) commitItem(activeItem);
             return true;
         }
         return false;
+    }
+
+    // 延迟显示加载提示；请求在延迟内返回时不渲染加载态
+    function scheduleLoadingHint(currentRequestId) {
+        clearLoadingHint();
+        loadingTimer = setTimeout(function () {
+            loadingTimer = null;
+            if (requestId !== currentRequestId || !loading) return;
+            loadingVisible = true;
+            renderPicker();
+        }, LOADING_HINT_DELAY_MS);
+    }
+
+    // 取消尚未显示的加载提示，并重置加载提示状态
+    function clearLoadingHint() {
+        if (loadingTimer) {
+            clearTimeout(loadingTimer);
+            loadingTimer = null;
+        }
+        loadingVisible = false;
     }
 
     return {

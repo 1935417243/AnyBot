@@ -2346,6 +2346,18 @@
             text-align: center;
         }
 
+        .skill-picker-empty-hint {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+        }
+
+        .file-picker-note {
+            padding: 8px 10px 4px;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
         .selected-skills {
             min-width: 0;
             display: flex;

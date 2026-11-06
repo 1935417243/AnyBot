@@ -505,6 +505,10 @@ export function createSlashPickerController(config) {
             var empty = document.createElement('div');
             empty.className = 'skill-picker-empty';
             empty.textContent = pickerItems.length === 0 ? '暂无可用技能、命令或项目' : '没有匹配的快捷项';
+            var emptyHint = document.createElement('span');
+            emptyHint.className = 'skill-picker-empty-hint';
+            emptyHint.textContent = '未识别的命令不会发送，按 Esc 取消';
+            empty.appendChild(emptyHint);
             list.appendChild(empty);
         } else {
             renderPickerGroups(list);

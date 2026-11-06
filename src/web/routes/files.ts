@@ -172,11 +172,10 @@ export function createFilesRouter(): Router {
 
     try {
       const workdir = getSessionWorkdir({ projectId });
-      const files = await listMentionableFiles(workdir, {
-        allowWorkspaceScan: !projectId,
+      const result = await listMentionableFiles(workdir, {
         excludeDefaultWorkspaceDirs: !projectId,
       });
-      res.json({ files });
+      res.json(result);
     } catch (error) {
       logger.warn("web.files.mention_list_failed", { projectId, error });
       res.json({ files: [] });
@@ -192,11 +191,10 @@ export function createFilesRouter(): Router {
 
     try {
       const workdir = getSessionWorkdir(session);
-      const files = await listMentionableFiles(workdir, {
-        allowWorkspaceScan: !session.projectId,
+      const result = await listMentionableFiles(workdir, {
         excludeDefaultWorkspaceDirs: !session.projectId,
       });
-      res.json({ files });
+      res.json(result);
     } catch (error) {
       logger.warn("web.files.mention_list_failed", { sessionId: session.id, error });
       res.json({ files: [] });
