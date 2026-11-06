@@ -433,9 +433,6 @@
                 : answerText;
             finalEl.innerHTML = renderMarkdown(visibleText);
             enhanceLocalFileLinks(finalEl);
-            finalEl.querySelectorAll('pre code').forEach(function (block) {
-                if (typeof hljs !== 'undefined') hljs.highlightElement(block);
-            });
             enhanceCodeBlocks(finalEl);
             if (isLarge) {
                 var expand = document.createElement('button');
@@ -457,9 +454,6 @@
                     }
                     finalEl.innerHTML = renderMarkdown(state.answerText);
                     enhanceLocalFileLinks(finalEl);
-                    finalEl.querySelectorAll('pre code').forEach(function (block) {
-                        if (typeof hljs !== 'undefined') hljs.highlightElement(block);
-                    });
                     enhanceCodeBlocks(finalEl);
                     renderChangeReview();
                 });
@@ -576,9 +570,6 @@
                 segment.plain = false;
                 segment.el.classList.remove('plain-text');
                 segment.el.innerHTML = renderMarkdown(segment.text);
-                segment.el.querySelectorAll('pre code').forEach(function (block) {
-                    if (typeof hljs !== 'undefined') hljs.highlightElement(block);
-                });
                 enhanceCodeBlocks(segment.el);
             }
             scrollBottom();

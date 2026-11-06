@@ -82,6 +82,18 @@ function extractHtmlTitle(code) {
     return match ? match[1].trim() : '';
 }
 
+// 预览卡片「查看代码」源码着色：html/svg 走 hljs 的 xml 语法，hljs 未注册的语言（如 mermaid）保持转义纯文本
+function highlightPreviewSource(lang, code) {
+    var highlightJs = getHighlightJs();
+    if (highlightJs && highlightJs.getLanguage(lang)) {
+        try {
+            return highlightJs.highlight(code, { language: lang }).value;
+        } catch (_) {
+        }
+    }
+    return escapeHtml(code);
+}
+
 // 生成预览卡片骨架：只含安全占位结构，iframe/图像在水合阶段注入
 // 默认预览态（无 show-code），水合前显示「渲染中…」占位，避免先闪代码再切换
 function buildPreviewCard(lang, code) {
@@ -108,7 +120,7 @@ function buildPreviewCard(lang, code) {
         + '</div>'
         + '<div class="code-preview-body">'
         + '<div class="code-preview-stage"><div class="code-preview-loading">' + escapeHtml(PREVIEW_LOADING_TEXT[lang] || '渲染中…') + '</div></div>'
-        + '<pre class="code-preview-source"><code class="hljs language-' + escapeAttr(lang) + '">' + escapeHtml(code) + '</code></pre>'
+        + '<pre class="code-preview-source"><code class="hljs language-' + escapeAttr(lang) + '">' + highlightPreviewSource(lang, code) + '</code></pre>'
         + '</div>'
         + '</div>';
 }
