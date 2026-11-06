@@ -47,7 +47,7 @@ export function initSidebarToggle(button) {
         button.setAttribute("aria-expanded", String(!sidebarCollapsed));
         var label = sidebarCollapsed ? "展开侧边栏" : "收起侧边栏";
         button.setAttribute("aria-label", label);
-        button.title = label;
+        button.dataset.titlebarTooltip = label;
     }
 
     button.addEventListener("pointerdown", function (event) {

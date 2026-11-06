@@ -86,6 +86,56 @@
             cursor: default;
         }
 
+        /* 标题条按钮悬停提示：按钮下方展示功能名与快捷键键帽，由 titlebar-tooltip.js 定位 */
+        .titlebar-tooltip {
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 8px 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--tooltip-bg);
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1;
+            white-space: nowrap;
+            box-shadow: 0 8px 24px var(--popover-shadow);
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-2px);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+        }
+
+        .titlebar-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .titlebar-tooltip-keys {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .titlebar-tooltip-key {
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            background: var(--subtle-active);
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 11px;
+        }
+
         /* 侧边栏收起后标题条悬浮在页面左上角，插件/频道/自动化/设置页头部下移避让 */
         body.sidebar-collapsed .plugins-header,
         body.sidebar-collapsed .channel-page-header,
@@ -428,15 +478,15 @@
             opacity: 1;
             pointer-events: none;
             white-space: nowrap;
-            padding: 6px 8px;
+            padding: 6px 10px;
             border: 1px solid var(--border);
-            border-radius: 6px;
-            background: #e8e8f0;
-            color: #24242c;
+            border-radius: 8px;
+            background: var(--tooltip-bg);
+            color: var(--text);
             font-size: 12px;
             font-weight: 500;
             line-height: 1;
-            box-shadow: 0 8px 20px var(--panel-shadow);
+            box-shadow: 0 8px 24px var(--popover-shadow);
             transform: translateY(-50%);
         }
 

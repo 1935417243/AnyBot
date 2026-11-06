@@ -43,7 +43,7 @@
      macOS 桌面端该容器本身是窗口拖拽区，按钮作为其 no-drag 子元素保证可点击 -->
 <div id="titlebar-strip">
     <div class="titlebar-group">
-        <button id="sidebar-toggle" type="button" aria-expanded="true" aria-label="收起侧边栏" title="收起侧边栏">
+        <button id="sidebar-toggle" type="button" aria-expanded="true" aria-label="收起侧边栏" data-titlebar-tooltip="收起侧边栏">
             <svg class="sidebar-toggle-icon-collapse" width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
                 <rect x="1.4" y="2" width="12.2" height="11" rx="2.2" stroke="currentColor" stroke-width="1.2"/>
                 <path d="M5.8 2v11" stroke="currentColor" stroke-width="1.2"/>
@@ -55,7 +55,7 @@
                 <path d="M8.6 5.4l1.9 2.1-1.9 2.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </button>
-        <button id="session-search-btn" class="titlebar-btn" type="button" aria-label="搜索会话" title="搜索会话">
+        <button id="session-search-btn" class="titlebar-btn" type="button" aria-label="搜索会话" data-titlebar-tooltip="搜索会话">
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
                 <circle cx="6.6" cy="6.6" r="4.6" stroke="currentColor" stroke-width="1.2"/>
                 <path d="M10 10l3.2 3.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
@@ -63,12 +63,12 @@
         </button>
     </div>
     <div class="titlebar-group">
-        <button id="nav-back-btn" class="titlebar-btn" type="button" aria-label="后退" title="后退" disabled>
+        <button id="nav-back-btn" class="titlebar-btn" type="button" aria-label="后退" data-titlebar-tooltip="后退" disabled>
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
                 <path d="M12.5 7.5h-10M6.5 3.5l-4 4 4 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </button>
-        <button id="nav-forward-btn" class="titlebar-btn" type="button" aria-label="前进" title="前进" disabled>
+        <button id="nav-forward-btn" class="titlebar-btn" type="button" aria-label="前进" data-titlebar-tooltip="前进" disabled>
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
                 <path d="M2.5 7.5h10M8.5 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>

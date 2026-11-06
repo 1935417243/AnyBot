@@ -286,7 +286,7 @@ export function createSessionSearchController(options) {
     // 绑定搜索按钮与全局快捷键
     function bind() {
         if (triggerBtn) {
-            triggerBtn.title = isMac ? '搜索会话（⌘K）' : '搜索会话（Ctrl+K）';
+            triggerBtn.dataset.titlebarShortcut = isMac ? '⌘ K' : 'Ctrl K';
             triggerBtn.addEventListener('click', function () {
                 open();
             });

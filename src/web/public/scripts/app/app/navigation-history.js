@@ -146,16 +146,16 @@ export function createNavigationHistory(options) {
         go(direction);
     }
 
-    // 绑定按钮点击、快捷键，并写入带快捷键的按钮提示
+    // 绑定按钮点击、快捷键，并写入标题条悬停提示中展示的快捷键
     function bind() {
-        var backHint = isMac ? '后退（⌘[）' : '后退（Alt+←）';
-        var forwardHint = isMac ? '前进（⌘]）' : '前进（Alt+→）';
+        var backShortcut = isMac ? '⌘ [' : 'Alt ←';
+        var forwardShortcut = isMac ? '⌘ ]' : 'Alt →';
         if (backBtn) {
-            backBtn.title = backHint;
+            backBtn.dataset.titlebarShortcut = backShortcut;
             backBtn.addEventListener('click', back);
         }
         if (forwardBtn) {
-            forwardBtn.title = forwardHint;
+            forwardBtn.dataset.titlebarShortcut = forwardShortcut;
             forwardBtn.addEventListener('click', forward);
         }
         documentRef.addEventListener('keydown', handleKeydown);
