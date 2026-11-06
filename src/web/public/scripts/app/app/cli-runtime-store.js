@@ -5,6 +5,9 @@
 export function createCliRuntimeStore(options) {
     options = options || {};
     var showError = options.showError || function () {};
+    // 全局 WebUI 事件总线（createWebUiEventBus），用于订阅 cli_runtime_changed
+    var eventBus = options.eventBus || null;
+    var unsubscribeEvents = null;
 
     // provider -> 后端 CliRuntimeStatus { provider, phase, percent, version, sizeBytes, source, message, supported }
     var statuses = {};
@@ -112,17 +115,13 @@ export function createCliRuntimeStore(options) {
         }
     }
 
-    // 订阅 SSE：其他入口触发的下载到达终态时同步刷新
+    // 订阅 SSE：其他入口触发的下载到达终态时同步刷新。
+    // 连接由全局事件总线（web-ui-events.js）统一维护与重连，这里只登记事件处理。
     function bindEvents() {
-        if (!window.EventSource) return;
-        var url = window.withApiToken ? window.withApiToken('/api/events') : '/api/events';
-        var source = new EventSource(url);
-        source.addEventListener('cli_runtime_changed', function () {
+        if (!eventBus || unsubscribeEvents) return;
+        unsubscribeEvents = eventBus.on('cli_runtime_changed', function () {
             refresh();
         });
-        source.onerror = function () {
-            source.close();
-        };
     }
 
     return {

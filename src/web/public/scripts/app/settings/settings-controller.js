@@ -97,9 +97,10 @@ export function createSettingsController(options) {
     let desktopUpdateRefreshTimer = null;
     let sessionModelSelections = {};
     let settingsProviderController = null;
-    /** 模型清单变更事件的 SSE 连接（断线后延迟重连） */
-    let modelConfigEvents = null;
-    let modelConfigEventsReconnectTimer = null;
+    /** 全局 WebUI 事件总线（连接与重连由总线统一维护） */
+    const eventBus = options.eventBus || null;
+    /** 模型清单变更事件的取消订阅函数 */
+    let unsubscribeModelConfigEvents = null;
     let currentThemeSetting = readStoredTheme();
     let currentFontSize = readStoredFontSize();
 
@@ -486,10 +487,8 @@ export function createSettingsController(options) {
 
     // 订阅后端模型清单变更事件（如 CodeBuddy 实时拉取成功）：刷新聊天区模型下拉与设置页模型列表
     function startModelConfigEvents() {
-        if (!window.EventSource || modelConfigEvents) return;
-        var source = new EventSource(window.withApiToken('/api/events'));
-        modelConfigEvents = source;
-        source.addEventListener('model_config_changed', function (e) {
+        if (!eventBus || unsubscribeModelConfigEvents) return;
+        unsubscribeModelConfigEvents = eventBus.on('model_config_changed', function (e) {
             var payload = {};
             try {
                 payload = JSON.parse(e.data || '{}');
@@ -505,15 +504,6 @@ export function createSettingsController(options) {
                 settingsProviderController.refreshModelConfigForProvider(payload.provider);
             }
         });
-        source.onerror = function () {
-            source.close();
-            modelConfigEvents = null;
-            if (modelConfigEventsReconnectTimer) return;
-            modelConfigEventsReconnectTimer = setTimeout(function () {
-                modelConfigEventsReconnectTimer = null;
-                startModelConfigEvents();
-            }, 5000);
-        };
     }
 
     async function fetchModelConfig(providerType) {

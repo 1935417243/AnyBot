@@ -75,7 +75,8 @@ export function createSidebarController(options) {
     var sidebarRefreshIntervalMs = options.sidebarRefreshIntervalMs;
     var currentSessionRefreshIntervalMs = options.currentSessionRefreshIntervalMs;
     var realtimeRefreshDebounceMs = options.realtimeRefreshDebounceMs;
-    var realtimeReconnectMs = options.realtimeReconnectMs;
+    // 全局 WebUI 事件总线（createWebUiEventBus）
+    var eventBus = options.eventBus || null;
     var sessionPageSize = options.sessionPageSize || 40;
 
     var activeProjectId = null;
@@ -92,8 +93,8 @@ export function createSidebarController(options) {
     var isCurrentSessionSyncInFlight = false;
     var sidebarRefreshTimer = null;
     var currentSessionRefreshTimer = null;
-    var realtimeEvents = null;
-    var realtimeReconnectTimer = null;
+    // 当前在事件总线上的订阅（取消订阅函数列表）
+    var realtimeSubscriptions = [];
     var realtimeRefreshTimer = null;
     var isSidebarRefreshInFlight = false;
     var isRealtimeLifecycleBound = false;
@@ -1483,49 +1484,38 @@ export function createSidebarController(options) {
         scheduleRealtimeRefresh();
     }
 
-    function closeRealtimeEvents() {
-        if (realtimeEvents) {
-            realtimeEvents.close();
-            realtimeEvents = null;
+    function handleRealtimeStatus(nextStatus) {
+        if (nextStatus === "open") {
+            stopPollingFallback();
+        } else if (nextStatus === "closed" || nextStatus === "unsupported") {
+            startPollingFallback();
         }
     }
 
-    function scheduleRealtimeReconnect() {
-        if (realtimeReconnectTimer) return;
-        realtimeReconnectTimer = setTimeout(function () {
-            realtimeReconnectTimer = null;
-            startRealtimeEvents();
-        }, realtimeReconnectMs);
-    }
-
+    // 订阅全局 WebUI 事件总线（web-ui-events.js）；连接建立、断线重连与卸载清理由总线统一负责，
+    // 断线期间（status=closed）退回轮询，连接恢复（status=open）后停止轮询
     function startRealtimeEvents() {
-        if (!window.EventSource) {
+        if (!eventBus || !eventBus.isSupported()) {
             startPollingFallback();
             return;
         }
-        if (realtimeEvents) return;
+        if (realtimeSubscriptions.length) return;
 
-        var source = new EventSource(window.withApiToken("/api/events"));
-        realtimeEvents = source;
-
-        source.addEventListener("ready", function () {
-            stopPollingFallback();
-        });
-        source.addEventListener("sessions_changed", handleRealtimeChange);
-        source.addEventListener("projects_changed", handleRealtimeChange);
-        source.addEventListener("history_cleared", handleRealtimeChange);
-        source.onerror = function () {
-            closeRealtimeEvents();
-            startPollingFallback();
-            scheduleRealtimeReconnect();
-        };
+        realtimeSubscriptions = [
+            eventBus.on("sessions_changed", handleRealtimeChange),
+            eventBus.on("projects_changed", handleRealtimeChange),
+            eventBus.on("history_cleared", handleRealtimeChange),
+            eventBus.onStatus(handleRealtimeStatus),
+        ];
+        handleRealtimeStatus(eventBus.getStatus());
     }
 
     function stopRealtimeEvents() {
-        closeRealtimeEvents();
-        if (realtimeReconnectTimer) clearTimeout(realtimeReconnectTimer);
+        realtimeSubscriptions.forEach(function (unsubscribe) {
+            unsubscribe();
+        });
+        realtimeSubscriptions = [];
         if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
-        realtimeReconnectTimer = null;
         realtimeRefreshTimer = null;
         stopPollingFallback();
     }
@@ -1538,10 +1528,8 @@ export function createSidebarController(options) {
             refreshDirectory();
             pollCurrentSessionMessages();
         });
-
-        window.addEventListener("beforeunload", function () {
-            stopRealtimeEvents();
-        });
+        // SSE 连接的卸载清理（pagehide）由事件总线负责；这里不在 beforeunload 中取消订阅，
+        // 以免页面从 bfcache 恢复后侧边栏失去实时更新
     }
 
     async function addLocalProject() {

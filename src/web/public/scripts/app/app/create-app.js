@@ -34,6 +34,7 @@ import { createToastController } from '../ui/toast.js';
 import { createCliRuntimeStore } from './cli-runtime-store.js';
 import { createNavigationHistory } from './navigation-history.js';
 import { createViewRouter } from './view-router.js';
+import { createWebUiEventBus } from './web-ui-events.js';
 
 const SESSION_MESSAGE_PAGE_SIZE = 40;
 const SESSION_LIST_PAGE_SIZE = 40;
@@ -208,8 +209,11 @@ export function createAnyBotApp(dom, deps) {
     // 左上角会话搜索弹窗
     let sessionSearchController = null;
     const toastController = createToastController({ documentRef: documentRef });
+    // 全局 /api/events SSE 事件总线：整页（及同源多标签页）共享一条连接，按事件类型分发给各模块
+    const webUiEvents = createWebUiEventBus({ reconnectMs: REALTIME_RECONNECT_MS });
     // 内置 CLI 组件下载状态共享 store（设置页状态条 / 聊天页提示条 / 发送拦截共用）
     const cliRuntimeStore = createCliRuntimeStore({
+        eventBus: webUiEvents,
         showError: function (msg) {
             toastController.showError(msg);
         },
@@ -359,6 +363,7 @@ export function createAnyBotApp(dom, deps) {
 
     settingsController = createSettingsController({
         addProjectBtn: addProjectBtn,
+        eventBus: webUiEvents,
         createNewChat: function (projectId, chatOptions) {
             return requireSessionController().createNewChat(projectId, chatOptions);
         },
@@ -640,7 +645,7 @@ export function createAnyBotApp(dom, deps) {
         projectList: projectList,
         projectSessionPreviewLimit: PROJECT_SESSION_PREVIEW_LIMIT,
         projectToggle: projectToggle,
-        realtimeReconnectMs: REALTIME_RECONNECT_MS,
+        eventBus: webUiEvents,
         realtimeRefreshDebounceMs: REALTIME_REFRESH_DEBOUNCE_MS,
         setCurrentNewestMessageId: function (value) {
             if (sessionController) sessionController.setCurrentNewestMessageId(value);
@@ -1189,6 +1194,8 @@ export function createAnyBotApp(dom, deps) {
         if (cliRuntimeBar) cliRuntimeBar.render();
         settings.startDesktopUpdateStatusRefresh();
         settings.startModelConfigEvents();
+        // 先登记 cliRuntime / settings 的事件处理，再建立唯一的 SSE 连接
+        webUiEvents.start();
         var initialSessions = sidebar.getSessions();
         if (initialSessions.length > 0) {
             await session.loadSession(initialSessions[0].id);
